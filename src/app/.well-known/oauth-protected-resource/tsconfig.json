@@ -1,0 +1,7 @@
+{
+  "extends": "../../../../tsconfig.json",
+  "include": ["route.ts"],
+  "compilerOptions": {
+    "noEmit": true
+  }
+}

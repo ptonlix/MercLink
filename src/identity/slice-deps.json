@@ -1,0 +1,3 @@
+{
+  "packages": ["@alicloud/captcha20230305", "@alicloud/dypnsapi20170525"]
+}

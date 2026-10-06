@@ -1,0 +1,70 @@
+export const smsMinIntervalMs = 60_000;
+const smsWindowMs = 24 * 60 * 60 * 1000;
+export const smsDailyCap = 10;
+export const smsMaxWrongChecks = 5;
+
+type RegistrationError = "captcha_required" | "sms_rate_limited" | "validation_error";
+
+export type RegistrationDecision =
+  { ok: true } | { ok: false; error: RegistrationError; message: string };
+
+export function captchaParamAccepted(
+  param: string,
+  usedParams: readonly string[],
+): RegistrationDecision {
+  const trimmed = param.trim();
+  if (trimmed.length === 0 || usedParams.includes(trimmed)) {
+    return { ok: false, error: "captcha_required", message: "请完成人机验证。" };
+  }
+  return { ok: true };
+}
+
+export function smsSendAllowed(input: {
+  now: Date;
+  sentAt: readonly Date[];
+}): RegistrationDecision {
+  const now = input.now.getTime();
+  const inWindow = input.sentAt.filter(
+    (sent) => now - sent.getTime() >= 0 && now - sent.getTime() < smsWindowMs,
+  );
+  let latest: number | null = null;
+  for (const sent of inWindow) {
+    const time = sent.getTime();
+    if (latest === null || time > latest) {
+      latest = time;
+    }
+  }
+  if (latest !== null && now - latest < smsMinIntervalMs) {
+    return { ok: false, error: "sms_rate_limited", message: "发送过于频繁，请稍后再试。" };
+  }
+  if (inWindow.length >= smsDailyCap) {
+    return { ok: false, error: "sms_rate_limited", message: "今日发送次数已达上限。" };
+  }
+  return { ok: true };
+}
+
+export function buyerPhoneOutcome(activeBuyerExists: boolean): "login" | "register" {
+  return activeBuyerExists ? "login" : "register";
+}
+
+export function emailCanLogin(): false {
+  return false;
+}
+
+export function recordWrongSmsCheck(currentWrongChecks: number): {
+  wrongChecks: number;
+  invalidated: boolean;
+} {
+  const wrongChecks = currentWrongChecks + 1;
+  return { wrongChecks, invalidated: wrongChecks >= smsMaxWrongChecks };
+}
+
+export function canSetPassword(input: {
+  smsVerified: boolean;
+  invalidated: boolean;
+}): RegistrationDecision {
+  if (input.invalidated || !input.smsVerified) {
+    return { ok: false, error: "captcha_required", message: "请重新完成验证。" };
+  }
+  return { ok: true };
+}

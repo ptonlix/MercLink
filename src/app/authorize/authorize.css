@@ -1,0 +1,95 @@
+.sheet {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 4.5rem 1.5rem 6rem;
+  color: #2f3437;
+  background: #f7f6f3;
+  font-family: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+  line-height: 1.6;
+}
+
+.kicker,
+h1 {
+  font-family: "Iowan Old Style", Palatino, "Songti SC", "Noto Serif SC", serif;
+}
+
+.kicker {
+  margin: 0;
+  letter-spacing: -0.03em;
+}
+
+h1 {
+  margin: 0.2rem 0 0.8rem;
+  font-size: 2.4rem;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.lede,
+.notice,
+.secret {
+  max-width: 36em;
+}
+
+.notice {
+  padding: 0.8rem 0;
+  color: #9f2f2d;
+  background: #fdebec;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin: 1.5rem 0;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+input {
+  border: 1px solid #eaeaea;
+  border-radius: 4px;
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+  background: #fff;
+}
+
+button {
+  width: fit-content;
+  border: 0;
+  border-radius: 4px;
+  padding: 0.7rem 1rem;
+  background: #111;
+  color: #fff;
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid #1f6c9f;
+  outline-offset: 2px;
+}
+
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+li {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  border-bottom: 1px solid #eaeaea;
+  padding: 0.8rem 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto;
+  }
+}
