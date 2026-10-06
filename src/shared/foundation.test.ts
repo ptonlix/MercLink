@@ -106,7 +106,6 @@ describe("domain boundaries", () => {
       ).rejects.toThrow();
     } finally {
       await rm(violation, { force: true });
-      await rm(path.dirname(violation), { recursive: true, force: true });
     }
 
     const passed = await execFileAsync("pnpm", ["run", "boundaries"], { cwd: process.cwd() });

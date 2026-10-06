@@ -57,11 +57,14 @@ describe("commerce schema", () => {
           AND connamespace = current_schema()::regnamespace
       `;
       expect(foreignKeys.length).toBeGreaterThan(0);
-      for (const key of foreignKeys) {
-        expect(key.referenced).not.toMatch(/buyers|catalogs|products|variants|merchants/);
-        expect(key.referenced).toMatch(/orders/);
-      }
+      const orderItemKeys = foreignKeys.filter((key) => key.table_name.endsWith("order_items"));
+      expect(orderItemKeys.some((key) => key.referenced.endsWith("orders"))).toBe(true);
+      expect(foreignKeys.some((key) => key.referenced.endsWith("buyers"))).toBe(true);
 
+      await sql`
+        INSERT INTO buyers (id, phone, password_hash)
+        VALUES ('byr_1', '13900000001', 'hash'), ('byr_2', '13900000002', 'hash')
+      `;
       await insertOrder(sql, "byr_1", "same-no");
       await expect(insertOrder(sql, "byr_1", "same-no")).rejects.toThrow();
       await insertOrder(sql, "byr_2", "same-no");

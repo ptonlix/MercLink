@@ -202,4 +202,3 @@ function cloneGraph(graph: StoredGraph): StoredGraph {
     payment: { ...graph.payment },
   };
 }
-

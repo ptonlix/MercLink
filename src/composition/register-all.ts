@@ -1,0 +1,93 @@
+import type Provider from "oidc-provider";
+import { registerAccessAuthenticator } from "../app-services/access/authenticate";
+import { parseAccountId } from "../app-services/access/grants";
+import { authorizationIssuer, createAccessProvider } from "../app-services/access/provider";
+import { registerCatalog } from "../app-services/catalog/register";
+import { registerCatalogOwnership } from "../app-services/commerce/runtime";
+import { getDatabase, type Sql } from "../db/client";
+import { ensureSuperAdmin } from "../app-services/identity/admin";
+import { findMerchant } from "../app-services/identity/merchants";
+import { appRuntime } from "../app-services/identity/runtime";
+import { loadEnv } from "../shared/env";
+
+let ready = false;
+let expiryTimer: ReturnType<typeof setInterval> | undefined;
+
+export function isCompositionReady(): boolean {
+  return ready;
+}
+
+export function registerSlices(input: { sql: Sql; provider: Provider }): void {
+  registerAccessAuthenticator(input.sql, input.provider);
+  registerCatalog(input.sql);
+  registerCatalogOwnership(async (merchantId) => {
+    const rows = await input.sql<{ id: string }[]>`
+      SELECT id FROM catalogs
+      WHERE merchant_id = ${merchantId} AND deleted_at IS NULL
+    `;
+    return rows.map((row) => row.id);
+  });
+}
+
+export async function registerAll(source: NodeJS.ProcessEnv = process.env): Promise<void> {
+  ready = false;
+  const loaded = loadEnv(source);
+  if (!loaded.ok) {
+    throw new Error(loaded.message.trim());
+  }
+  const runtime = appRuntime();
+  await ensureSuperAdmin(runtime.sql, {
+    phone: loaded.env.ADMIN_PHONE,
+    password: loaded.env.ADMIN_PASSWORD,
+  });
+  const provider = await createAccessProvider({
+    issuer: authorizationIssuer(loaded.env.APP_BASE_URL),
+    cookieSecret: loaded.env.OAUTH_SIGNING_SECRET,
+    sql: runtime.sql,
+    accounts: {
+      isActive: (accountId) => accountIsActive(runtime.sql, accountId),
+    },
+  });
+  registerSlices({ sql: getDatabase(loaded.env.DATABASE_URL).sql, provider });
+  ready = true;
+}
+
+export function scheduleExpiryScan(): void {
+  if (expiryTimer !== undefined) {
+    return;
+  }
+  expiryTimer = setInterval(() => {
+    void import("../jobs/close-expired-orders")
+      .then((job) => job.runOnce())
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "expiry scan failed";
+        process.stderr.write(`${message}\n`);
+      });
+  }, 60_000);
+  expiryTimer.unref();
+}
+
+export async function runCompositionSteps(
+  steps: readonly (() => Promise<void> | void)[],
+): Promise<void> {
+  ready = false;
+  for (const step of steps) {
+    await step();
+  }
+  ready = true;
+}
+
+async function accountIsActive(sql: Sql, accountId: string): Promise<boolean> {
+  const parsed = parseAccountId(accountId);
+  if (parsed === null) {
+    return false;
+  }
+  if (parsed.ownerType === "buyer") {
+    const rows = await sql<{ id: string }[]>`
+      SELECT id FROM buyers WHERE id = ${parsed.ownerId} AND deleted_at IS NULL
+    `;
+    return rows.length > 0;
+  }
+  const merchant = await findMerchant(sql, parsed.ownerId);
+  return merchant !== null && merchant.status === "active" && merchant.deletedAt === null;
+}

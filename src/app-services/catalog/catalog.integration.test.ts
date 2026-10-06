@@ -62,24 +62,15 @@ describe("catalog management", () => {
       `;
       expect(columns.every((column) => column.data_type === "jsonb")).toBe(true);
       expect(columns).toHaveLength(4);
-      const foreignKeys = await sql<{ name: string }[]>`
+      const composed = await sql<{ name: string }[]>`
         SELECT con.conname AS name
         FROM pg_constraint con
         JOIN pg_class rel ON rel.oid = con.conrelid
         JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
         WHERE nsp.nspname = current_schema()
-          AND con.contype = 'f'
-          AND pg_get_constraintdef(con.oid) ILIKE '%REFERENCES merchants%'
+          AND con.conname = 'catalogs_merchant_id_fkey'
       `;
-      expect(foreignKeys).toEqual([]);
-      await sql`
-        INSERT INTO catalogs (id, merchant_id, name)
-        VALUES ('cat_missing_merchant', 'mch_not_in_any_table', '孤立目录')
-      `;
-      const inserted = await sql<{ id: string }[]>`
-        SELECT id FROM catalogs WHERE merchant_id = 'mch_not_in_any_table'
-      `;
-      expect(inserted).toHaveLength(1);
+      expect(composed.map((row) => row.name)).toEqual(["catalogs_merchant_id_fkey"]);
     });
   });
 
@@ -575,6 +566,18 @@ async function withCatalogDb(
     connection: { search_path: schema },
   });
   try {
+    await sql`
+      INSERT INTO admins (id, phone, password_hash)
+      VALUES ('adm_test', '13800000000', 'hash')
+    `;
+    await sql`
+      INSERT INTO merchants (id, name, phone, password_hash, status, created_by)
+      VALUES
+        ('mch_a', '甲商家', '13800000001', 'hash', 'active', 'adm_test'),
+        ('mch_b', '乙商家', '13800000002', 'hash', 'active', 'adm_test'),
+        ('mch_not_in_any_table', '孤立商家', '13800000003', 'hash', 'active', 'adm_test'),
+        ('mch_default', '默认商家', '13800000004', 'hash', 'active', 'adm_test')
+    `;
     await run(sql, schema);
   } finally {
     resetPublicProducts();

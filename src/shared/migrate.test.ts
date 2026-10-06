@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import postgres from "postgres";
@@ -87,9 +87,12 @@ INSERT INTO exec_log (name) VALUES ('010_platform.sql');
       try {
         await sql`SET search_path TO ${sql(schema)}`;
         const rows = await sql<{ filename: string }[]>`SELECT filename FROM schema_migrations`;
-        expect(first).toEqual(["010_platform.sql"]);
+        const expected = (await readdir(directory))
+          .filter((name) => name.endsWith(".sql"))
+          .sort((left, right) => left.localeCompare(right, "en"));
+        expect(first).toEqual(expected);
         expect(second).toEqual([]);
-        expect(rows.map((row) => row.filename)).toEqual(["010_platform.sql"]);
+        expect(rows.map((row) => row.filename).sort()).toEqual(expected);
       } finally {
         await sql.end({ timeout: 5 });
       }

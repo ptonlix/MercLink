@@ -6,9 +6,7 @@ import { loadEnv } from "../../shared/env";
 import { createDrizzleCommerceRepository } from "./drizzle-store";
 import type { CommerceRepository } from "./repository";
 
-type CatalogOwnership = (
-  merchantId: string,
-) => Promise<readonly string[]> | readonly string[];
+type CatalogOwnership = (merchantId: string) => Promise<readonly string[]> | readonly string[];
 
 export type CommerceRuntime = {
   repo: CommerceRepository;

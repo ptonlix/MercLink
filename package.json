@@ -15,6 +15,7 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:acceptance": "vitest run tests/acceptance",
     "boundaries": "depcruise --config .dependency-cruiser.cjs src",
     "knip": "knip",
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run boundaries && pnpm run knip"

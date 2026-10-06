@@ -22,7 +22,10 @@ type RowDb = Pick<Database, "select" | "insert" | "update" | "execute">;
 export function createDrizzleCommerceRepository(db: Database): CommerceRepository {
   return {
     transaction(run) {
-      return db.transaction((tx) => run(createUnit(tx)));
+      return db.transaction(async (tx) => {
+        const client = postgresTransaction(tx);
+        return run(createUnit(tx, client));
+      });
     },
     findById(orderId) {
       return loadById(db, orderId);
@@ -57,9 +60,14 @@ export function createDrizzleCommerceRepository(db: Database): CommerceRepositor
   };
 }
 
-function createUnit(db: RowDb): CommerceUnit {
+function postgresTransaction(tx: object): CommerceUnit["seamTx"] {
+  const session = (tx as { session?: { client?: CommerceUnit["seamTx"] } }).session;
+  return session?.client ?? tx;
+}
+
+function createUnit(db: RowDb, seamTx: CommerceUnit["seamTx"] = db): CommerceUnit {
   return {
-    seamTx: db,
+    seamTx,
     findByClientNo(buyerId, clientOrderNo) {
       return loadByClientNo(db, buyerId, clientOrderNo);
     },
