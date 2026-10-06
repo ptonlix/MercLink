@@ -1,0 +1,64 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: merclink
+          POSTGRES_PASSWORD: merclink
+          POSTGRES_DB: merclink
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U merclink -d merclink"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://merclink:merclink@localhost:5432/merclink
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.1"
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@12.9.1 --activate
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Check
+        run: pnpm run check
+      - name: Audit
+        run: pnpm audit --audit-level=high
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v3

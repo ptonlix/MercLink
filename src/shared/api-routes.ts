@@ -1,0 +1,78 @@
+export const apiAudiences = ["buyer", "merchant"] as const;
+
+export type ApiAudience = (typeof apiAudiences)[number];
+
+export type ApiMethod = "GET" | "POST" | "PATCH" | "DELETE";
+
+export type ApiRoute = {
+  method: ApiMethod;
+  path: string;
+  audiences: readonly ApiAudience[];
+};
+
+const buyer = ["buyer"] as const satisfies readonly ApiAudience[];
+const merchant = ["merchant"] as const satisfies readonly ApiAudience[];
+const buyerAndMerchant = ["buyer", "merchant"] as const satisfies readonly ApiAudience[];
+
+// Sole path list. Skill tests read this file and must not invent a second registry.
+export const apiRoutes = [
+  { method: "GET", path: "/api/v1/products", audiences: buyer },
+  { method: "GET", path: "/api/v1/products/{id}", audiences: buyer },
+  { method: "GET", path: "/api/v1/catalogs/{id}/schema", audiences: buyerAndMerchant },
+  { method: "POST", path: "/api/v1/orders", audiences: buyer },
+  { method: "GET", path: "/api/v1/orders/{id}", audiences: buyer },
+  { method: "GET", path: "/api/v1/catalogs", audiences: merchant },
+  { method: "POST", path: "/api/v1/catalogs", audiences: merchant },
+  { method: "GET", path: "/api/v1/catalogs/{id}/fields", audiences: merchant },
+  { method: "POST", path: "/api/v1/catalogs/{id}/fields", audiences: merchant },
+  { method: "POST", path: "/api/v1/catalogs/{id}/fields/changes", audiences: merchant },
+  { method: "GET", path: "/api/v1/catalogs/{id}/products", audiences: merchant },
+  { method: "POST", path: "/api/v1/catalogs/{id}/products", audiences: merchant },
+  {
+    method: "PATCH",
+    path: "/api/v1/catalogs/{id}/products/{product_id}",
+    audiences: merchant,
+  },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/publish",
+    audiences: merchant,
+  },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/unpublish",
+    audiences: merchant,
+  },
+  {
+    method: "DELETE",
+    path: "/api/v1/catalogs/{id}/products/{product_id}",
+    audiences: merchant,
+  },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/restore",
+    audiences: merchant,
+  },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/options",
+    audiences: merchant,
+  },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/variants",
+    audiences: merchant,
+  },
+  { method: "PATCH", path: "/api/v1/catalogs/{id}/variants/{variant_id}", audiences: merchant },
+  { method: "DELETE", path: "/api/v1/catalogs/{id}/variants/{variant_id}", audiences: merchant },
+  { method: "GET", path: "/api/v1/manage/orders", audiences: merchant },
+  { method: "POST", path: "/api/v1/payments/alipay/notify", audiences: [] },
+  { method: "GET", path: "/.well-known/oauth-protected-resource", audiences: [] },
+] as const satisfies readonly ApiRoute[];
+
+export function routesFor(audience: ApiAudience): readonly ApiRoute[] {
+  return apiRoutes.filter((route) => {
+    const audiences: readonly string[] = route.audiences;
+    return audiences.includes(audience);
+  });
+}

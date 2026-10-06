@@ -1,0 +1,13 @@
+allowBuilds:
+  argon2: true
+  esbuild: true
+  unrs-resolver: true
+
+auditConfig:
+  ignoreGhsas:
+    # GHSA-vfj7-8cjw-p6xm: braces ReDoS, dev-only through eslint-config-next > fast-glob > micromatch. No patched release. Exception expires 2027-01-05; remove the ignore when a fix exists or on that date, whichever comes first.
+    - GHSA-vfj7-8cjw-p6xm
+
+minimumReleaseAgeExclude:
+  - knip@6.40.0
+  - typescript-eslint@8.71.1

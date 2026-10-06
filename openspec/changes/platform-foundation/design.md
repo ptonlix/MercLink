@@ -22,7 +22,7 @@
 ### 技术栈按架构文档锁定
 
 - Node.js 24、Next.js 16 当前稳定版、TypeScript `strict`，并打开 `noUncheckedIndexedAccess`、`noImplicitOverride`、`noFallthroughCasesInSwitch`、`verbatimModuleSyntax`。不打开 `exactOptionalPropertyTypes`。
-- 包管理只用 pnpm 12.9.1。`package.json` 的 `packageManager` 固定为 `pnpm@12.9.1`，由 Corepack 启用。锁文件只有 `pnpm-lock.yaml`。安装用 `pnpm install`，执行脚本用 `pnpm run <script>`，切片内的 Vitest 用 `pnpm exec vitest`。不运行 `npm install`、`npm run`、`npx` 或 `yarn`，不提交 `package-lock.json` 或 `yarn.lock`。Dockerfile 和 CI 同样只走 Corepack 启用的 pnpm。
+- 包管理只用 pnpm 12.9.1。`package.json` 的 `packageManager` 固定为 `pnpm@12.9.1`，由 Corepack 启用。锁文件只有 `pnpm-lock.yaml`。pnpm 12 不再读取 `package.json` 的 `pnpm` 字段；构建脚本批准和发布时间例外写在 `pnpm-workspace.yaml`，不写 `.npmrc`，也不靠一次性的 `--allow-build`。裸 `pnpm install` 必须成功。安装用 `pnpm install`，执行脚本用 `pnpm run <script>`，切片内的 Vitest 用 `pnpm exec vitest`。不运行 `npm install`、`npm run`、`npx` 或 `yarn`，不提交 `package-lock.json` 或 `yarn.lock`。Dockerfile 和 CI 同样只走 Corepack 启用的 pnpm。
 - PostgreSQL 18、Drizzle、Zod、Vitest、ESLint 扁平配置加 `typescript-eslint` 的 `strictTypeChecked`、Prettier、dependency-cruiser、Knip。
 - 领域层禁止 import `app`、`db`、`adapters`。本变更只创建空的 `src/domain` 边界和失败测试，不写业务规则。
 
@@ -32,7 +32,7 @@
 
 本变更独占并创建：
 
-- `package.json`、`pnpm-lock.yaml`、`tsconfig.json`、`next.config.ts`、`eslint.config.mjs`、`prettier.config.mjs`、`vitest.config.ts`、`knip.json`、`.dependency-cruiser.cjs`
+- `package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、`tsconfig.json`、`next.config.ts`、`eslint.config.mjs`、`prettier.config.mjs`、`vitest.config.ts`、`knip.json`、`.dependency-cruiser.cjs`
 - `drizzle.config.ts`、`src/db/client.ts`、`src/db/migrate.ts`、`src/db/migrations/010_platform.sql`
 - `src/shared/**`、`src/ports/**`、`src/app/layout.tsx`、`src/app/globals.css`、`src/app/api/health/route.ts`、`src/instrumentation.ts`
 - `Dockerfile`、`compose.yaml`、`.env.example`、`.github/workflows/ci.yml`
@@ -87,6 +87,7 @@
 - [切片在基础合并前开工] → 任务要求以包含本变更的基线开分支。没有 `package.json` 时不得自建第二份，也不得生成 `package-lock.json` 或 `yarn.lock`。
 - [接缝未接入进程] → 切片单测自己注册替身；集成变更负责生产注册。这是有意的合并边界。
 - [官方 SDK 包名变化] → 适配器切片记录包名，不在本变更猜包名。
+- [GHSA-vfj7-8cjw-p6xm] → `braces` <=3.0.3 的 ReDoS 没有修复版本。路径是 `eslint-config-next` > `@next/eslint-plugin-next` > `fast-glob` > `micromatch` > `braces`，只存在于开发依赖。`pnpm-workspace.yaml` 的 `auditConfig.ignoreGhsas` 记录这一条例外，到期日 2027-01-05。有修复版本或到了该日期，以先到者为准，删除例外。不忽略 moderate 的 esbuild 发现，也不改 `pnpm audit --audit-level=high`。
 
 ## Migration Plan
 

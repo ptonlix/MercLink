@@ -1,0 +1,46 @@
+{
+  "name": "merclink",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@12.9.1",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "format": "prettier --write --ignore-unknown \"src/**/*.{ts,tsx,css}\" package.json tsconfig.json knip.json next.config.ts drizzle.config.ts vitest.config.ts eslint.config.mjs prettier.config.mjs .dependency-cruiser.cjs pnpm-workspace.yaml compose.yaml .github/workflows/ci.yml",
+    "format:check": "prettier --check --ignore-unknown \"src/**/*.{ts,tsx,css}\" package.json tsconfig.json knip.json next.config.ts drizzle.config.ts vitest.config.ts eslint.config.mjs prettier.config.mjs .dependency-cruiser.cjs pnpm-workspace.yaml compose.yaml .github/workflows/ci.yml",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "boundaries": "depcruise --config .dependency-cruiser.cjs src",
+    "knip": "knip",
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run boundaries && pnpm run knip"
+  },
+  "dependencies": {
+    "argon2": "0.45.1",
+    "drizzle-orm": "0.45.3",
+    "next": "16.3.8",
+    "oidc-provider": "9.12.2",
+    "postgres": "3.4.9",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "dependency-cruiser": "18.5.0",
+    "drizzle-kit": "0.31.11",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.8",
+    "knip": "6.40.0",
+    "prettier": "3.9.9",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.1",
+    "vitest": "5.0.3"
+  }
+}

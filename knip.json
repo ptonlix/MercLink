@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreDependencies": ["argon2", "oidc-provider"],
+  "ignoreIssues": {
+    "src/db/client.ts": ["exports", "types"],
+    "src/ports/**": ["exports", "types"],
+    "src/shared/actor.ts": ["exports", "types"],
+    "src/shared/api-routes.ts": ["exports", "types"],
+    "src/shared/env.ts": ["exports", "types"],
+    "src/shared/errors.ts": ["exports", "types"],
+    "src/shared/id.ts": ["exports", "types"],
+    "src/shared/log.ts": ["exports", "types"],
+    "src/shared/seams/**": ["exports", "types"]
+  }
+}

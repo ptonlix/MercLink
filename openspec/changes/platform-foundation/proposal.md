@@ -26,6 +26,6 @@ MercLink v1 还没有可运行的应用。后续四个业务切片要由不同 S
 
 ## Impact
 
-- 新增根配置、`pnpm-lock.yaml`、`src/shared`、`src/ports`、`src/db` 客户端和 `010_platform.sql`。这些路径只由本变更写入。
-- 业务切片只能追加自己的目录和 `src/db/migrations/0xx_*.sql`，不能修改本变更拥有的根配置，也不能改写锁文件或另生成 `package-lock.json`。
+- 新增根配置、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、`src/shared`、`src/ports`、`src/db` 客户端和 `010_platform.sql`。这些路径只由本变更写入。`pnpm-workspace.yaml` 只放 pnpm 12 的构建脚本批准和必要的发布时间例外，后续切片不得修改。
+- 业务切片只能追加自己的目录和 `src/db/migrations/0xx_*.sql`，不能修改本变更拥有的根配置，也不能改写锁文件、`pnpm-workspace.yaml` 或另生成 `package-lock.json`。
 - 外部依赖按 `docs/ARCHITECTURE.md` 选定；不引入 Redis、队列或第二个进程。安装用 `pnpm install`，执行脚本用 `pnpm run <script>`。
