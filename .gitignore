@@ -1,5 +1,7 @@
-# 依赖与包管理器
+# 依赖与包管理器。只提交 pnpm-lock.yaml。
 node_modules/
+package-lock.json
+yarn.lock
 .pnp
 .pnp.js
 .yarn/cache

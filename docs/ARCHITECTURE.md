@@ -1,6 +1,6 @@
 # MercLink 技术架构
 
-状态：v1  
+状态：v1.1  
 对应需求：`docs/PRD.md` v1.10  
 日期：2026-05-16
 
@@ -51,6 +51,7 @@ Agent 不直连数据库，也不直连支付宝或阿里云。它只调用 Merc
 | --- | --- | --- |
 | 语言 | TypeScript | 页面、API、领域类型可以共享。商品字段和订单快照都是结构化 JSON |
 | 运行时 | Node.js 24 LTS，当前小版本 24.18.1 | 24 是现在的 Active LTS。26.10.0 更新，但还不是 LTS，不用于生产 |
+| 包管理 | pnpm 12，当前稳定版 12.9.1 | 只用这一套安装依赖。不使用 npm 或 Yarn，也不提交 `package-lock.json`、`yarn.lock` |
 | 应用框架 | Next.js 16，当前稳定版 16.3.8 | 总落地页、商品页、授权页、超管页和 API 放在一个应用里。使用最新稳定版，不用 canary |
 | 领域代码 | `src/domain` 纯 TypeScript | 不依赖 Next.js。规则可以用单元测试直接跑 |
 | 数据库 | PostgreSQL 18，当前小版本 18.6 | 18 是现在最新的正式大版本。19 仍是 Beta，不用于生产。小版本跟到当前 18.x |
@@ -63,11 +64,13 @@ Agent 不直连数据库，也不直连支付宝或阿里云。它只调用 Merc
 | 单元测试 | Vitest | 与 Vite、TypeScript 同一套转换。领域规则不启动 Next.js |
 | 架构约束 | dependency-cruiser | 防止领域层引用页面、数据库和厂商 SDK |
 | 无用代码 | Knip | 找出未使用的文件、导出和依赖 |
-| 安全扫描 | GitHub CodeQL、Dependabot、Gitleaks、`npm audit` | 分别覆盖代码漏洞、依赖漏洞和密钥泄漏。不叠多套同类扫描 |
+| 安全扫描 | GitHub CodeQL、Dependabot、Gitleaks、`pnpm audit` | 分别覆盖代码漏洞、依赖漏洞和密钥泄漏。不叠多套同类扫描 |
 | 定时任务 | 进程内每分钟扫描 | 只用于关闭超时未支付订单。不引入队列 |
 | 部署 | 一个容器 + 托管 PostgreSQL | 设计伙伴阶段没有第二套基础设施的必要 |
 
 不引入 Redis、Kafka、Elasticsearch、Neo4j、微服务和独立 MCP 进程。短信频率限制和设备码都放在 PostgreSQL。以后接口变成瓶颈，再把限流移到 Redis，不改变领域模型。
+
+依赖只通过 pnpm 管理。`package.json` 的 `packageManager` 固定为 `pnpm@12.9.1`，用 Corepack 启用这个版本。锁文件只有 `pnpm-lock.yaml`。安装用 `pnpm install`，执行脚本用 `pnpm run <script>`。不运行 `npm install` 或 `yarn`，避免生成另一套锁文件。
 
 ---
 
@@ -266,7 +269,7 @@ Skill 路径测试仍然保留。
 | 检查 | 时机 | 失败条件 |
 | --- | --- | --- |
 | Gitleaks | 每次提交和合并 | 发现密钥、私钥、访问令牌 |
-| `npm audit --audit-level=high` | 每次合并 | 生产依赖有高危或严重漏洞 |
+| `pnpm audit --audit-level=high` | 每次合并 | 生产依赖有高危或严重漏洞 |
 | Dependabot | 持续 | 依赖和 GitHub Actions 有可用更新 |
 | CodeQL | 每次合并 | 新增高危代码扫描结果 |
 
@@ -275,16 +278,16 @@ Skill 路径测试仍然保留。
 ### 10.5 命令
 
 ```text
-npm run format:check
-npm run lint
-npm run typecheck
-npm run test
-npm run boundaries
-npm run knip
-npm audit --audit-level=high
+pnpm run format:check
+pnpm run lint
+pnpm run typecheck
+pnpm run test
+pnpm run boundaries
+pnpm run knip
+pnpm audit --audit-level=high
 ```
 
-`npm run check` 依次执行除审计以外的本地检查。审计和 CodeQL 放在合并流水线。任一失败都不能合并。
+`pnpm run check` 依次执行除审计以外的本地检查。审计和 CodeQL 放在合并流水线。任一失败都不能合并。
 
 ---
 
