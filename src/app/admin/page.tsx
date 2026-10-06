@@ -1,0 +1,55 @@
+import type { ReactNode } from "react";
+import { ensureSuperAdmin, findAdmin } from "../../app-services/identity/admin";
+import { appRuntime } from "../../app-services/identity/runtime";
+import { readSession, adminCookie } from "../../app-services/identity/session";
+import { AdminView } from "../authorize/views";
+import "./admin.css";
+
+export const dynamic = "force-dynamic";
+export const metadata = { robots: { index: false, follow: false }, title: "管理" };
+
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ notice?: string }>;
+}): Promise<ReactNode> {
+  const params = await searchParams;
+  const runtime = appRuntime();
+  await ensureSuperAdmin(runtime.sql, {
+    phone: runtime.env.ADMIN_PHONE,
+    password: runtime.env.ADMIN_PASSWORD,
+  });
+  const header = await headerCookie();
+  const session =
+    header === undefined
+      ? null
+      : readSession(header, runtime.env.OAUTH_SIGNING_SECRET, runtime.clock.now());
+  const admin = session?.kind === "admin" ? await findAdmin(runtime.sql) : null;
+  if (admin === null || session === null || session.kind !== "admin") {
+    return (
+      <main className="sheet">
+        <h1>超级管理员</h1>
+        {params.notice === undefined ? null : <p className="notice">{params.notice}</p>}
+        <form action="/admin/submit" method="post" className="stack">
+          <input type="hidden" name="intent" value="login" />
+          <label>
+            手机号
+            <input name="phone" autoComplete="username" required />
+          </label>
+          <label>
+            密码
+            <input name="password" type="password" autoComplete="current-password" required />
+          </label>
+          <button type="submit">登录</button>
+        </form>
+      </main>
+    );
+  }
+  return <AdminView notice={params.notice ?? null} mustChangePassword={admin.mustChangePassword} />;
+}
+
+async function headerCookie(): Promise<string | undefined> {
+  const { cookies } = await import("next/headers");
+  const jar = await cookies();
+  return jar.get(adminCookie)?.value;
+}
