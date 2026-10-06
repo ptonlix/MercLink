@@ -59,7 +59,7 @@
 
 ### 验收命令
 
-`npx vitest run src/domain/commerce src/app-services/commerce`
+`pnpm exec vitest run src/domain/commerce src/app-services/commerce`
 
 覆盖下单扣库存、重复业务单号、超时回补、验签失败、重复通知。外部支付宝使用端口假实现。领域覆盖率不低于 90%。
 

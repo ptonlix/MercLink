@@ -23,4 +23,4 @@
 
 ## 4. 切片验收
 
-- [ ] 4.1 运行 `npx vitest run src/domain/identity src/domain/access src/app-services/identity src/app-services/access`，并验证领域覆盖率不低于 90% 且未修改平台根配置
+- [ ] 4.1 运行 `pnpm exec vitest run src/domain/identity src/domain/access src/app-services/identity src/app-services/access`，并验证领域覆盖率不低于 90% 且未修改平台根配置

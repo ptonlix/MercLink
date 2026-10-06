@@ -24,7 +24,7 @@
 并行切片禁止修改的文件，本变更在合并后可以改：
 
 - `src/instrumentation.ts`：启动时调用 `src/composition/register-all.ts`，并每分钟调用 `runOnce`。
-- `package.json`：只合并各 `slice-deps.json` 中的官方 SDK，并加入 `test:acceptance`。
+- `package.json` 和 `pnpm-lock.yaml`：只合并各 `slice-deps.json` 中的官方 SDK，并加入 `test:acceptance`。用 `pnpm install` 更新锁文件。不生成 `package-lock.json` 或 `yarn.lock`。
 - `050_foreign_keys.sql`：补 `catalogs.merchant_id`、`orders.buyer_id`、`order_items` 到目录、商品、规格的外键。
 - `tests/acceptance/**`
 

@@ -15,4 +15,4 @@
 
 ## 3. 切片验收
 
-- [ ] 3.1 运行 `npx vitest run src/public-discovery src/agent-docs`，并验证未修改 `next.config.ts` 和业务 API 实现
+- [ ] 3.1 运行 `pnpm exec vitest run src/public-discovery src/agent-docs`，并验证未修改 `next.config.ts` 和业务 API 实现

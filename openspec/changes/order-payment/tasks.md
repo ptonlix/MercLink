@@ -16,4 +16,4 @@
 
 ## 3. 切片验收
 
-- [ ] 3.1 运行 `npx vitest run src/domain/commerce src/app-services/commerce`，并验证领域覆盖率不低于 90%，假接缝足以完成本地验收且未 import 目录内部模块
+- [ ] 3.1 运行 `pnpm exec vitest run src/domain/commerce src/app-services/commerce`，并验证领域覆盖率不低于 90%，假接缝足以完成本地验收且未 import 目录内部模块

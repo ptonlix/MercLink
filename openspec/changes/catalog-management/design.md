@@ -62,7 +62,7 @@
 
 ### 验收命令
 
-`npx vitest run src/domain/catalog src/app-services/catalog`
+`pnpm exec vitest run src/domain/catalog src/app-services/catalog`
 
 领域覆盖率不低于 90%。库存锁测试使用真实测试事务和 `SELECT FOR UPDATE`，不用内存锁冒充。
 

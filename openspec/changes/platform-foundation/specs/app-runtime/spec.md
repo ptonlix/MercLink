@@ -6,6 +6,13 @@
 
 ## ADDED Requirements
 
+### Requirement: Dependencies are installed only with pnpm
+The application MUST declare `packageManager` as `pnpm@12.9.1` and MUST keep `pnpm-lock.yaml` as its only lockfile. It MUST NOT commit `package-lock.json` or `yarn.lock`. Install and script commands MUST use pnpm, not npm or Yarn.
+
+#### Scenario: The baseline is installed
+- **WHEN** dependencies for this change are installed
+- **THEN** the only lockfile written is `pnpm-lock.yaml`, and `package-lock.json` and `yarn.lock` are absent
+
 ### Requirement: Missing configuration prevents startup
 The process MUST refuse to listen when any required setting is missing or empty: database URL, initial super-admin phone, initial super-admin password, authorization signing secret, captcha credentials, SMS credentials, Alipay application credentials, Alipay public key, payment notification URL, and public base URL. It MUST NOT fall back to a secret stored in source code.
 

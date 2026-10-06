@@ -24,5 +24,5 @@
 ## Impact
 
 - 只在五个切片合并后由主 Agent 实施。
-- 允许修改 `src/instrumentation.ts`、新增 `src/composition`、`050_foreign_keys.sql` 和 `tests/acceptance`。
+- 允许修改 `src/instrumentation.ts`、`package.json` 和 `pnpm-lock.yaml`，新增 `src/composition`、`050_foreign_keys.sql` 和 `tests/acceptance`。合并官方 SDK 时只用 `pnpm install`，不生成 `package-lock.json` 或 `yarn.lock`。
 - 并行 Subagent 不得领取本变更。

@@ -22,4 +22,4 @@
 
 ## 4. 切片验收
 
-- [ ] 4.1 运行 `npx vitest run src/domain/catalog src/app-services/catalog`，并验证领域覆盖率不低于 90%、库存锁测试使用数据库事务，且未修改平台根配置
+- [ ] 4.1 运行 `pnpm exec vitest run src/domain/catalog src/app-services/catalog`，并验证领域覆盖率不低于 90%、库存锁测试使用数据库事务，且未修改平台根配置

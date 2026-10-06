@@ -3,7 +3,7 @@
 ## 1. 合并前检查
 
 - [ ] 1.1 确认身份、目录、交易、公开页面和平台独占目录都已存在，并验证缺失任一目录时停止且不补写业务实现
-- [ ] 1.2 检查五个切片没有并行修改同一根配置，并验证 `git diff` 中 `package.json` 的业务依赖只来自各 `slice-deps.json`
+- [ ] 1.2 检查五个切片没有并行修改同一根配置，并验证 `git diff` 中 `package.json` 的业务依赖只来自各 `slice-deps.json`，且没有新增 `package-lock.json` 或 `yarn.lock`
 
 ## 2. 组合
 
@@ -14,4 +14,4 @@
 ## 3. 最终验收
 
 - [ ] 3.1 用测试数据库和端口假实现运行 `tests/acceptance`，并验证 PRD 第 12 节的 14 条跨模块场景通过
-- [ ] 3.2 运行 `npm run check` 和 `npm run test:acceptance`，并验证领域覆盖率仍不低于 90% 且没有新增 PRD 之外的功能
+- [ ] 3.2 运行 `pnpm run check` 和 `pnpm run test:acceptance`，并验证领域覆盖率仍不低于 90% 且没有新增 PRD 之外的功能

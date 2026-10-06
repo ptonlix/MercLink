@@ -45,7 +45,7 @@
 
 ### 验收命令
 
-`npx vitest run src/public-discovery src/agent-docs`
+`pnpm exec vitest run src/public-discovery src/agent-docs`
 
 页面测试用注册进接缝的固定商品，不断言目录模块存在。
 

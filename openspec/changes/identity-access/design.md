@@ -66,7 +66,7 @@ Scope 决定页面：
 
 ### 验收命令
 
-`npx vitest run src/domain/identity src/domain/access src/app-services/identity src/app-services/access`
+`pnpm exec vitest run src/domain/identity src/domain/access src/app-services/identity src/app-services/access`
 
 领域覆盖率不低于 90%。不启动 Next.js 也能跑这些测试；路由测试用平台接缝的假 Actor。
 
