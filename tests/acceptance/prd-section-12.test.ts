@@ -17,7 +17,11 @@ import { GET as publicProductsRoute } from "../../src/app/api/v1/products/route"
 import { MerchantAuthorizeView } from "../../src/app/authorize/views";
 import { registerSlices } from "../../src/composition/register-all";
 import { approveAgent, revokeGrant } from "../../src/app-services/access/grants";
-import { agentClientId, agentRedirectUri, startAuthorizationServer } from "../../src/app-services/access/provider";
+import {
+  agentClientId,
+  agentRedirectUri,
+  startAuthorizationServer,
+} from "../../src/app-services/access/provider";
 import { bindCatalogSql } from "../../src/app-services/catalog/http";
 import { registerCatalog } from "../../src/app-services/catalog/register";
 import { createCatalog, listCatalogs } from "../../src/app-services/catalog/catalogs";
@@ -41,6 +45,8 @@ import {
   type CommerceRuntime,
 } from "../../src/app-services/commerce/runtime";
 import { changeAdminPassword, ensureSuperAdmin } from "../../src/app-services/identity/admin";
+import { createMemoryRateLimit } from "../../src/adapters/redis/memory";
+import { smsRateLimitPolicies } from "../../src/domain/identity/registration";
 import { requestBuyerSms } from "../../src/app-services/identity/buyers";
 import { fakeCaptcha, fakeSms } from "../../src/app-services/identity/fakes";
 import { provisionMerchant } from "../../src/app-services/identity/merchants";
@@ -208,9 +214,9 @@ describe("PRD section 12", () => {
         return;
       }
       await sql`UPDATE variants SET status = 'off' WHERE id = ${defaultVariant.id}`;
-      expect(
-        await publishProduct(sql, first.merchantId, shoes.id, product.value.id),
-      ).toMatchObject({ ok: true });
+      expect(await publishProduct(sql, first.merchantId, shoes.id, product.value.id)).toMatchObject(
+        { ok: true },
+      );
 
       const preview = await changeFields(sql, first.merchantId, shoes.id, {
         op: "make_required",
@@ -428,7 +434,13 @@ describe("PRD section 12", () => {
         const captcha = fakeCaptcha(() => false);
         const sms = fakeSms();
         const blocked = await requestBuyerSms(
-          { sql, clock: systemClock, captcha, sms },
+          {
+            sql,
+            clock: systemClock,
+            captcha,
+            sms,
+            rateLimit: createMemoryRateLimit(smsRateLimitPolicies()),
+          },
           { phone: "13900000009", captchaVerifyParam: "bad-captcha" },
         );
         expect(blocked).toMatchObject({ ok: false, error: "captcha_required" });
@@ -463,7 +475,9 @@ describe("PRD section 12", () => {
       await expect(sql.begin(async (tx) => tx.unsafe(body).simple())).rejects.toThrow(
         /orphan catalogs: cat_orphan/,
       );
-      const remaining = await sql<{ id: string }[]>`SELECT id FROM catalogs WHERE id = 'cat_orphan'`;
+      const remaining = await sql<
+        { id: string }[]
+      >`SELECT id FROM catalogs WHERE id = 'cat_orphan'`;
       expect(remaining).toHaveLength(1);
       await sql.end({ timeout: 5 });
     } finally {
@@ -580,7 +594,8 @@ async function issueTokens(
 ): Promise<{ access_token: string; refresh_token: string; grantId: string }> {
   const verifier = randomBytes(32).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
-  const scope = ownerType === "merchant" ? "product:write product:read order:read" : "order:write order:read";
+  const scope =
+    ownerType === "merchant" ? "product:write product:read order:read" : "order:write order:read";
   const redirect = encodeURIComponent(agentRedirectUri);
   const auth = await fetch(
     `${started.origin}/oauth/auth?client_id=${agentClientId}&response_type=code&redirect_uri=${redirect}&scope=${encodeURIComponent(scope)}&code_challenge=${challenge}&code_challenge_method=S256&state=xyz`,
@@ -602,7 +617,9 @@ async function issueTokens(
     redirect: "manual",
     headers: { cookie: cookieHeader },
   });
-  const code = new URL(resumed.headers.get("location") ?? agentRedirectUri).searchParams.get("code");
+  const code = new URL(resumed.headers.get("location") ?? agentRedirectUri).searchParams.get(
+    "code",
+  );
   const tokenResponse = await fetch(`${started.origin}/oauth/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },

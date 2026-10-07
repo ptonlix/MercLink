@@ -93,12 +93,6 @@ export const oauthGrants = pgTable("oauth_grants", {
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
 });
 
-export const smsSends = pgTable("sms_sends", {
-  id: text("id").primaryKey(),
-  phone: text("phone").notNull(),
-  sentAt: timestamp("sent_at", { withTimezone: true }).notNull(),
-});
-
 export const usedCaptchaParams = pgTable("used_captcha_params", {
   captchaHash: text("captcha_hash").primaryKey(),
   usedAt: timestamp("used_at", { withTimezone: true }).notNull().defaultNow(),

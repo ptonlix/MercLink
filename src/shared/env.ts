@@ -4,6 +4,7 @@ const nonEmpty = z.string().trim().min(1);
 
 export const envSchema = z.object({
   DATABASE_URL: nonEmpty,
+  REDIS_URL: nonEmpty,
   ADMIN_PHONE: nonEmpty,
   ADMIN_PASSWORD: nonEmpty,
   OAUTH_SIGNING_SECRET: nonEmpty,
@@ -24,6 +25,7 @@ export const envSchema = z.object({
 
 export const requiredEnvKeys = [
   "DATABASE_URL",
+  "REDIS_URL",
   "ADMIN_PHONE",
   "ADMIN_PASSWORD",
   "OAUTH_SIGNING_SECRET",
@@ -90,13 +92,18 @@ export function loadEnv(source: Readonly<Record<string, string | undefined>>): L
 
 export function secretValues(env: AppEnv): readonly string[] {
   const values: string[] = Object.values(env);
+  pushUrlPassword(values, env.DATABASE_URL);
+  pushUrlPassword(values, env.REDIS_URL);
+  return values.filter((value) => value.length > 0);
+}
+
+function pushUrlPassword(values: string[], url: string): void {
   try {
-    const password = new URL(env.DATABASE_URL).password;
+    const password = new URL(url).password;
     if (password !== "") {
       values.push(decodeURIComponent(password));
     }
   } catch {
-    // The full DATABASE_URL is already included.
+    // The full URL is already included.
   }
-  return values.filter((value) => value.length > 0);
 }

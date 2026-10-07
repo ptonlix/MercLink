@@ -1,7 +1,11 @@
 export const smsMinIntervalMs = 60_000;
-const smsWindowMs = 24 * 60 * 60 * 1000;
+export const smsWindowMs = 24 * 60 * 60 * 1000;
 export const smsDailyCap = 10;
 export const smsMaxWrongChecks = 5;
+export const smsSendPolicyNames = {
+  interval: "sms-send:60s",
+  daily: "sms-send:24h",
+} as const;
 
 type RegistrationError = "captcha_required" | "sms_rate_limited" | "validation_error";
 
@@ -17,6 +21,27 @@ export function captchaParamAccepted(
     return { ok: false, error: "captcha_required", message: "请完成人机验证。" };
   }
   return { ok: true };
+}
+
+export function smsRateLimitPolicies(): {
+  readonly [smsSendPolicyNames.interval]: { limit: number; windowMs: number };
+  readonly [smsSendPolicyNames.daily]: { limit: number; windowMs: number };
+} {
+  return {
+    [smsSendPolicyNames.interval]: { limit: 1, windowMs: smsMinIntervalMs },
+    [smsSendPolicyNames.daily]: { limit: smsDailyCap, windowMs: smsWindowMs },
+  };
+}
+
+export function smsSendLimited(reason: "interval" | "daily"): {
+  ok: false;
+  error: "sms_rate_limited";
+  message: string;
+} {
+  if (reason === "interval") {
+    return { ok: false, error: "sms_rate_limited", message: "发送过于频繁，请稍后再试。" };
+  }
+  return { ok: false, error: "sms_rate_limited", message: "今日发送次数已达上限。" };
 }
 
 export function smsSendAllowed(input: {
@@ -35,10 +60,10 @@ export function smsSendAllowed(input: {
     }
   }
   if (latest !== null && now - latest < smsMinIntervalMs) {
-    return { ok: false, error: "sms_rate_limited", message: "发送过于频繁，请稍后再试。" };
+    return smsSendLimited("interval");
   }
   if (inWindow.length >= smsDailyCap) {
-    return { ok: false, error: "sms_rate_limited", message: "今日发送次数已达上限。" };
+    return smsSendLimited("daily");
   }
   return { ok: true };
 }

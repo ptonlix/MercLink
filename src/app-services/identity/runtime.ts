@@ -1,8 +1,11 @@
 import { createAliyunCaptcha } from "../../adapters/aliyun-captcha/adapter";
 import { createAliyunSms } from "../../adapters/aliyun-sms/adapter";
+import { createRedisRateLimit } from "../../adapters/redis/limiter";
 import { getDatabase, type Sql } from "../../db/client";
+import { smsRateLimitPolicies } from "../../domain/identity/registration";
 import { systemClock, type Clock } from "../../ports/clock";
 import type { CaptchaPort } from "../../ports/captcha";
+import type { RateLimitPort } from "../../ports/rate-limit";
 import type { SmsPort } from "../../ports/sms";
 import { loadEnv, type AppEnv } from "../../shared/env";
 
@@ -12,6 +15,7 @@ export type AppRuntime = {
   clock: Clock;
   captcha: CaptchaPort;
   sms: SmsPort;
+  rateLimit: RateLimitPort;
 };
 
 export function appRuntime(): AppRuntime {
@@ -33,6 +37,10 @@ export function appRuntime(): AppRuntime {
       accessKeySecret: loaded.env.ALIYUN_SMS_ACCESS_KEY_SECRET,
       signName: loaded.env.ALIYUN_SMS_SIGN_NAME,
       templateCode: loaded.env.ALIYUN_SMS_TEMPLATE_CODE,
+    }),
+    rateLimit: createRedisRateLimit({
+      url: loaded.env.REDIS_URL,
+      policies: smsRateLimitPolicies(),
     }),
   };
 }
