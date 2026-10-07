@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { BuyerCaptcha } from "./buyer-captcha";
 
 export function MerchantAuthorizeView(props: {
   notice: string | null;
@@ -46,6 +47,8 @@ export function MerchantAuthorizeView(props: {
 export function BuyerAuthorizeView(props: {
   notice: string | null;
   mode: "login" | "register";
+  captchaPrefix: string;
+  captchaSceneId: string;
 }): ReactNode {
   return (
     <main className="sheet">
@@ -59,11 +62,11 @@ export function BuyerAuthorizeView(props: {
           手机号
           <input name="phone" inputMode="numeric" autoComplete="username" required />
         </label>
-        <label>
-          人机验证参数
-          <input name="captchaVerifyParam" required />
-        </label>
-        <button type="submit">发送验证码</button>
+        <BuyerCaptcha prefix={props.captchaPrefix} sceneId={props.captchaSceneId} />
+        <p className="hint">完成图形人机验证后再发送短信。验证参数由验证码组件回填，不要手改。</p>
+        <button id="captcha-send" type="submit" disabled>
+          发送验证码
+        </button>
       </form>
       <form action="/authorize/buyer/submit" method="post" className="stack">
         <input type="hidden" name="intent" value="check" />
