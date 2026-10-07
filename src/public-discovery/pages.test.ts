@@ -135,6 +135,27 @@ describe("public pages", () => {
     await expectNoindexNotFound(ProductPage({ params: Promise.resolve({ id: "prd_hidden" }) }));
   });
 
+  it("renders an http cover as an image and omits img when the cover is empty", async () => {
+    const product = publishedProduct();
+    registerProducts([product]);
+    const html = renderToStaticMarkup(
+      await ProductPage({ params: Promise.resolve({ id: product.id }) }),
+    );
+    const visible = visibleHtml(html);
+    expect(visible).toContain(`<img src="${product.cover}" alt="${product.title}"/>`);
+    const block = jsonLdBlocks(html)[0];
+    expect(isRecord(block) ? block.image : undefined).toBe(product.cover);
+
+    const empty = publishedProduct();
+    empty.id = "prd_empty_cover";
+    empty.cover = null;
+    registerProducts([empty]);
+    const emptyHtml = renderToStaticMarkup(
+      await ProductPage({ params: Promise.resolve({ id: empty.id }) }),
+    );
+    expect(emptyHtml).not.toContain("<img");
+  });
+
   it("renders an empty success page when the seam is unregistered", async () => {
     resetPublicProducts();
 

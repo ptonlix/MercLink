@@ -104,6 +104,8 @@ describe("merchant skill", () => {
       expect(body).toContain("买家令牌不能调用商家写接口");
       expect(body).toContain("`paid`");
       expect(body).toContain("`forbidden`");
+      expect(body).toContain("/api/v1/catalogs/{id}/images");
+      expect(body).toContain("先上传图片");
       expect(body).not.toContain(sentinel);
       expect(body).not.toContain("prd_private");
       expect(body).not.toMatch(/Bearer\s+[A-Za-z0-9\-._]{12,}/);

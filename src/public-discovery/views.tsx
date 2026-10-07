@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-html-link-for-pages -- Public pages must navigate without the Next client runtime. */
+/* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element -- Public pages must navigate and show remote covers without the Next client runtime. */
 import type { ReactNode } from "react";
 import type { PublicProduct, PublicVariant } from "../shared/seams/public-products";
 import {
@@ -179,7 +179,7 @@ function Cover({ cover, title }: { cover: string | null; title: string }): React
   if (!isHttpUrl(cover)) {
     return cover;
   }
-  return <a href={cover}>{title}</a>;
+  return <img src={cover} alt={title} />;
 }
 
 function FieldList({ fields }: { fields: PublicProduct["fields"] }): ReactNode {

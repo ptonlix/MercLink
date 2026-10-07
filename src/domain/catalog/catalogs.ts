@@ -1,4 +1,5 @@
 import { minorUnits, type MinorUnits } from "../../shared/money";
+import { isAbsoluteHttpUrl } from "./images";
 import { catalogFail, catalogOk, type CatalogResult } from "./result";
 
 export const defaultCatalogName = "默认目录";
@@ -54,10 +55,14 @@ export function parseCover(value: unknown): CatalogResult<string | null> {
   if (value === undefined || value === null) {
     return catalogOk(null);
   }
-  if (typeof value !== "string" || value.trim().length === 0 || value.length > 2000) {
+  if (typeof value !== "string") {
     return catalogFail("validation_error", "封面必须是图片 URL。");
   }
-  return catalogOk(value.trim());
+  const cover = value.trim();
+  if (cover.length === 0 || cover.length > 2000 || !isAbsoluteHttpUrl(cover)) {
+    return catalogFail("validation_error", "封面必须是图片 URL。");
+  }
+  return catalogOk(cover);
 }
 
 export function parseSku(value: unknown): CatalogResult<string | null> {

@@ -13,6 +13,7 @@ const expectedTables = [
   "products",
   "product_options",
   "variants",
+  "product_images",
 ] as const;
 
 export function registerCatalog(sql: Sql): void {

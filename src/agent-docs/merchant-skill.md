@@ -27,6 +27,7 @@ POST /api/v1/catalogs/{id}/fields
 POST /api/v1/catalogs/{id}/fields/changes
 GET /api/v1/catalogs/{id}/products
 POST /api/v1/catalogs/{id}/products
+POST /api/v1/catalogs/{id}/images
 PATCH /api/v1/catalogs/{id}/products/{product_id}
 POST /api/v1/catalogs/{id}/products/{product_id}/publish
 POST /api/v1/catalogs/{id}/products/{product_id}/unpublish
@@ -76,6 +77,8 @@ GET /api/v1/manage/orders
 ## 商品和规格
 
 价格单位是分，必须是整数。不要换算成元。空库存表示不限。新建商品默认下架。规格默认可售。确认后再调用 publish。
+
+先上传图片，再把返回的 `url` 写入 `cover`。`POST /api/v1/catalogs/{id}/images` 使用 `multipart/form-data`，文件字段名是 `file`。成功时返回绝对 `url`。只把这个 `url` 或外部 http(s) URL 写入商品或规格的 `cover`。
 
 没有规格差异时，价格和库存写在商品上，系统创建一条默认可售规格：
 

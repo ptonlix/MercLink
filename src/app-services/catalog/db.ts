@@ -3,6 +3,7 @@ import type postgres from "postgres";
 import {
   catalogs,
   productFields,
+  productImages,
   productOptions,
   products,
   schemaRevisions,
@@ -22,6 +23,7 @@ export const catalogTableNames = [
   getTableName(products),
   getTableName(productOptions),
   getTableName(variants),
+  getTableName(productImages),
 ] as const;
 
 export type CatalogRow = {

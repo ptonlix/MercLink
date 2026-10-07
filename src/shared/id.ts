@@ -10,6 +10,7 @@ export const idPrefixes = {
   product: "prd_",
   option: "opt_",
   variant: "var_",
+  image: "img_",
   order: "ord_",
   orderLine: "oli_",
   payment: "pay_",

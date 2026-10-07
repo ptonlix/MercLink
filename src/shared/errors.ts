@@ -11,6 +11,7 @@ export const errorCodes = [
   "conflict",
   "captcha_required",
   "sms_rate_limited",
+  "rate_limited",
   "payment_retryable",
   "invalid_signature",
   "dependency_unavailable",

@@ -8,7 +8,12 @@ import { getDatabase, type Sql } from "../db/client";
 import { ensureSuperAdmin } from "../app-services/identity/admin";
 import { findMerchant } from "../app-services/identity/merchants";
 import { appRuntime } from "../app-services/identity/runtime";
-import { loadEnv } from "../shared/env";
+import { connectRedis, createRedisRateLimit, openRedisClient } from "../adapters/redis";
+import { createObjectStorageClient, createS3ObjectStorage } from "../adapters/s3";
+import { bindMediaRuntime } from "../app-services/catalog/media-runtime";
+import { assertRuntimeDependencies } from "./runtime-deps";
+import { loadEnv, secretValues, type AppEnv } from "../shared/env";
+import { redactText } from "../shared/log";
 
 let ready = false;
 let expiryTimer: ReturnType<typeof setInterval> | undefined;
@@ -35,6 +40,7 @@ export async function registerAll(source: NodeJS.ProcessEnv = process.env): Prom
   if (!loaded.ok) {
     throw new Error(loaded.message.trim());
   }
+  await bindObjectStorage(loaded.env);
   const runtime = appRuntime();
   await ensureSuperAdmin(runtime.sql, {
     phone: loaded.env.ADMIN_PHONE,
@@ -75,6 +81,32 @@ export async function runCompositionSteps(
     await step();
   }
   ready = true;
+}
+
+async function bindObjectStorage(env: AppEnv): Promise<void> {
+  const redis = openRedisClient(env.REDIS_URL);
+  const s3 = createObjectStorageClient({
+    endpoint: env.OBJECT_STORAGE_ENDPOINT,
+    region: env.OBJECT_STORAGE_REGION,
+    accessKeyId: env.OBJECT_STORAGE_ACCESS_KEY_ID,
+    secretAccessKey: env.OBJECT_STORAGE_SECRET_ACCESS_KEY,
+  });
+  const objectStorage = createS3ObjectStorage({
+    client: { send: (command) => s3.send(command as never) },
+    bucket: env.OBJECT_STORAGE_BUCKET,
+  });
+  try {
+    await connectRedis(redis);
+    await assertRuntimeDependencies({ redis, objectStorage });
+  } catch (error: unknown) {
+    const raw = error instanceof Error ? error.message : "runtime dependency failed";
+    throw new Error(redactText(raw, secretValues(env)));
+  }
+  bindMediaRuntime({
+    rateLimit: createRedisRateLimit(redis),
+    objectStorage,
+    mediaBaseUrl: env.APP_BASE_URL,
+  });
 }
 
 async function accountIsActive(sql: Sql, accountId: string): Promise<boolean> {

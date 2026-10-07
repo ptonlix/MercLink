@@ -5,12 +5,32 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { GET } from "../app/api/health/route";
-import { requiredEnvKeys } from "./env";
+import { loadEnv, requiredEnvKeys } from "./env";
 import { formatRequestLog } from "./log";
 
 const canary = "canary-secret-do-not-print";
 
 describe("startup refusal", () => {
+  it("fails loadEnv when any object storage or Redis variable is missing", () => {
+    const source = Object.fromEntries(requiredEnvKeys.map((key) => [key, `value-${key}`]));
+    for (const key of [
+      "REDIS_URL",
+      "OBJECT_STORAGE_ENDPOINT",
+      "OBJECT_STORAGE_REGION",
+      "OBJECT_STORAGE_BUCKET",
+      "OBJECT_STORAGE_ACCESS_KEY_ID",
+      "OBJECT_STORAGE_SECRET_ACCESS_KEY",
+    ] as const) {
+      const missing = { ...source };
+      delete missing[key];
+      const loaded = loadEnv(missing);
+      expect(loaded.ok).toBe(false);
+      if (!loaded.ok) {
+        expect(loaded.missing).toContain(key);
+      }
+    }
+  });
+
   it("exits non-zero without ALIPAY_PRIVATE_KEY and does not print secrets", async () => {
     const env: NodeJS.ProcessEnv = { ...process.env };
     for (const key of requiredEnvKeys) {
