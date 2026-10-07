@@ -58,7 +58,7 @@ async function sourceFiles(directory: string): Promise<string[]> {
       files.push(...(await sourceFiles(full)));
       continue;
     }
-    if (entry.name.endsWith(".ts")) {
+    if (entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts")) {
       files.push(full);
     }
   }

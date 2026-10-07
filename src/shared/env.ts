@@ -107,9 +107,9 @@ export function secretValues(env: AppEnv): readonly string[] {
   return values.filter((value) => value.length > 0);
 }
 
-function pushUrlPassword(values: string[], raw: string): void {
+function pushUrlPassword(values: string[], url: string): void {
   try {
-    const password = new URL(raw).password;
+    const password = new URL(url).password;
     if (password !== "") {
       values.push(decodeURIComponent(password));
     }

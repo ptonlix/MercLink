@@ -149,7 +149,7 @@ describe("product images", () => {
 
       const down = memoryStorage();
       bind(sql, down.port, {
-        consume: () => Promise.resolve({ ok: false, error: "unavailable" }),
+        reserve: () => Promise.resolve({ ok: false, error: "unavailable" }),
         release: () => Promise.resolve({ ok: true }),
       });
       const unavailable = await uploadRoute(uploadRequest(catalog.id, png), {
@@ -370,9 +370,9 @@ function countingLimit(inner: RateLimitPort): { port: RateLimitPort; consumes: n
       return state.consumes;
     },
     port: {
-      consume: (input) => {
+      reserve: (input) => {
         state.consumes += 1;
-        return inner.consume(input);
+        return inner.reserve(input);
       },
       release: (reservation) => inner.release(reservation),
     },

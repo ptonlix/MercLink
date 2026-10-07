@@ -28,6 +28,7 @@ export async function POST(request: Request): Promise<Response> {
     clock: runtime.clock,
     captcha: runtime.captcha,
     sms: runtime.sms,
+    rateLimit: runtime.rateLimit,
   };
   const form = await request.formData();
   const intent = formValue(form, "intent");

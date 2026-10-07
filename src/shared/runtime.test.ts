@@ -32,10 +32,7 @@ describe("startup refusal", () => {
   });
 
   it("exits non-zero without ALIPAY_PRIVATE_KEY and does not print secrets", async () => {
-    const env: NodeJS.ProcessEnv = { ...process.env };
-    for (const key of requiredEnvKeys) {
-      env[key] = `${canary}-${key}`;
-    }
+    const env = filledEnv();
     delete env.ALIPAY_PRIVATE_KEY;
 
     const result = await runStartup(env);
@@ -44,6 +41,18 @@ describe("startup refusal", () => {
     expect(result.output).toContain("ALIPAY_PRIVATE_KEY");
     expect(result.output).not.toContain(canary);
     expect(result.output).not.toContain("BEGIN PRIVATE KEY");
+  }, 20_000);
+
+  it("exits non-zero without REDIS_URL and does not add a second Redis variable", async () => {
+    expect(requiredEnvKeys.filter((key) => key.includes("REDIS"))).toEqual(["REDIS_URL"]);
+    const env = filledEnv();
+    delete env.REDIS_URL;
+
+    const result = await runStartup(env);
+
+    expect(result.code).not.toBe(0);
+    expect(result.output).toContain("REDIS_URL");
+    expect(result.output).not.toContain(canary);
   }, 20_000);
 });
 
@@ -91,6 +100,14 @@ describe("request logs", () => {
     expect(line).toContain("[redacted]");
   });
 });
+
+function filledEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of requiredEnvKeys) {
+    env[key] = `${canary}-${key}`;
+  }
+  return env;
+}
 
 async function runStartup(env: NodeJS.ProcessEnv): Promise<{ code: number; output: string }> {
   const dir = await mkdtemp(path.join(tmpdir(), "merclink-start-"));

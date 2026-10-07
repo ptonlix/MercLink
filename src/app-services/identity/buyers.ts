@@ -4,13 +4,15 @@ import {
   canSetPassword,
   captchaParamAccepted,
   recordWrongSmsCheck,
-  smsSendAllowed,
+  smsSendLimited,
+  smsSendPolicyNames,
 } from "../../domain/identity/registration";
 import { nextPasswordAccepted, passwordIsHashed } from "../../domain/identity/password";
 import { isLoginPhone, normalizePhone } from "../../domain/identity/phone";
 import { tokenHash } from "../../domain/access/tokens";
 import type { Clock } from "../../ports/clock";
 import type { CaptchaPort } from "../../ports/captcha";
+import type { RateLimitPort } from "../../ports/rate-limit";
 import type { SmsPort } from "../../ports/sms";
 import { createPublicId } from "../../shared/id";
 import { hashPassword, verifyPassword } from "./passwords";
@@ -23,11 +25,14 @@ export type BuyerRecord = {
   passwordHash: string;
 };
 
+const smsUnavailable = "短信服务暂不可用。";
+
 export type BuyerFlow = {
   sql: Sql;
   clock: Clock;
   captcha: CaptchaPort;
   sms: SmsPort;
+  rateLimit: RateLimitPort;
 };
 
 function beginBuyerPhone(activeBuyerExists: boolean): "login" | "register" {
@@ -61,18 +66,22 @@ export async function requestBuyerSms(
     INSERT INTO used_captcha_params (captcha_hash) VALUES (${captchaHash})
     ON CONFLICT (captcha_hash) DO NOTHING
   `;
-  const sends = await flow.sql<{ sent_at: Date }[]>`
-    SELECT sent_at FROM sms_sends WHERE phone = ${phone}
-  `;
-  const limit = smsSendAllowed({ now: flow.clock.now(), sentAt: sends.map((row) => row.sent_at) });
-  if (!limit.ok) {
-    return failure(429, limit.error, limit.message);
+  const reserved = await flow.rateLimit.reserve({
+    subject: phone,
+    policies: [smsSendPolicyNames.interval, smsSendPolicyNames.daily],
+    now: flow.clock.now(),
+  });
+  if (!reserved.ok) {
+    if (reserved.error === "unavailable") {
+      return failure(503, "dependency_unavailable", smsUnavailable);
+    }
+    return smsLimited(reserved.policy);
   }
   const sent = await flow.sms.sendCode({ phone });
   if (!sent.ok) {
+    await flow.rateLimit.release(reserved.reservation);
     return failure(503, "dependency_unavailable", sent.message);
   }
-  await flow.sql`INSERT INTO sms_sends (id, phone, sent_at) VALUES (${createPublicId("grant")}, ${phone}, ${flow.clock.now()})`;
   await flow.sql`
     INSERT INTO registration_challenges (id, phone, captcha_hash)
     VALUES (${createPublicId("grant")}, ${phone}, ${captchaHash})
@@ -160,6 +169,18 @@ export async function completeBuyerRegistration(
     throw error;
   }
   return { ok: true, buyerId, created: true, mode: "register" };
+}
+
+function smsLimited(policy: string): Failure {
+  if (policy === smsSendPolicyNames.interval) {
+    const decision = smsSendLimited("interval");
+    return failure(429, decision.error, decision.message);
+  }
+  if (policy === smsSendPolicyNames.daily) {
+    const decision = smsSendLimited("daily");
+    return failure(429, decision.error, decision.message);
+  }
+  return failure(503, "dependency_unavailable", smsUnavailable);
 }
 
 export async function loginBuyerWithPassword(

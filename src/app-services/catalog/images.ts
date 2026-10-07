@@ -7,16 +7,12 @@ import {
 } from "../../domain/catalog/images";
 import { catalogFail, catalogOk, type CatalogResult } from "../../domain/catalog/result";
 import type { ObjectStoragePort } from "../../ports/object-storage";
-import type { RateLimitPort, RateWindow } from "../../ports/rate-limit";
+import { imageUploadPolicies, type RateLimitPort } from "../../ports/rate-limit";
 import { apiError } from "../../shared/errors";
 import { lockCatalog, ownedCatalog, type Db, type Sql } from "./db";
 import { mediaRuntime } from "./media-runtime";
 
-const imageUploadWindow = {
-  name: "image-upload",
-  limit: 30,
-  windowMs: 60_000,
-} as const satisfies RateWindow;
+const imageUploadPolicy = Object.keys(imageUploadPolicies)[0] ?? "image-upload";
 
 export type StoredImage = {
   id: string;
@@ -195,12 +191,16 @@ async function consumeUpload(
   merchantId: string,
 ): Promise<ImageResult<true>> {
   try {
-    const decision = await rateLimit.consume({ subject: merchantId, windows: [imageUploadWindow] });
+    const decision = await rateLimit.reserve({
+      subject: merchantId,
+      policies: [imageUploadPolicy],
+      now: new Date(),
+    });
     if (!decision.ok) {
+      if (decision.error === "limited") {
+        return imageFail("rate_limited", "上传过于频繁，请稍后再试。");
+      }
       return imageFail("dependency_unavailable", "上传服务暂时不可用。");
-    }
-    if (!decision.allowed) {
-      return imageFail("rate_limited", "上传过于频繁，请稍后再试。");
     }
     return { ok: true, value: true };
   } catch {

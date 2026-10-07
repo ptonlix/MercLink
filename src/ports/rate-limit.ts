@@ -1,24 +1,30 @@
-export type RateWindow = {
-  name: string;
+export type RateLimitPolicy = {
   limit: number;
   windowMs: number;
 };
 
-export type RateReservation = {
+export const imageUploadPolicies = {
+  "image-upload": { limit: 30, windowMs: 60_000 },
+} as const satisfies Record<string, RateLimitPolicy>;
+
+export type RateLimitReservation = {
+  id: string;
   subject: string;
-  member: string;
-  windows: readonly string[];
+  policies: readonly string[];
 };
 
-export type RateConsumeResult =
-  | { ok: true; allowed: true; reservation: RateReservation }
-  | { ok: true; allowed: false }
+export type RateLimitReserveResult =
+  | { ok: true; reservation: RateLimitReservation }
+  | { ok: false; error: "limited"; policy: string }
   | { ok: false; error: "unavailable" };
 
-export type RateReleaseResult = { ok: true } | { ok: false; error: "unavailable" };
+export type RateLimitReleaseResult = { ok: true } | { ok: false; error: "unavailable" };
 
-// Shared by image uploads and later SMS send limits. One Redis client serves every policy.
 export type RateLimitPort = {
-  consume: (input: { subject: string; windows: readonly RateWindow[] }) => Promise<RateConsumeResult>;
-  release: (reservation: RateReservation) => Promise<RateReleaseResult>;
+  reserve(input: {
+    subject: string;
+    policies: readonly string[];
+    now: Date;
+  }): Promise<RateLimitReserveResult>;
+  release(reservation: RateLimitReservation): Promise<RateLimitReleaseResult>;
 };

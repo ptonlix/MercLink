@@ -1,3 +1,5 @@
+import { readdir, readFile } from "node:fs/promises";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   activePhoneAvailable,
@@ -25,6 +27,7 @@ import {
   smsMaxWrongChecks,
   smsMinIntervalMs,
   smsSendAllowed,
+  smsWindowMs,
 } from "./registration";
 
 describe("phones and passwords", () => {
@@ -99,6 +102,7 @@ describe("buyer registration rules", () => {
     expect(smsSendAllowed({ now, sentAt: [recent] })).toMatchObject({
       ok: false,
       error: "sms_rate_limited",
+      message: "发送过于频繁，请稍后再试。",
     });
     expect(smsSendAllowed({ now, sentAt: [new Date(now.getTime() - smsMinIntervalMs)] })).toEqual({
       ok: true,
@@ -113,8 +117,20 @@ describe("buyer registration rules", () => {
       message: "今日发送次数已达上限。",
     });
     expect(smsSendAllowed({ now, sentAt: [] })).toEqual({ ok: true });
-    const stale = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const stale = new Date(now.getTime() - smsWindowMs);
     expect(smsSendAllowed({ now, sentAt: [stale] })).toEqual({ ok: true });
+  });
+
+  it("does not import the Redis client", async () => {
+    const directory = path.join(process.cwd(), "src/domain/identity");
+    const files = await readdir(directory);
+    for (const file of files) {
+      if (!file.endsWith(".ts") || file.endsWith(".test.ts")) {
+        continue;
+      }
+      const source = await readFile(path.join(directory, file), "utf8");
+      expect(source).not.toMatch(/from ["']redis["']|adapters\/redis/);
+    }
   });
 
   it("turns an existing phone into login and ignores email", () => {

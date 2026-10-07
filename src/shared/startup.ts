@@ -12,6 +12,8 @@ export async function boot(source: NodeJS.ProcessEnv = process.env): Promise<voi
 
   try {
     await runMigrations({ databaseUrl: loaded.env.DATABASE_URL });
+    const redis = await import("../adapters/redis/client");
+    await redis.assertRedisReady(loaded.env.REDIS_URL);
   } catch (error: unknown) {
     const raw = error instanceof Error ? error.message : "migration failed";
     process.stderr.write(`${redactText(raw, secretValues(loaded.env))}\n`);

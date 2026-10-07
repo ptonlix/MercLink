@@ -8,7 +8,9 @@ import { getDatabase, type Sql } from "../db/client";
 import { ensureSuperAdmin } from "../app-services/identity/admin";
 import { findMerchant } from "../app-services/identity/merchants";
 import { appRuntime } from "../app-services/identity/runtime";
-import { connectRedis, createRedisRateLimit, openRedisClient } from "../adapters/redis";
+import { getRedisClient } from "../adapters/redis/client";
+import { createRedisRateLimit } from "../adapters/redis/limiter";
+import { imageUploadPolicies } from "../ports/rate-limit";
 import { createObjectStorageClient, createS3ObjectStorage } from "../adapters/s3";
 import { bindMediaRuntime } from "../app-services/catalog/media-runtime";
 import { assertRuntimeDependencies } from "./runtime-deps";
@@ -84,7 +86,7 @@ export async function runCompositionSteps(
 }
 
 async function bindObjectStorage(env: AppEnv): Promise<void> {
-  const redis = openRedisClient(env.REDIS_URL);
+  const redis = await getRedisClient(env.REDIS_URL);
   const s3 = createObjectStorageClient({
     endpoint: env.OBJECT_STORAGE_ENDPOINT,
     region: env.OBJECT_STORAGE_REGION,
@@ -96,14 +98,17 @@ async function bindObjectStorage(env: AppEnv): Promise<void> {
     bucket: env.OBJECT_STORAGE_BUCKET,
   });
   try {
-    await connectRedis(redis);
     await assertRuntimeDependencies({ redis, objectStorage });
   } catch (error: unknown) {
     const raw = error instanceof Error ? error.message : "runtime dependency failed";
     throw new Error(redactText(raw, secretValues(env)));
   }
   bindMediaRuntime({
-    rateLimit: createRedisRateLimit(redis),
+    rateLimit: createRedisRateLimit({
+      url: env.REDIS_URL,
+      policies: imageUploadPolicies,
+      client: redis,
+    }),
     objectStorage,
     mediaBaseUrl: env.APP_BASE_URL,
   });
