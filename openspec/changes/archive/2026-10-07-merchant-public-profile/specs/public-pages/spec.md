@@ -13,6 +13,8 @@ The `/` page MUST be server-rendered HTML. When a store profile is published, th
 - **WHEN** the public store seam returns a published profile
 - **THEN** `/` shows that display name and summary above the product summary and does not show a login phone, a self-registration notice, or a link to another store
 
+## ADDED Requirements
+
 ### Requirement: Landing products use a store shelf
 The published products on `/` MUST render as linked product cards in one horizontal shelf. Each card MUST show the cover or a placeholder, the title, and the price in major currency units derived from minor units. The whole card MUST link to `/products/{id}`. The shelf MUST be movable sideways without autoplay and MUST remain readable without client-side script. The page MUST use a warm paper background, serif slogan and store name, and one green accent. It MUST NOT use a neon gradient, giant background wordmark, floating purchase chip, or autoplay media. When more products exist beyond the shelf, the page MUST link to `/products`. An empty shelf MUST state that no product is available.
 
@@ -24,8 +26,14 @@ The published products on `/` MUST render as linked product cards in one horizon
 - **WHEN** a reader fetches `/` and does not run JavaScript
 - **THEN** the product cards and their links are already present in the shelf
 
+## MODIFIED Requirements
+
 ### Requirement: Discovery files stay small and current
 `/llms.txt` MUST point to the landing page, product list, both skills, and the API, and MUST NOT embed the full catalog or the store profile. `/sitemap.xml` MUST include the landing page, product list, currently public products, and both skills. It MUST NOT add per-merchant store URLs. `/robots.txt` MUST allow those public pages and MUST disallow authorization pages, the super-admin page, and `/api`.
+
+#### Scenario: Product becomes unpublished
+- **WHEN** a product is no longer returned by the public-product seam
+- **THEN** it is absent from the sitemap and its public URL is not indexable
 
 #### Scenario: Profile is withdrawn
 - **WHEN** the store profile is no longer published

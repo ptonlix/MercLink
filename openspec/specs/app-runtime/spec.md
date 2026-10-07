@@ -40,3 +40,10 @@ Logs MUST NOT record passwords, SMS verification codes, access tokens, refresh t
 #### Scenario: A request carries a bearer token
 - **WHEN** an authenticated request is logged
 - **THEN** the log line does not contain the bearer token or a refresh token
+
+### Requirement: Architecture checks cover context boundaries
+The dependency check MUST fail when a page or route imports a domain module, and when an application service imports another context's domain module. Domain code MUST still be forbidden from importing application, database, or adapter modules.
+
+#### Scenario: Cross-context domain import
+- **WHEN** an identity application service imports an access domain module
+- **THEN** the dependency check fails

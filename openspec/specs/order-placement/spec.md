@@ -21,11 +21,11 @@ The line MUST identify a sellable variant of a published product. If the product
 - **THEN** no order is created and the error is `variant_required`
 
 ### Requirement: Server prices and snapshots the line
-The caller MUST NOT supply a price. The line amount MUST equal the locked variant price multiplied by quantity. The order amount MUST equal the sum of line amounts. The order header MUST store buyer, grant, currency, amount, status, and expiry. The line MUST snapshot catalog, product, variant, title, variant options, unit price, custom fields, and schema revision. Currency MUST come from the variant's catalog.
+The caller MUST NOT supply a price. Detecting a caller price MUST be done by the domain function that the order tests lock, and the place-order use case MUST call that function with the request body. A request containing a price key MUST be rejected. The line amount MUST equal the locked variant price multiplied by quantity. The order amount MUST equal the sum of line amounts. The order header MUST store buyer, grant, currency, amount, status, and expiry. The line MUST snapshot catalog, product, variant, title, variant option values, unit price, fields, and schema revision. Currency MUST come from the variant's catalog.
 
 #### Scenario: Caller sends a price
 - **WHEN** a buyer includes a price in the order request
-- **THEN** that price is ignored or the request is rejected, and the stored line amount equals the variant price times quantity
+- **THEN** the domain price check rejects the request and no order is stored
 
 ### Requirement: Stock and idempotency share one transaction
 When the variant has finite stock, the system MUST lock that variant and decrement stock in the same transaction that writes the order header, the one line, and one pending payment record. Unlimited stock MUST NOT be decremented. Repeating the same buyer and `client_order_no` MUST return the original order and MUST NOT add a line or decrement stock again. A different buyer using the same client order number MUST NOT receive the first buyer's order.
