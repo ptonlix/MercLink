@@ -56,6 +56,7 @@ function createProductionRuntime(): CommerceRuntime {
       privateKey: loaded.env.ALIPAY_PRIVATE_KEY,
       alipayPublicKey: loaded.env.ALIPAY_PUBLIC_KEY,
       notifyUrl: loaded.env.ALIPAY_NOTIFY_URL,
+      product: process.env.ALIPAY_PRODUCT === "alipayplus" ? "alipayplus" : "domestic",
     }),
     clock: systemClock,
     ownedCatalogs: (merchantId) => ownership(merchantId),

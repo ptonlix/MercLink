@@ -1,3 +1,4 @@
+import { AlipaySdk } from "alipay-sdk";
 import type {
   CancelPaymentResult,
   CreatePaymentInput,
@@ -7,27 +8,32 @@ import type {
   QueryPaymentResult,
   VerifyNotificationResult,
 } from "../../ports/payment";
-import {
-  alipayGateway,
-  alipayMethods,
-  buildSignedParams,
-  extractJsonNode,
-  extractResponseSign,
-  pagePayBizContent,
-  parseForm,
-  signedContent,
-  toFormBody,
-  verifyRsa2,
-} from "./sign";
+import { alipayGateway, alipayMethods, pagePayBizContent, parseForm } from "./sign";
 
-type AlipayAdapterConfig = {
+type AlipayProduct = "domestic" | "alipayplus";
+
+export type AlipayAdapterConfig = {
   appId: string;
   privateKey: string;
   alipayPublicKey: string;
   notifyUrl: string;
   gateway?: string;
-  fetch?: typeof fetch;
+  product?: AlipayProduct;
+  client?: AlipayOpenApi;
   now?: () => Date;
+};
+
+export type AlipayOpenApi = {
+  pageExecute(
+    method: string,
+    httpMethod: "GET",
+    params: { bizContent: Record<string, string>; notifyUrl: string },
+  ): string;
+  exec(
+    method: string,
+    params: { bizContent: Record<string, string> },
+  ): Promise<Record<string, unknown>>;
+  checkNotifySign(postData: Record<string, string>): boolean;
 };
 
 const retryable = (
@@ -44,9 +50,7 @@ const unavailable = {
   message: "支付网关不可用。",
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
+const internationalUnavailable = retryable("国际 Alipay+ 请求字段尚未进入平台合同。");
 
 function readString(record: Record<string, unknown>, key: string): string | null {
   const value = record[key];
@@ -67,9 +71,10 @@ function viewStatus(tradeStatus: string): PaymentViewStatus | null {
 }
 
 export function createAlipayPaymentPort(config: AlipayAdapterConfig): PaymentPort {
-  const gateway = config.gateway ?? alipayGateway;
-  const fetchImpl = config.fetch ?? globalThis.fetch.bind(globalThis);
-  const now = config.now ?? ((): Date => new Date());
+  if (config.product === "alipayplus") {
+    return closedInternationalPort();
+  }
+  const client = config.client ?? createAlipaySdk(config);
 
   return {
     createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
@@ -85,19 +90,11 @@ export function createAlipayPaymentPort(config: AlipayAdapterConfig): PaymentPor
         return Promise.resolve(retryable("支付创建失败，请重试。"));
       }
       try {
-        const params = buildSignedParams({
-          appId: config.appId,
-          method: alipayMethods.create,
-          bizContent,
+        const action = client.pageExecute(alipayMethods.create, "GET", {
+          bizContent: JSON.parse(bizContent) as Record<string, string>,
           notifyUrl: config.notifyUrl,
-          privateKey: config.privateKey,
-          now: now(),
         });
-        return Promise.resolve({
-          ok: true,
-          action: `${gateway}?${toFormBody(params)}`,
-          providerTradeNo: null,
-        });
+        return Promise.resolve({ ok: true, action, providerTradeNo: null });
       } catch {
         return Promise.resolve(retryable("支付创建失败，请重试。"));
       }
@@ -108,35 +105,19 @@ export function createAlipayPaymentPort(config: AlipayAdapterConfig): PaymentPor
       if (input.providerTradeNo !== null && input.providerTradeNo !== "") {
         biz.trade_no = input.providerTradeNo;
       }
-      const executed = await execute(config, fetchImpl, gateway, alipayMethods.query, biz, now());
-      if (!executed.ok) {
-        return executed;
-      }
-      const node = verifiedNode(
-        executed.raw,
-        "alipay_trade_query_response",
-        config.alipayPublicKey,
-      );
-      if (!isRecord(node)) {
-        return retryable("支付查询失败，请重试。");
-      }
-      const code = readString(node, "code");
-      if (code === "10000") {
-        const tradeStatus = readString(node, "trade_status");
-        const status = tradeStatus === null ? null : viewStatus(tradeStatus);
-        if (status === null) {
+      try {
+        const result = await client.exec(alipayMethods.query, { bizContent: biz });
+        const status = readString(result, "tradeStatus") ?? readString(result, "trade_status");
+        const providerTradeNo =
+          readString(result, "tradeNo") ?? readString(result, "trade_no") ?? input.providerTradeNo;
+        const view = status === null ? null : viewStatus(status);
+        if (view === null) {
           return retryable("支付查询失败，请重试。");
         }
-        return {
-          ok: true,
-          status,
-          providerTradeNo: readString(node, "trade_no"),
-        };
+        return { ok: true, status: view, providerTradeNo };
+      } catch {
+        return unavailable;
       }
-      if (readString(node, "sub_code") === "ACQ.TRADE_NOT_EXIST") {
-        return { ok: true, status: "pending", providerTradeNo: null };
-      }
-      return retryable("支付查询失败，请重试。");
     },
 
     async cancelPayment(input): Promise<CancelPaymentResult> {
@@ -144,41 +125,22 @@ export function createAlipayPaymentPort(config: AlipayAdapterConfig): PaymentPor
       if (input.providerTradeNo !== null && input.providerTradeNo !== "") {
         biz.trade_no = input.providerTradeNo;
       }
-      const executed = await execute(config, fetchImpl, gateway, alipayMethods.close, biz, now());
-      if (!executed.ok) {
-        return retryable(executed.message);
-      }
-      const node = verifiedNode(
-        executed.raw,
-        "alipay_trade_close_response",
-        config.alipayPublicKey,
-      );
-      if (!isRecord(node)) {
+      try {
+        const result = await client.exec(alipayMethods.close, { bizContent: biz });
+        const code = readString(result, "code");
+        const subCode = readString(result, "subCode") ?? readString(result, "sub_code");
+        if (code === "10000" || subCode === "ACQ.TRADE_NOT_EXIST") {
+          return { ok: true };
+        }
+        return retryable("支付取消失败，请重试。");
+      } catch {
         return retryable("支付取消失败，请重试。");
       }
-      const code = readString(node, "code");
-      const subCode = readString(node, "sub_code");
-      if (code === "10000" || subCode === "ACQ.TRADE_NOT_EXIST") {
-        return { ok: true };
-      }
-      return retryable("支付取消失败，请重试。");
     },
 
     verifyNotification(input): Promise<VerifyNotificationResult> {
       const params = parseForm(input.body);
-      const signature = params.sign;
-      if (signature === undefined || signature === "") {
-        return Promise.resolve({
-          ok: false,
-          error: "invalid_signature",
-          message: "通知验签失败。",
-        });
-      }
-      const content = signedContent(params, {
-        exclude: ["sign", "sign_type"],
-        skipEmpty: false,
-      });
-      if (!verifyRsa2(content, signature, config.alipayPublicKey)) {
+      if (!client.checkNotifySign(params)) {
         return Promise.resolve({
           ok: false,
           error: "invalid_signature",
@@ -210,65 +172,37 @@ export function createAlipayPaymentPort(config: AlipayAdapterConfig): PaymentPor
           message: "通知验签失败。",
         });
       }
-      return Promise.resolve({
-        ok: true,
-        status,
-        providerTradeNo,
-        paymentId,
-      });
+      return Promise.resolve({ ok: true, status, providerTradeNo, paymentId });
     },
   };
 }
 
-async function execute(
-  config: AlipayAdapterConfig,
-  fetchImpl: typeof fetch,
-  gateway: string,
-  method: string,
-  biz: Readonly<Record<string, string>>,
-  now: Date,
-): Promise<
-  | { ok: true; raw: string }
-  | { ok: false; error: "payment_retryable" | "dependency_unavailable"; message: string }
-> {
-  let body = "";
-  try {
-    const params = buildSignedParams({
-      appId: config.appId,
-      method,
-      bizContent: JSON.stringify(biz),
-      privateKey: config.privateKey,
-      now,
-    });
-    body = toFormBody(params);
-  } catch {
-    return retryable("支付请求签名失败，请重试。");
-  }
-  try {
-    const response = await fetchImpl(gateway, {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded;charset=UTF-8" },
-      body,
-    });
-    const raw = await response.text();
-    if (!response.ok) {
-      return unavailable;
-    }
-    return { ok: true, raw };
-  } catch {
-    return unavailable;
-  }
+export function createAlipaySdk(config: AlipayAdapterConfig): AlipayOpenApi {
+  const sdk = new AlipaySdk({
+    appId: config.appId,
+    privateKey: config.privateKey,
+    alipayPublicKey: config.alipayPublicKey,
+    gateway: config.gateway ?? alipayGateway,
+    keyType: "PKCS8",
+    signType: "RSA2",
+  });
+  return {
+    pageExecute: (method, httpMethod, params) => sdk.pageExecute(method, httpMethod, params),
+    exec: async (method, params) => sdk.exec(method, params),
+    checkNotifySign: (postData) => sdk.checkNotifySign(postData),
+  };
 }
 
-function verifiedNode(raw: string, nodeName: string, publicKey: string): unknown {
-  const node = extractJsonNode(raw, nodeName);
-  const signature = extractResponseSign(raw);
-  if (node === null || signature === null || !verifyRsa2(node, signature, publicKey)) {
-    return null;
-  }
-  try {
-    return JSON.parse(node) as unknown;
-  } catch {
-    return null;
-  }
+function closedInternationalPort(): PaymentPort {
+  return {
+    createPayment: () => Promise.resolve(internationalUnavailable),
+    queryPayment: () => Promise.resolve(internationalUnavailable),
+    cancelPayment: () => Promise.resolve(internationalUnavailable),
+    verifyNotification: () =>
+      Promise.resolve({
+        ok: false,
+        error: "invalid_signature",
+        message: "国际 Alipay+ 通知字段尚未进入平台合同。",
+      }),
+  };
 }

@@ -35,7 +35,14 @@ describe("foundation files", () => {
         "vitest",
       ]),
     );
-    expect(names.some((name) => /alipay|aliyun|alicloud/i.test(name))).toBe(false);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "@alicloud/captcha20230305",
+        "@alicloud/dypnsapi20170525",
+        "@alicloud/openapi-core",
+        "alipay-sdk",
+      ]),
+    );
     await expect(readFile("pnpm-lock.yaml", "utf8")).resolves.toContain("lockfileVersion");
     await expect(readFile("package-lock.json", "utf8")).rejects.toThrow();
     await expect(readFile("yarn.lock", "utf8")).rejects.toThrow();

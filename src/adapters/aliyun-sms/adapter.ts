@@ -1,5 +1,9 @@
+import DypnsClient, {
+  CheckSmsVerifyCodeRequest,
+  SendSmsVerifyCodeRequest,
+} from "@alicloud/dypnsapi20170525";
+import { $OpenApiUtil } from "@alicloud/openapi-core";
 import type { SmsPort, SmsResult } from "../../ports/sms";
-import { signedPost } from "../aliyun-captcha/adapter";
 
 export type AliyunSmsConfig = {
   accessKeyId: string;
@@ -8,64 +12,91 @@ export type AliyunSmsConfig = {
   templateCode: string;
 };
 
-const endpoint = "https://dypnsapi.aliyuncs.com/";
+type SmsSendRequest = {
+  phoneNumber: string;
+  signName: string;
+  templateCode: string;
+  countryCode: string;
+  codeLength: number;
+  validTime: number;
+  interval: number;
+  codeType: number;
+};
 
-export function createAliyunSms(config: AliyunSmsConfig, fetchImpl: typeof fetch = fetch): SmsPort {
+type SmsCheckRequest = {
+  phoneNumber: string;
+  verifyCode: string;
+  countryCode: string;
+};
+
+type SmsResponse = {
+  body?: {
+    success?: boolean;
+    code?: string;
+    model?: { verifyResult?: string };
+  };
+};
+
+export type SmsSdk = {
+  sendSmsVerifyCode(request: SmsSendRequest): Promise<SmsResponse>;
+  checkSmsVerifyCode(request: SmsCheckRequest): Promise<SmsResponse>;
+};
+
+export function createAliyunSms(
+  config: AliyunSmsConfig,
+  client: SmsSdk = createSmsSdk(config),
+): SmsPort {
   return {
     async sendCode(input): Promise<SmsResult> {
-      const response = await signedPost(fetchImpl, {
-        url: endpoint,
-        action: "SendSmsVerifyCode",
-        version: "2017-05-25",
-        accessKeyId: config.accessKeyId,
-        accessKeySecret: config.accessKeySecret,
-        body: JSON.stringify({
-          PhoneNumber: input.phone,
-          SignName: config.signName,
-          TemplateCode: config.templateCode,
-          CountryCode: "86",
-          CodeLength: 6,
-          ValidTime: 300,
-          Interval: 60,
-          CodeType: 1,
-        }),
+      const response = await client.sendSmsVerifyCode({
+        phoneNumber: input.phone,
+        signName: config.signName,
+        templateCode: config.templateCode,
+        countryCode: "86",
+        codeLength: 6,
+        validTime: 300,
+        interval: 60,
+        codeType: 1,
       });
       return mapResult(response);
     },
     async checkCode(input): Promise<SmsResult> {
-      const response = await signedPost(fetchImpl, {
-        url: endpoint,
-        action: "CheckSmsVerifyCode",
-        version: "2017-05-25",
-        accessKeyId: config.accessKeyId,
-        accessKeySecret: config.accessKeySecret,
-        body: JSON.stringify({
-          PhoneNumber: input.phone,
-          VerifyCode: input.code,
-          CountryCode: "86",
-        }),
+      const response = await client.checkSmsVerifyCode({
+        phoneNumber: input.phone,
+        verifyCode: input.code,
+        countryCode: "86",
       });
       return mapResult(response, true);
     },
   };
 }
 
-async function mapResult(response: Response, check = false): Promise<SmsResult> {
-  if (!response.ok) {
-    return { ok: false, message: "短信服务暂不可用。" };
-  }
-  const parsed: unknown = await response.json();
-  const payload =
-    parsed !== null && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
-  const model = payload.Model;
-  const modelRecord =
-    model !== null && typeof model === "object" ? (model as Record<string, unknown>) : null;
-  const verifyResult = modelRecord?.VerifyResult;
-  if (check && verifyResult !== "PASS" && verifyResult !== true) {
+export function createSmsSdk(config: AliyunSmsConfig): SmsSdk {
+  const sdk = new DypnsClient(
+    new $OpenApiUtil.Config({
+      accessKeyId: config.accessKeyId,
+      accessKeySecret: config.accessKeySecret,
+      endpoint: "dypnsapi.aliyuncs.com",
+    }),
+  );
+  return {
+    sendSmsVerifyCode: (request) =>
+      sdk.sendSmsVerifyCode(new SendSmsVerifyCodeRequest(request)) as Promise<SmsResponse>,
+    checkSmsVerifyCode: (request) => sdk.checkSmsVerifyCode(new CheckSmsVerifyCodeRequest(request)),
+  };
+}
+
+function mapResult(response: SmsResponse, check = false): SmsResult {
+  const body = response.body;
+  const verifyResult = body?.model?.verifyResult;
+  if (check && verifyResult !== "PASS") {
     return { ok: false, message: "验证码不正确。" };
   }
-  if (payload.Success === false || payload.Code === "isv.BUSINESS_LIMIT_CONTROL") {
+  if (body?.success === false || body?.code === "isv.BUSINESS_LIMIT_CONTROL") {
     return { ok: false, message: "短信发送失败。" };
+  }
+  if (body?.code !== undefined && body.code !== "OK" && body.success !== true) {
+    return { ok: false, message: "短信服务暂不可用。" };
   }
   return { ok: true };
 }

@@ -1,38 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { createAliyunCaptcha } from "../../adapters/aliyun-captcha/adapter";
-import { createAliyunSms } from "../../adapters/aliyun-sms/adapter";
+import {
+  createAliyunCaptcha,
+  createCaptchaSdk,
+  type CaptchaSdk,
+} from "../../adapters/aliyun-captcha/adapter";
+import { createAliyunSms, createSmsSdk, type SmsSdk } from "../../adapters/aliyun-sms/adapter";
 
 describe("aliyun adapters", () => {
-  it("calls captcha verification and does not put the secret in the request", async () => {
-    const calls: { url: string; action: string | null; authorization: string | null }[] = [];
-    const fetchImpl: typeof fetch = (input, init) => {
-      const headers = new Headers(init?.headers);
-      calls.push({
-        url: input instanceof Request ? input.url : input instanceof URL ? input.href : input,
-        action: headers.get("x-acs-action"),
-        authorization: headers.get("authorization"),
-      });
-      return Promise.resolve(Response.json({ Success: true, Result: { VerifyResult: true } }));
+  it("asks the official captcha SDK to verify and does not send the secret", async () => {
+    const calls: { captchaVerifyParam: string; sceneId: string }[] = [];
+    const client: CaptchaSdk = {
+      verifyIntelligentCaptcha: (request) => {
+        calls.push(request);
+        expect(JSON.stringify(request)).not.toContain("captcha-secret");
+        return Promise.resolve({ body: { result: { verifyResult: true } } });
+      },
     };
     const captcha = createAliyunCaptcha(
       { accessKeyId: "captcha-key", accessKeySecret: "captcha-secret", sceneId: "scene" },
-      fetchImpl,
+      client,
     );
     await expect(captcha.verify({ captchaVerifyParam: "param" })).resolves.toEqual({ ok: true });
-    expect(calls[0]?.url).toContain("captcha.cn-shanghai.aliyuncs.com");
-    expect(calls[0]?.action).toBe("VerifyIntelligentCaptcha");
-    expect(calls[0]?.authorization).toContain("captcha-key");
-    expect(calls[0]?.authorization).not.toContain("captcha-secret");
-    expect(calls[0]?.url).not.toContain("captcha-secret");
+    expect(calls).toEqual([{ captchaVerifyParam: "param", sceneId: "scene" }]);
+    expect(createCaptchaSdk).toBeTypeOf("function");
   });
 
-  it("sends and checks SMS through the number-authentication actions", async () => {
+  it("sends and checks SMS through the official number-authentication SDK", async () => {
     const actions: string[] = [];
-    const fetchImpl: typeof fetch = (_input, init) => {
-      actions.push(new Headers(init?.headers).get("x-acs-action") ?? "");
-      return Promise.resolve(
-        Response.json({ Success: true, Code: "OK", Model: { VerifyResult: "PASS" } }),
-      );
+    const client: SmsSdk = {
+      sendSmsVerifyCode: (request) => {
+        actions.push("SendSmsVerifyCode");
+        expect(request.signName).toBe("签名");
+        expect(JSON.stringify(request)).not.toContain("sms-secret");
+        return Promise.resolve({ body: { success: true, code: "OK" } });
+      },
+      checkSmsVerifyCode: () => {
+        actions.push("CheckSmsVerifyCode");
+        return Promise.resolve({
+          body: { success: true, code: "OK", model: { verifyResult: "PASS" } },
+        });
+      },
     };
     const sms = createAliyunSms(
       {
@@ -41,12 +48,13 @@ describe("aliyun adapters", () => {
         signName: "签名",
         templateCode: "SMS_1",
       },
-      fetchImpl,
+      client,
     );
     await expect(sms.sendCode({ phone: "13800138000" })).resolves.toEqual({ ok: true });
     await expect(sms.checkCode({ phone: "13800138000", code: "123456" })).resolves.toEqual({
       ok: true,
     });
     expect(actions).toEqual(["SendSmsVerifyCode", "CheckSmsVerifyCode"]);
+    expect(createSmsSdk).toBeTypeOf("function");
   });
 });

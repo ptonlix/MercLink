@@ -202,16 +202,20 @@ describe("super-admin and merchants", () => {
 });
 
 describe("slice boundaries", () => {
-  it("records official SDK names without editing the platform manifest", async () => {
+  it("records official SDK names that the composed manifest installs", async () => {
     const manifest = JSON.parse(await readFile("package.json", "utf8")) as {
       dependencies?: Record<string, string>;
     };
     const slice = JSON.parse(await readFile("src/identity/slice-deps.json", "utf8")) as {
       packages: string[];
     };
-    expect(slice.packages).toEqual(["@alicloud/captcha20230305", "@alicloud/dypnsapi20170525"]);
+    expect(slice.packages).toEqual([
+      "@alicloud/captcha20230305",
+      "@alicloud/dypnsapi20170525",
+      "@alicloud/openapi-core",
+    ]);
     for (const name of slice.packages) {
-      expect(manifest.dependencies ?? {}).not.toHaveProperty(name);
+      expect(manifest.dependencies ?? {}).toHaveProperty(name);
     }
   });
 });

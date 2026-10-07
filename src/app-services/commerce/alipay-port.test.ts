@@ -1,14 +1,11 @@
 import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { createAlipayPaymentPort } from "../../adapters/alipay";
 import {
-  alipayMethods,
-  extractJsonNode,
-  parseForm,
-  signRsa2,
-  signedContent,
-  verifyRsa2,
-} from "../../adapters/alipay/sign";
+  createAlipayPaymentPort,
+  createAlipaySdk,
+  type AlipayOpenApi,
+} from "../../adapters/alipay";
+import { alipayMethods, pagePayBizContent } from "../../adapters/alipay/sign";
 import { minorUnits } from "../../shared/money";
 
 const keys = generateKeyPairSync("rsa", {
@@ -18,41 +15,39 @@ const keys = generateKeyPairSync("rsa", {
 });
 
 const appId = "2014072300007148";
-const now = new Date("2026-05-16T08:07:50.000Z");
 
 describe("alipay adapter", () => {
-  it("builds the documented page pay request and verifies trade status notifications", async () => {
-    const calls: { url: string; body: string }[] = [];
+  it("uses the official SDK for page pay, query, close, and notification checks", async () => {
+    const calls: string[] = [];
+    const client: AlipayOpenApi = {
+      pageExecute: (method, httpMethod, params) => {
+        calls.push(method);
+        expect(httpMethod).toBe("GET");
+        expect(params.notifyUrl).toBe("https://merclink.example/api/v1/payments/alipay/notify");
+        expect(params.bizContent).toEqual({
+          out_trade_no: "pay_001",
+          total_amount: "1599.00",
+          subject: "Shoe42",
+          product_code: "FAST_INSTANT_TRADE_PAY",
+        });
+        return `https://openapi.alipay.com/gateway.do?method=${method}`;
+      },
+      exec: (method) => {
+        calls.push(method);
+        return Promise.resolve({
+          code: "10000",
+          tradeStatus: "TRADE_SUCCESS",
+          tradeNo: "2013112011001004330000121536",
+        });
+      },
+      checkNotifySign: (postData) => postData.trade_status === "TRADE_SUCCESS",
+    };
     const port = createAlipayPaymentPort({
       appId,
       privateKey: keys.privateKey,
       alipayPublicKey: keys.publicKey,
       notifyUrl: "https://merclink.example/api/v1/payments/alipay/notify",
-      now: () => now,
-      fetch: (url, init) => {
-        const requestUrl =
-          typeof url === "string" ? url : url instanceof URL ? url.toString() : url.url;
-        const rawBody = init?.body;
-        const body = typeof rawBody === "string" ? rawBody : "";
-        calls.push({ url: requestUrl, body });
-        const params = parseForm(body);
-        const method = params.method;
-        const nodeName =
-          method === alipayMethods.query
-            ? "alipay_trade_query_response"
-            : "alipay_trade_close_response";
-        const payload = {
-          code: "10000",
-          msg: "Success",
-          trade_no: "2013112011001004330000121536",
-          out_trade_no: "pay_1",
-          trade_status: "TRADE_SUCCESS",
-        };
-        const node = JSON.stringify(payload);
-        const signature = signRsa2(node, keys.privateKey);
-        const raw = `{"${nodeName}":${node},"sign":"${signature}"}`;
-        return Promise.resolve(new Response(raw, { status: 200 }));
-      },
+      client,
     });
 
     const created = await port.createPayment({
@@ -62,82 +57,73 @@ describe("alipay adapter", () => {
       currency: "CNY",
       subject: "Shoe/42",
     });
-    expect(created.ok).toBe(true);
-    if (!created.ok) {
-      return;
-    }
-    expect(created.providerTradeNo).toBeNull();
-    expect(created.action).toEqual(expect.stringContaining("method=alipay.trade.page.pay"));
-    const action = String(created.action);
-    const query = new URL(action).searchParams;
-    expect(query.get("method")).toBe(alipayMethods.create);
-    const biz = JSON.parse(query.get("biz_content") ?? "{}") as Record<string, string>;
-    expect(biz).toEqual({
-      out_trade_no: "pay_001",
-      total_amount: "1599.00",
-      subject: "Shoe42",
-      product_code: "FAST_INSTANT_TRADE_PAY",
+    expect(created).toMatchObject({
+      ok: true,
+      action: "https://openapi.alipay.com/gateway.do?method=alipay.trade.page.pay",
+      providerTradeNo: null,
     });
-    expect(query.get("notify_url")).toBe("https://merclink.example/api/v1/payments/alipay/notify");
-    const signed = parseForm(action.slice(action.indexOf("?") + 1));
-    expect(
-      verifyRsa2(
-        signedContent(signed, { exclude: ["sign"], skipEmpty: true }),
-        signed.sign ?? "",
-        keys.publicKey,
-      ),
-    ).toBe(true);
-
-    const queried = await port.queryPayment({ paymentId: "pay_001", providerTradeNo: null });
-    expect(queried).toEqual({
+    await expect(
+      port.queryPayment({ paymentId: "pay_001", providerTradeNo: null }),
+    ).resolves.toEqual({
       ok: true,
       status: "paid",
       providerTradeNo: "2013112011001004330000121536",
     });
-    const queryBody = parseForm(calls[0]?.body ?? "");
-    expect(queryBody.method).toBe(alipayMethods.query);
-    expect(JSON.parse(queryBody.biz_content ?? "{}")).toEqual({ out_trade_no: "pay_001" });
-
-    const closed = await port.cancelPayment({ paymentId: "pay_001", providerTradeNo: "trade_1" });
-    expect(closed).toEqual({ ok: true });
-    expect(parseForm(calls[1]?.body ?? "").method).toBe(alipayMethods.close);
-
-    const notify = formNotify({
-      app_id: appId,
-      trade_status: "TRADE_SUCCESS",
-      trade_no: "2013112011001004330000121536",
-      out_trade_no: "pay_001",
-      notify_type: "trade_status_sync",
-    });
-    await expect(port.verifyNotification({ body: notify, headers: {} })).resolves.toEqual({
-      ok: true,
-      status: "paid",
-      providerTradeNo: "2013112011001004330000121536",
-      paymentId: "pay_001",
-    });
-    const tampered = notify.replace("TRADE_SUCCESS", "TRADE_CLOSED");
-    await expect(port.verifyNotification({ body: tampered, headers: {} })).resolves.toMatchObject({
-      ok: false,
-      error: "invalid_signature",
-    });
-
-    const wrongCurrency = await port.createPayment({
-      paymentId: "pay_002",
-      orderId: "ord_2",
-      amount: minorUnits(100),
-      currency: "USD",
-      subject: "Shoe",
-    });
-    expect(wrongCurrency).toMatchObject({ ok: false, error: "payment_retryable" });
+    await expect(
+      port.cancelPayment({ paymentId: "pay_001", providerTradeNo: "trade_1" }),
+    ).resolves.toEqual({ ok: true });
+    await expect(
+      port.verifyNotification({
+        body: "app_id=2014072300007148&trade_status=TRADE_SUCCESS&trade_no=2013112011001004330000121536&out_trade_no=pay_001",
+        headers: {},
+      }),
+    ).resolves.toMatchObject({ ok: true, status: "paid" });
+    await expect(
+      port.verifyNotification({
+        body: "app_id=2014072300007148&trade_status=TRADE_CLOSED&trade_no=1&out_trade_no=pay_001",
+        headers: {},
+      }),
+    ).resolves.toMatchObject({ ok: false, error: "invalid_signature" });
+    expect(calls).toEqual([alipayMethods.create, alipayMethods.query, alipayMethods.close]);
     expect(
-      extractJsonNode(`{"alipay_trade_query_response":{"code":"10000"}}`, "missing"),
-    ).toBeNull();
+      pagePayBizContent({ paymentId: "pay_001", amount: minorUnits(159900), subject: "Shoe/42" }),
+    ).toContain("FAST_INSTANT_TRADE_PAY");
+  });
+
+  it("builds a domestic payment link with the official SDK and refuses an unverified Alipay+ contract", async () => {
+    const sdk = createAlipaySdk({
+      appId,
+      privateKey: keys.privateKey,
+      alipayPublicKey: keys.publicKey,
+      notifyUrl: "https://merclink.example/api/v1/payments/alipay/notify",
+    });
+    const action = sdk.pageExecute(alipayMethods.create, "GET", {
+      bizContent: {
+        out_trade_no: "pay_001",
+        total_amount: "1599.00",
+        subject: "Shoe42",
+        product_code: "FAST_INSTANT_TRADE_PAY",
+      },
+      notifyUrl: "https://merclink.example/api/v1/payments/alipay/notify",
+    });
+    expect(action).toContain("method=alipay.trade.page.pay");
+    expect(action).not.toContain(keys.privateKey);
+
+    const international = createAlipayPaymentPort({
+      appId,
+      privateKey: keys.privateKey,
+      alipayPublicKey: keys.publicKey,
+      notifyUrl: "https://merclink.example/notify",
+      product: "alipayplus",
+    });
+    await expect(
+      international.createPayment({
+        paymentId: "pay_002",
+        orderId: "ord_2",
+        amount: minorUnits(100),
+        currency: "USD",
+        subject: "Shoe",
+      }),
+    ).resolves.toMatchObject({ ok: false, error: "payment_retryable" });
   });
 });
-
-function formNotify(fields: Record<string, string>): string {
-  const content = signedContent(fields, { exclude: ["sign", "sign_type"], skipEmpty: false });
-  const sign = signRsa2(content, keys.privateKey);
-  const params = new URLSearchParams({ ...fields, sign, sign_type: "RSA2" });
-  return params.toString();
-}

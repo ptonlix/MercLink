@@ -1,1 +1,1 @@
-export { createAlipayPaymentPort } from "./adapter";
+export { createAlipayPaymentPort, createAlipaySdk, type AlipayOpenApi } from "./adapter";

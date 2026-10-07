@@ -103,7 +103,8 @@ describe("PRD section 12", () => {
       path.join(process.cwd(), "src/adapters/alipay/adapter.ts"),
       "utf8",
     );
-    expect(adapter).toContain("action:");
+    expect(adapter).toContain("pageExecute");
+    expect(adapter).toContain("alipayMethods.create");
   });
 
   it("runs the merchant and buyer loop on one database transaction", async () => {
