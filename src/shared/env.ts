@@ -20,6 +20,12 @@ export const envSchema = z.object({
   ALIPAY_PUBLIC_KEY: nonEmpty,
   ALIPAY_NOTIFY_URL: nonEmpty,
   APP_BASE_URL: nonEmpty,
+  REDIS_URL: nonEmpty,
+  OBJECT_STORAGE_ENDPOINT: nonEmpty,
+  OBJECT_STORAGE_REGION: nonEmpty,
+  OBJECT_STORAGE_BUCKET: nonEmpty,
+  OBJECT_STORAGE_ACCESS_KEY_ID: nonEmpty,
+  OBJECT_STORAGE_SECRET_ACCESS_KEY: nonEmpty,
 });
 
 export const requiredEnvKeys = [
@@ -40,6 +46,12 @@ export const requiredEnvKeys = [
   "ALIPAY_PUBLIC_KEY",
   "ALIPAY_NOTIFY_URL",
   "APP_BASE_URL",
+  "REDIS_URL",
+  "OBJECT_STORAGE_ENDPOINT",
+  "OBJECT_STORAGE_REGION",
+  "OBJECT_STORAGE_BUCKET",
+  "OBJECT_STORAGE_ACCESS_KEY_ID",
+  "OBJECT_STORAGE_SECRET_ACCESS_KEY",
 ] as const satisfies readonly (keyof z.infer<typeof envSchema>)[];
 
 export type EnvKey = (typeof requiredEnvKeys)[number];
@@ -90,13 +102,18 @@ export function loadEnv(source: Readonly<Record<string, string | undefined>>): L
 
 export function secretValues(env: AppEnv): readonly string[] {
   const values: string[] = Object.values(env);
+  pushUrlPassword(values, env.DATABASE_URL);
+  pushUrlPassword(values, env.REDIS_URL);
+  return values.filter((value) => value.length > 0);
+}
+
+function pushUrlPassword(values: string[], raw: string): void {
   try {
-    const password = new URL(env.DATABASE_URL).password;
+    const password = new URL(raw).password;
     if (password !== "") {
       values.push(decodeURIComponent(password));
     }
   } catch {
-    // The full DATABASE_URL is already included.
+    // The full URL is already included.
   }
-  return values.filter((value) => value.length > 0);
 }

@@ -41,6 +41,8 @@ import {
   type Sql,
   type VariantRow,
 } from "./db";
+import { ownedMediaCover } from "./images";
+import { mediaBaseUrl } from "./media-runtime";
 import { productRecord, type ProductRecord, variantRecord } from "./records";
 
 export async function createProduct(
@@ -84,6 +86,10 @@ export async function createProduct(
       if (catalog === undefined) {
         return catalogFail("not_found", "没有找到目录。");
       }
+      const acceptedCover = await writableCover(tx, merchantId, catalogId, cover.value);
+      if (!acceptedCover.ok) {
+        return acceptedCover;
+      }
       const fields = (await loadFields(tx, catalogId)).map(toField);
       const attrs = validateAttrs(fields, parsed.value.fields);
       if (!attrs.ok) {
@@ -99,7 +105,7 @@ export async function createProduct(
           ${catalogId},
           ${title.value},
           'off',
-          ${cover.value},
+          ${acceptedCover.value},
           ${tx.json(attrs.value)},
           ${catalog.schema_revision}
         )
@@ -118,7 +124,7 @@ export async function createProduct(
             ${price.value},
             ${stock.value},
             'on',
-            ${cover.value}
+            ${acceptedCover.value}
           )
         `;
       }
@@ -157,6 +163,13 @@ export async function patchProduct(
       if (!loaded.ok) {
         return loaded;
       }
+      const acceptedCover =
+        cover === undefined
+          ? undefined
+          : await writableCover(tx, merchantId, catalogId, cover.value);
+      if (acceptedCover !== undefined && !acceptedCover.ok) {
+        return acceptedCover;
+      }
       const fields = (await loadFields(tx, catalogId)).map(toField);
       const attrs =
         parsed.value.fields === undefined
@@ -181,7 +194,7 @@ export async function patchProduct(
       await tx`
         UPDATE products
         SET title = ${title?.ok === true ? title.value : loaded.value.title},
-            cover = ${cover === undefined ? loaded.value.cover : cover.value},
+            cover = ${acceptedCover === undefined ? loaded.value.cover : acceptedCover.value},
             attrs = ${tx.json(attrs.value)},
             updated_at = now()
         WHERE id = ${productId}
@@ -386,6 +399,10 @@ export async function createVariant(
       if (!combination.ok) {
         return combination;
       }
+      const acceptedCover = await writableCover(tx, merchantId, catalogId, cover.value);
+      if (!acceptedCover.ok) {
+        return acceptedCover;
+      }
       await tx`
         INSERT INTO variants (
           id, catalog_id, product_id, sku, option_values, price, stock, status, cover
@@ -399,7 +416,7 @@ export async function createVariant(
           ${price.value},
           ${stock.value},
           'on',
-          ${cover.value}
+          ${acceptedCover.value}
         )
       `;
       await tx`UPDATE products SET updated_at = now() WHERE id = ${productId}`;
@@ -450,6 +467,13 @@ export async function patchVariant(
       if (!loaded.ok) {
         return loaded;
       }
+      const acceptedCover =
+        cover === undefined
+          ? undefined
+          : await writableCover(tx, merchantId, catalogId, cover.value);
+      if (acceptedCover !== undefined && !acceptedCover.ok) {
+        return acceptedCover;
+      }
       const restoring = parsed.value.restore === true;
       if (variant.deleted_at !== null && !restoring) {
         return catalogFail("not_found", "没有找到规格。");
@@ -485,7 +509,7 @@ export async function patchVariant(
         SET price = ${price?.ok === true ? price.value : variant.price},
             stock = ${stock === undefined ? variant.stock : stock.value},
             sku = ${sku === undefined ? variant.sku : sku.value},
-            cover = ${cover === undefined ? variant.cover : cover.value},
+            cover = ${acceptedCover === undefined ? variant.cover : acceptedCover.value},
             status = ${nextStatus},
             deleted_at = ${restoring ? null : variant.deleted_at},
             updated_at = now()
@@ -523,6 +547,20 @@ export async function softDeleteVariant(
       WHERE id = ${variantId}
     `;
     return catalogOk(await assemble(tx, variant.product_id));
+  });
+}
+
+async function writableCover(
+  db: Db,
+  merchantId: string,
+  catalogId: string,
+  cover: string | null,
+): Promise<CatalogResult<string | null>> {
+  return ownedMediaCover(db, {
+    merchantId,
+    catalogId,
+    cover,
+    appBaseUrl: mediaBaseUrl(),
   });
 }
 

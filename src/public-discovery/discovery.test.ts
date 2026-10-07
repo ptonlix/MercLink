@@ -35,6 +35,7 @@ describe("discovery files", () => {
 
   it("drops a product from the sitemap when the seam stops returning it", async () => {
     const first = product("prd_first", "第一双");
+    first.cover = `${origin}/media/img_secret`;
     const second = product("prd_second", "第二双");
     publicProducts.register({
       list: (query) => {
@@ -61,6 +62,8 @@ describe("discovery files", () => {
     expect(withProducts.some((url) => url.includes("/admin"))).toBe(false);
     expect(withProducts.some((url) => url.includes("/api"))).toBe(false);
     expect(withProducts.some((url) => url.includes("/agent-docs/"))).toBe(false);
+    expect(withProducts.some((url) => url.includes("/media/"))).toBe(false);
+    expect(withProducts).not.toContain(first.cover);
 
     publicProducts.register({
       list: () => Promise.resolve({ items: [second], nextCursor: null }),

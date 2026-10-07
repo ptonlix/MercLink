@@ -28,6 +28,7 @@ export const apiRoutes = [
   { method: "POST", path: "/api/v1/catalogs/{id}/fields/changes", audiences: merchant },
   { method: "GET", path: "/api/v1/catalogs/{id}/products", audiences: merchant },
   { method: "POST", path: "/api/v1/catalogs/{id}/products", audiences: merchant },
+  { method: "POST", path: "/api/v1/catalogs/{id}/images", audiences: merchant },
   {
     method: "PATCH",
     path: "/api/v1/catalogs/{id}/products/{product_id}",

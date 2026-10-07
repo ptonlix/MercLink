@@ -46,7 +46,7 @@
 
 ### Redis 是必填运行依赖
 
-`REDIS_URL` 加入启动必填环境变量，缺少时拒绝启动。`compose.yaml` 增加 Redis，以及 MinIO `RELEASE.2025-10-15T17-29-55Z`，并在启动前创建桶。这只让本地 compose 能填满必填配置。不启动 MinIO 或清空对象存储变量时，应用必须启动失败。不设内存或磁盘假实现作为生产降级。Redis 故障时上传失败关闭，已存图片的 `GET /media/{id}` 不访问 Redis，但仍从对象存储读取。
+`REDIS_URL` 加入启动必填环境变量，缺少时拒绝启动。`compose.yaml` 增加 Redis，以及 `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z`，并在启动前创建桶。原计划的 `minio/minio:RELEASE.2025-10-15T17-29-55Z` 没有可拉取的已发布镜像，Docker Hub 上也不再有 `minio/minio` 仓库，因此改为最后发布的社区镜像，摘要 `sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e`。这只让本地 compose 能填满必填配置。不启动 MinIO 或清空对象存储变量时，应用必须启动失败。不设内存或磁盘假实现作为生产降级。Redis 故障时上传失败关闭，已存图片的 `GET /media/{id}` 不访问 Redis，但仍从对象存储读取。
 
 镜像钉为官方 `redis:8.10.2`。本地 compose 只在应用网络内访问 Redis，不把 6379 发布到宿主机。生产若必须对外暴露，要求密码，且密码不进仓库。
 
@@ -85,4 +85,4 @@
 
 ## Open Questions
 
-无。相册和缩略图留到后续变更。实施时若 `minio/minio:RELEASE.2025-10-15T17-29-55Z` 拉不下来，停止并更换已发布标签，不得改回本地目录。
+无。相册和缩略图留到后续变更。对象存储镜像已改为 `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z`，因为 `minio/minio:RELEASE.2025-10-15T17-29-55Z` 拉不下来。不得改回本地目录。

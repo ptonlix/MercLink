@@ -21,6 +21,8 @@ import {
   softDeleteVariant,
   unpublishProduct,
 } from "./products";
+import { imageResponse, publicImageResponse, readPublicImage, uploadCatalogImage } from "./images";
+import { mediaRuntime } from "./media-runtime";
 import { getPublicProduct, listMerchantProducts, listPublicProducts } from "./query";
 import { registerCatalog } from "./register";
 import type { Sql } from "./db";
@@ -265,6 +267,34 @@ export async function getMerchantProducts(request: Request, catalogId: string): 
     items: value.items.map(productJson),
     next_cursor: value.nextCursor,
   }));
+}
+
+export async function postCatalogImage(request: Request, catalogId: string): Promise<Response> {
+  const gate = await merchantGate(request, "product:write");
+  if (!gate.ok) {
+    return gate.response;
+  }
+  const sql = ensureCatalogRegistered();
+  const uploaded = await uploadCatalogImage(sql, gate.merchantId, catalogId, request);
+  return imageResponse(
+    uploaded,
+    (image) => ({
+      id: image.id,
+      url: image.url,
+      content_type: image.contentType,
+      byte_size: image.byteSize,
+    }),
+    201,
+  );
+}
+
+export async function getMedia(id: string): Promise<Response> {
+  const runtime = mediaRuntime();
+  if (runtime === undefined) {
+    return apiError("dependency_unavailable", "图片暂时无法读取。", 503);
+  }
+  const sql = ensureCatalogRegistered();
+  return publicImageResponse(await readPublicImage(sql, runtime.objectStorage, id));
 }
 
 export async function postProduct(request: Request, catalogId: string): Promise<Response> {

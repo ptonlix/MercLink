@@ -92,6 +92,17 @@ export const productOptions = pgTable(
   (table) => [uniqueIndex("product_options_product_key").on(table.productId, table.key)],
 );
 
+export const productImages = pgTable("product_images", {
+  id: text("id").primaryKey(),
+  merchantId: text("merchant_id").notNull(),
+  catalogId: text("catalog_id")
+    .notNull()
+    .references(() => catalogs.id),
+  contentType: text("content_type").notNull(),
+  byteSize: integer("byte_size").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const variants = pgTable("variants", {
   id: text("id").primaryKey(),
   catalogId: text("catalog_id").notNull(),

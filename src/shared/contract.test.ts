@@ -64,6 +64,8 @@ describe("errors", () => {
       expect(errorCodes).toContain(code);
     }
     expect(errorCodes).toContain("password_change_required");
+    expect(errorCodes).toContain("rate_limited");
+    expect(errorCodes).toContain("sms_rate_limited");
 
     const response = apiError("validation_error", "Invalid JSON body\n    at secret line", 400);
     const text = await response.text();
@@ -80,8 +82,12 @@ describe("ids and money", () => {
   it("keeps public ids prefixed and prices in minor units", () => {
     const productId = createPublicId("product");
     const orderId = createPublicId("order");
+    const imageId = createPublicId("image");
     expect(hasIdPrefix(productId, "product")).toBe(true);
     expect(hasIdPrefix(orderId, "order")).toBe(true);
+    expect(hasIdPrefix(imageId, "image")).toBe(true);
+    expect(imageId.startsWith(idPrefixes.image)).toBe(true);
+    expect(imageId).not.toContain("photo");
     expect(productId.startsWith(idPrefixes.order)).toBe(false);
     expect(orderId.startsWith(idPrefixes.product)).toBe(false);
     expect(minorUnits(159900)).toBe(159900);
