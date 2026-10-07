@@ -46,8 +46,12 @@ describe("place order rules", () => {
       ok: false,
       error: "validation_error",
     });
-    expect(rejectCallerPrice(true)).toMatchObject({ ok: false, error: "validation_error" });
-    expect(rejectCallerPrice(false)).toEqual({ ok: true });
+    expect(rejectCallerPrice({ price: 1 })).toMatchObject({ ok: false, error: "validation_error" });
+    expect(rejectCallerPrice({ items: [{ variant_id: "var_1", qty: 1, price: 1 }] })).toMatchObject({
+      ok: false,
+      error: "validation_error",
+    });
+    expect(rejectCallerPrice({ items: [{ variant_id: "var_1", qty: 1 }] })).toEqual({ ok: true });
     expect(validateSingleLine([{ variantId: "var_1", qty: 2 }])).toMatchObject({
       ok: true,
       line: { qty: 2 },

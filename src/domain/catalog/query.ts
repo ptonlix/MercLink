@@ -182,7 +182,7 @@ function resolveOne(
     }
     return catalogOk({ kind: "eq", key: field.key, type: "boolean", value: filter.raw === "true" });
   }
-  if (field.type === "single-select" && !field.options.includes(filter.raw)) {
+  if (field.type === "single-select" && !field.choices.includes(filter.raw)) {
     return catalogOk({ kind: "eq", key: field.key, type: field.type, value: filter.raw });
   }
   return catalogOk({ kind: "eq", key: field.key, type: field.type, value: filter.raw });

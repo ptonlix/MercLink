@@ -1,6 +1,6 @@
 import { minorUnits } from "../../shared/money";
 import type { PublicProduct, PublicProductPage } from "../../shared/seams/public-products";
-import { publicAttrs } from "../../domain/catalog/attributes";
+import { publicFields } from "../../domain/catalog/attributes";
 import {
   encodeCursor,
   likePattern,
@@ -16,7 +16,7 @@ import {
   findCatalog,
   loadFields,
   ownedCatalog,
-  readAttrs,
+  readFields,
   readOptionValues,
   toField,
   type Db,
@@ -65,7 +65,7 @@ export async function getPublicProduct(
   productId: string,
 ): Promise<CatalogResult<PublicProduct>> {
   const rows = await db<PublicQueryRow[]>`
-    SELECT p.id, p.catalog_id, p.title, p.status, p.cover, p.attrs, p.schema_revision,
+    SELECT p.id, p.catalog_id, p.title, p.status, p.cover, p.fields, p.schema_revision,
            p.created_at, p.updated_at, p.deleted_at, c.currency
     FROM products p
     JOIN catalogs c ON c.id = p.catalog_id
@@ -118,7 +118,7 @@ export async function listMerchantProducts(
   const limit = parsed.value.limit + 1;
   const rows = await db.unsafe<PublicQueryRow[]>(
     `
-      SELECT p.id, p.catalog_id, p.title, p.status, p.cover, p.attrs, p.schema_revision,
+      SELECT p.id, p.catalog_id, p.title, p.status, p.cover, p.fields, p.schema_revision,
              p.created_at, p.updated_at, p.deleted_at, c.currency
       FROM products p
       JOIN catalogs c ON c.id = p.catalog_id
@@ -176,7 +176,7 @@ async function queryVisibleProducts(
         WHERE f.catalog_id = p.catalog_id
           AND f.status = 'active'
           AND f.type = 'text'
-          AND COALESCE(p.attrs->>f.key, '') ILIKE ${pattern} ESCAPE '\\'
+          AND COALESCE(p.fields->>f.key, '') ILIKE ${pattern} ESCAPE '\\'
       )
     )`);
   }
@@ -204,7 +204,7 @@ async function queryVisibleProducts(
   }
   const rows = await db.unsafe<PublicQueryRow[]>(
     `
-      SELECT p.id, p.catalog_id, p.title, p.status, p.cover, p.attrs, p.schema_revision,
+      SELECT p.id, p.catalog_id, p.title, p.status, p.cover, p.fields, p.schema_revision,
              p.created_at, p.updated_at, p.deleted_at, c.currency
       FROM products p
       JOIN catalogs c ON c.id = p.catalog_id
@@ -267,14 +267,14 @@ async function toPublic(db: Db, row: PublicQueryRow): Promise<PublicProduct | un
       currency: row.currency,
       availability: offer.availability,
     },
-    fields: publicAttrs(fields, readAttrs(row.attrs)),
+    fields: publicFields(fields, readFields(row.fields)),
     variants: sellable.map((variant) => ({
       id: variant.id,
       price: minorUnits(variant.price),
       currency: row.currency,
       stock: variant.stock,
       availability: availability(variant.stock),
-      options: readOptionValues(variant.option_values),
+      optionValues: readOptionValues(variant.option_values),
       sku: variant.sku,
     })),
   };
@@ -307,11 +307,11 @@ async function assembleMerchant(
 function filterClause(filter: ResolvedFieldFilter, add: (value: SqlParam) => string): string {
   const key = add(filter.key);
   if (filter.kind === "number") {
-    return `(p.attrs->>${key})::numeric ${numberOp(filter.op)} ${add(filter.value)}`;
+    return `(p.fields->>${key})::numeric ${numberOp(filter.op)} ${add(filter.value)}`;
   }
   const value =
     filter.type === "boolean" ? (filter.value ? "true" : "false") : String(filter.value);
-  return `p.attrs->>${key} = ${add(value)}`;
+  return `p.fields->>${key} = ${add(value)}`;
 }
 
 function numberOp(op: CompareOp): string {

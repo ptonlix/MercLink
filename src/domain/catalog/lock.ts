@@ -1,5 +1,5 @@
 import { minorUnits, type MinorUnits } from "../../shared/money";
-import type { Attrs } from "./fields";
+import type { Fields } from "./fields";
 import { catalogFail, catalogOk, type CatalogResult } from "./result";
 
 export type LockCandidate = {
@@ -12,7 +12,7 @@ export type LockCandidate = {
   stock: number | null;
   sku: string | null;
   optionValues: Readonly<Record<string, string>>;
-  attrs: Attrs;
+  fields: Fields;
   schemaRevision: number;
   variantStatus: "on" | "off";
   productStatus: "on" | "off";

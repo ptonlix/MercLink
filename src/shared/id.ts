@@ -16,6 +16,7 @@ export const idPrefixes = {
   payment: "pay_",
   apiKey: "key_",
   grant: "grn_",
+  challenge: "chg_",
 } as const;
 
 export type IdKind = keyof typeof idPrefixes;

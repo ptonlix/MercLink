@@ -28,9 +28,9 @@ export function parseFieldChangeBody(input: unknown): CatalogResult<ParsedFieldC
     if (!type.ok) {
       return type;
     }
-    const options = readOptions(record);
-    if (!options.ok) {
-      return options;
+    const choices = readChoices(record);
+    if (!choices.ok) {
+      return choices;
     }
     return catalogOk({
       confirm,
@@ -40,7 +40,7 @@ export function parseFieldChangeBody(input: unknown): CatalogResult<ParsedFieldC
         label: readString(record, "label") ?? "",
         type: type.value,
         required: record.required === true,
-        options: options.value,
+        choices: choices.value,
       },
     });
   }
@@ -58,11 +58,11 @@ export function parseFieldChangeBody(input: unknown): CatalogResult<ParsedFieldC
     if (!type.ok) {
       return type;
     }
-    const options = readOptions(record);
-    if (!options.ok) {
-      return options;
+    const choices = readChoices(record);
+    if (!choices.ok) {
+      return choices;
     }
-    return catalogOk({ confirm, change: { op, key, type: type.value, options: options.value } });
+    return catalogOk({ confirm, change: { op, key, type: type.value, choices: choices.value } });
   }
   if (op === "make_required" || op === "make_optional" || op === "retire") {
     return catalogOk({ confirm, change: { op, key } });
@@ -79,9 +79,9 @@ export function parseFieldCreateBody(input: unknown): CatalogResult<ParsedFieldC
   if (!type.ok) {
     return type;
   }
-  const options = readOptions(record);
-  if (!options.ok) {
-    return options;
+  const choices = readChoices(record);
+  if (!choices.ok) {
+    return choices;
   }
   return catalogOk({
     confirm: record.confirm === true,
@@ -91,7 +91,7 @@ export function parseFieldCreateBody(input: unknown): CatalogResult<ParsedFieldC
       label: readString(record, "label") ?? "",
       type: type.value,
       required: record.required === true,
-      options: options.value,
+      choices: choices.value,
     },
   });
 }
@@ -162,7 +162,7 @@ export function parseProductPatch(input: unknown): CatalogResult<{
   });
 }
 
-export function parseOptionBody(input: unknown): CatalogResult<{ key: string; label: string }> {
+export function parseAxisBody(input: unknown): CatalogResult<{ key: string; label: string }> {
   const record = asRecord(input);
   if (record === undefined) {
     return catalogFail("validation_error", "请求体必须是 JSON 对象。");
@@ -174,7 +174,7 @@ export function parseOptionBody(input: unknown): CatalogResult<{ key: string; la
 }
 
 export function parseVariantBody(input: unknown): CatalogResult<{
-  options: Readonly<Record<string, string>>;
+  optionValues: Readonly<Record<string, string>>;
   price: unknown;
   stock?: unknown;
   sku?: unknown;
@@ -184,15 +184,18 @@ export function parseVariantBody(input: unknown): CatalogResult<{
   if (record === undefined) {
     return catalogFail("validation_error", "请求体必须是 JSON 对象。");
   }
-  const options = readStringRecord(record, "options");
-  if (!options.ok) {
-    return options;
+  if (hasOwn(record, "options")) {
+    return catalogFail("validation_error", "请使用 option_values，不能使用 options。");
+  }
+  const optionValues = readStringRecord(record, "option_values");
+  if (!optionValues.ok) {
+    return optionValues;
   }
   if (!hasOwn(record, "price")) {
     return catalogFail("validation_error", "规格必须有价格。");
   }
   return catalogOk({
-    options: options.value,
+    optionValues: optionValues.value,
     price: record.price,
     ...(hasOwn(record, "stock") ? { stock: record.stock } : {}),
     ...(hasOwn(record, "sku") ? { sku: record.sku } : {}),
@@ -237,14 +240,17 @@ function readType(record: Readonly<Record<string, unknown>>): CatalogResult<Fiel
   return catalogOk(type);
 }
 
-function readOptions(record: Readonly<Record<string, unknown>>): CatalogResult<readonly string[]> {
-  if (!hasOwn(record, "options") || record.options === undefined) {
+function readChoices(record: Readonly<Record<string, unknown>>): CatalogResult<readonly string[]> {
+  if (hasOwn(record, "options")) {
+    return catalogFail("validation_error", "请使用 choices，不能使用 options。");
+  }
+  if (!hasOwn(record, "choices") || record.choices === undefined) {
     return catalogOk([]);
   }
-  if (!Array.isArray(record.options) || record.options.some((item) => typeof item !== "string")) {
+  if (!Array.isArray(record.choices) || record.choices.some((item) => typeof item !== "string")) {
     return catalogFail("validation_error", "选项必须是字符串数组。");
   }
-  return catalogOk(record.options);
+  return catalogOk(record.choices);
 }
 
 function readObject(
@@ -270,7 +276,7 @@ function readStringRecord(
     return catalogOk<Readonly<Record<string, string>>>({});
   }
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return catalogFail("validation_error", "options 必须是对象。");
+    return catalogFail("validation_error", "option_values 必须是对象。");
   }
   const parsed: Record<string, string> = {};
   for (const [itemKey, itemValue] of Object.entries(value)) {

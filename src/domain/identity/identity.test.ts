@@ -26,7 +26,9 @@ import {
   smsDailyCap,
   smsMaxWrongChecks,
   smsMinIntervalMs,
-  smsSendAllowed,
+  smsRateLimitPolicies,
+  smsSendLimited,
+  smsSendPolicyNames,
   smsWindowMs,
 } from "./registration";
 
@@ -84,6 +86,15 @@ describe("admin and merchant accounts", () => {
     ).toBe(true);
     expect(unknownMerchantMessage).toBe("请联系管理员开通");
   });
+
+  it("disables a merchant through the access seam instead of writing grant tables", async () => {
+    const source = await readFile("src/app-services/identity/merchants.ts", "utf8");
+    expect(source).toContain("disableMerchantEffects");
+    expect(source).toContain("revokeMerchantAccess");
+    expect(source).not.toContain("oauth_grants");
+    expect(source).not.toContain("api_keys");
+    expect(source).not.toContain("oidc_records");
+  });
 });
 
 describe("buyer registration rules", () => {
@@ -96,29 +107,31 @@ describe("buyer registration rules", () => {
     expect(captchaParamAccepted("param-1", [])).toEqual({ ok: true });
   });
 
-  it("enforces the 60 second interval and the 24 hour cap", () => {
-    const now = new Date("2026-05-16T12:00:00.000Z");
-    const recent = new Date(now.getTime() - 30_000);
-    expect(smsSendAllowed({ now, sentAt: [recent] })).toMatchObject({
+  it("locks the live SMS rate-limit policies and messages", async () => {
+    expect(smsRateLimitPolicies()).toEqual({
+      [smsSendPolicyNames.interval]: { limit: 1, windowMs: smsMinIntervalMs },
+      [smsSendPolicyNames.daily]: { limit: smsDailyCap, windowMs: smsWindowMs },
+    });
+    expect(smsSendLimited("interval")).toEqual({
       ok: false,
       error: "sms_rate_limited",
       message: "发送过于频繁，请稍后再试。",
     });
-    expect(smsSendAllowed({ now, sentAt: [new Date(now.getTime() - smsMinIntervalMs)] })).toEqual({
-      ok: true,
-    });
-
-    const sends = Array.from({ length: smsDailyCap }, (_item, index) => {
-      return new Date(now.getTime() - smsMinIntervalMs * (index + 1));
-    });
-    expect(smsSendAllowed({ now, sentAt: sends })).toMatchObject({
+    expect(smsSendLimited("daily")).toEqual({
       ok: false,
       error: "sms_rate_limited",
       message: "今日发送次数已达上限。",
     });
-    expect(smsSendAllowed({ now, sentAt: [] })).toEqual({ ok: true });
-    const stale = new Date(now.getTime() - smsWindowMs);
-    expect(smsSendAllowed({ now, sentAt: [stale] })).toEqual({ ok: true });
+    const buyers = await readFile("src/app-services/identity/buyers.ts", "utf8");
+    const runtime = await readFile("src/app-services/identity/runtime.ts", "utf8");
+    expect(buyers).toContain("smsSendLimited");
+    expect(buyers).toContain("smsSendPolicyNames");
+    expect(runtime).toContain("smsRateLimitPolicies");
+    expect(buyers).not.toContain("smsSendAllowed");
+    expect(runtime).not.toContain("smsSendAllowed");
+    expect(await readFile("src/domain/identity/registration.ts", "utf8")).not.toContain(
+      "smsSendAllowed",
+    );
   });
 
   it("does not import the Redis client", async () => {

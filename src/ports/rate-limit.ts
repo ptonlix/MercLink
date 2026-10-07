@@ -1,11 +1,11 @@
+import { imageUploadPolicies as catalogImageUploadPolicies } from "../domain/catalog/images";
+
 export type RateLimitPolicy = {
   limit: number;
   windowMs: number;
 };
 
-export const imageUploadPolicies = {
-  "image-upload": { limit: 30, windowMs: 60_000 },
-} as const satisfies Record<string, RateLimitPolicy>;
+export const imageUploadPolicies = catalogImageUploadPolicies();
 
 export type RateLimitReservation = {
   id: string;

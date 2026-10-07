@@ -4,6 +4,7 @@ import {
   changeMerchantPassword,
   loginMerchant,
   merchantApprovalAllowed,
+  unknownMerchantCopy,
 } from "../../../../app-services/identity/merchants";
 import {
   appRuntime,
@@ -17,7 +18,6 @@ import {
   sessionTtlSeconds,
   signSession,
 } from "../../../../app-services/identity/session";
-import { unknownMerchantMessage } from "../../../../domain/identity/accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +38,7 @@ export async function POST(request: Request): Promise<Response> {
     });
     if (!result.ok) {
       const notice =
-        result.message === unknownMerchantMessage ? unknownMerchantMessage : result.message;
+        result.message === unknownMerchantCopy() ? unknownMerchantCopy() : result.message;
       return redirectTo(`/authorize/merchant?notice=${encodeURIComponent(notice)}`);
     }
     return redirectTo("/authorize/merchant", {
@@ -57,7 +57,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (session === null || session.kind !== "account" || session.ownerType !== "merchant") {
-    return redirectTo(`/authorize/merchant?notice=${encodeURIComponent(unknownMerchantMessage)}`);
+    return redirectTo(`/authorize/merchant?notice=${encodeURIComponent(unknownMerchantCopy())}`);
   }
 
   if (intent === "change-password") {
@@ -75,7 +75,7 @@ export async function POST(request: Request): Promise<Response> {
     const { findMerchant } = await import("../../../../app-services/identity/merchants");
     const merchant = await findMerchant(runtime.sql, session.ownerId);
     if (merchant === null) {
-      return redirectTo(`/authorize/merchant?notice=${encodeURIComponent(unknownMerchantMessage)}`);
+      return redirectTo(`/authorize/merchant?notice=${encodeURIComponent(unknownMerchantCopy())}`);
     }
     const allowed = merchantApprovalAllowed(merchant);
     if (!allowed.ok) {

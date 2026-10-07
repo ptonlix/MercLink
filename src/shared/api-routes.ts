@@ -56,7 +56,7 @@ export const apiRoutes = [
   },
   {
     method: "POST",
-    path: "/api/v1/catalogs/{id}/products/{product_id}/options",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/axes",
     audiences: merchant,
   },
   {

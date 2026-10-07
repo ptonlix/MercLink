@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { anonymousActor, scriptActor } from "../../shared/actor";
 import { canReadSchema } from "./access";
-import { validateAttrs } from "./attributes";
+import { validateFields } from "./attributes";
 import { parseCover, parseSku, parseTitle, planCatalog } from "./catalogs";
 import {
-  convertAttrValue,
+  convertFieldValue,
   parseFieldKey,
   parseLabel,
-  parseOptions,
+  parseChoices,
   planFieldChange,
   type FieldDefinition,
 } from "./fields";
@@ -16,7 +16,7 @@ import {
   parseCatalogBody,
   parseFieldChangeBody,
   parseFieldCreateBody,
-  parseOptionBody,
+  parseAxisBody,
   parseProductBody,
   parseProductPatch,
   parseVariantBody,
@@ -41,7 +41,7 @@ const weight: FieldDefinition = {
   label: "重量",
   type: "number",
   required: false,
-  options: [],
+  choices: [],
   status: "active",
 };
 const color: FieldDefinition = {
@@ -49,7 +49,7 @@ const color: FieldDefinition = {
   label: "颜色",
   type: "single-select",
   required: true,
-  options: ["黑"],
+  choices: ["黑"],
   status: "active",
 };
 const flag: FieldDefinition = {
@@ -57,7 +57,7 @@ const flag: FieldDefinition = {
   label: "可折",
   type: "boolean",
   required: false,
-  options: [],
+  choices: [],
   status: "active",
 };
 const note: FieldDefinition = {
@@ -65,7 +65,7 @@ const note: FieldDefinition = {
   label: "备注",
   type: "text",
   required: false,
-  options: [],
+  choices: [],
   status: "active",
 };
 
@@ -80,7 +80,7 @@ function candidate(overrides: Partial<LockCandidate> = {}): LockCandidate {
     stock: 2,
     sku: null,
     optionValues: {},
-    attrs: {},
+    fields: {},
     schemaRevision: 1,
     variantStatus: "on",
     productStatus: "on",
@@ -107,11 +107,11 @@ describe("catalog edge branches", () => {
     expect(parseLabel("")).toMatchObject({ ok: false });
     expect(parseFieldKey("1bad")).toMatchObject({ ok: false });
     expect(parseFieldKey("price")).toMatchObject({ ok: false });
-    expect(parseOptions("text", ["x"])).toMatchObject({ ok: false });
-    expect(parseOptions("single-select", [])).toMatchObject({ ok: false });
-    expect(parseOptions("single-select", ["黑", "黑"])).toMatchObject({ ok: false });
-    expect(parseOptions("single-select", [" "])).toMatchObject({ ok: false });
-    expect(parseOptions("number", []).ok).toBe(true);
+    expect(parseChoices("text", ["x"])).toMatchObject({ ok: false });
+    expect(parseChoices("single-select", [])).toMatchObject({ ok: false });
+    expect(parseChoices("single-select", ["黑", "黑"])).toMatchObject({ ok: false });
+    expect(parseChoices("single-select", [" "])).toMatchObject({ ok: false });
+    expect(parseChoices("number", []).ok).toBe(true);
   });
 
   it("rejects invalid field changes and attribute writes", () => {
@@ -136,7 +136,7 @@ describe("catalog edge branches", () => {
         label: "重量",
         type: "number",
         required: false,
-        options: [],
+        choices: [],
       }),
     ).toMatchObject({ ok: false, error: "conflict" });
     expect(
@@ -146,7 +146,7 @@ describe("catalog edge branches", () => {
         label: "",
         type: "number",
         required: false,
-        options: [],
+        choices: [],
       }),
     ).toMatchObject({ ok: false });
     expect(
@@ -156,7 +156,7 @@ describe("catalog edge branches", () => {
         label: "尺码",
         type: "text",
         required: false,
-        options: ["x"],
+        choices: ["x"],
       }),
     ).toMatchObject({ ok: false });
     expect(
@@ -190,7 +190,7 @@ describe("catalog edge branches", () => {
         op: "change_type",
         key: "weight_g",
         type: "number",
-        options: [],
+        choices: [],
       }),
     ).toMatchObject({ ok: false });
     expect(
@@ -198,22 +198,22 @@ describe("catalog edge branches", () => {
         op: "change_type",
         key: "weight_g",
         type: "single-select",
-        options: [],
+        choices: [],
       }),
     ).toMatchObject({ ok: false });
-    expect(convertAttrValue(Number.NaN, "number", [])).toBeUndefined();
-    expect(convertAttrValue(true, "number", [])).toBeUndefined();
-    expect(convertAttrValue(false, "boolean", [])).toBe(false);
-    expect(convertAttrValue("false", "boolean", [])).toBe(false);
-    expect(convertAttrValue("maybe", "boolean", [])).toBeUndefined();
-    expect(convertAttrValue(1, "single-select", ["1"])).toBe("1");
-    expect(convertAttrValue(1, "single-select", ["2"])).toBeUndefined();
-    expect(validateAttrs([weight], { title: "鞋" })).toMatchObject({ ok: false });
-    expect(validateAttrs([weight], { weight_g: null })).toEqual({ ok: true, value: {} });
-    expect(validateAttrs([note], { note: "" })).toMatchObject({ ok: false });
-    expect(validateAttrs([note], { note: "布" }).ok).toBe(true);
-    expect(validateAttrs([flag], { folded: "true" })).toMatchObject({ ok: false });
-    expect(validateAttrs([color], { color: "黑" }).ok).toBe(true);
+    expect(convertFieldValue(Number.NaN, "number", [])).toBeUndefined();
+    expect(convertFieldValue(true, "number", [])).toBeUndefined();
+    expect(convertFieldValue(false, "boolean", [])).toBe(false);
+    expect(convertFieldValue("false", "boolean", [])).toBe(false);
+    expect(convertFieldValue("maybe", "boolean", [])).toBeUndefined();
+    expect(convertFieldValue(1, "single-select", ["1"])).toBe("1");
+    expect(convertFieldValue(1, "single-select", ["2"])).toBeUndefined();
+    expect(validateFields([weight], { title: "鞋" })).toMatchObject({ ok: false });
+    expect(validateFields([weight], { weight_g: null })).toEqual({ ok: true, value: {} });
+    expect(validateFields([note], { note: "" })).toMatchObject({ ok: false });
+    expect(validateFields([note], { note: "布" }).ok).toBe(true);
+    expect(validateFields([flag], { folded: "true" })).toMatchObject({ ok: false });
+    expect(validateFields([color], { color: "黑" }).ok).toBe(true);
   });
 
   it("rejects invalid variants, locks, and queries", () => {
@@ -271,16 +271,16 @@ describe("catalog edge branches", () => {
     expect(
       assertPublishable({
         deleted: false,
-        attrs: {},
-        fields: [],
+        fields: {},
+        definitions: [],
         variants: [{ ...variant({}), status: "off" }],
       }),
     ).toMatchObject({ ok: false, error: "conflict" });
     expect(
       assertPublishable({
         deleted: false,
-        attrs: {},
-        fields: [],
+        fields: {},
+        definitions: [],
         variants: [variant({ size: "40" }), variant({ color: "黑" })],
       }),
     ).toMatchObject({ ok: false, error: "conflict" });
@@ -370,7 +370,7 @@ describe("catalog edge branches", () => {
     expect(parseFieldChangeBody(null)).toMatchObject({ ok: false });
     expect(parseFieldChangeBody({})).toMatchObject({ ok: false });
     expect(parseFieldChangeBody({ op: "add_field", type: "nope" })).toMatchObject({ ok: false });
-    expect(parseFieldChangeBody({ op: "add_field", type: "number", options: "x" })).toMatchObject({
+    expect(parseFieldChangeBody({ op: "add_field", type: "number", choices: "x" })).toMatchObject({
       ok: false,
     });
     expect(
@@ -383,7 +383,7 @@ describe("catalog edge branches", () => {
     expect(parseFieldChangeBody({ op: "change_type", key: "weight_g", type: "text" }).ok).toBe(
       true,
     );
-    expect(parseFieldChangeBody({ op: "change_type", type: "number", options: [1] })).toMatchObject(
+    expect(parseFieldChangeBody({ op: "change_type", type: "number", choices: [1] })).toMatchObject(
       { ok: false },
     );
     expect(parseFieldChangeBody({ op: "retire", key: "weight_g" }).ok).toBe(true);
@@ -391,7 +391,7 @@ describe("catalog edge branches", () => {
     expect(parseFieldCreateBody({ type: "nope" })).toMatchObject({ ok: false });
     expect(parseFieldCreateBody({ type: "text", key: "note", label: "备注" }).ok).toBe(true);
     expect(
-      parseFieldCreateBody({ type: "single-select", options: ["黑"], key: "color", label: "颜色" })
+      parseFieldCreateBody({ type: "single-select", choices: ["黑"], key: "color", label: "颜色" })
         .ok,
     ).toBe(true);
     expect(parseCatalogBody(null)).toMatchObject({ ok: false });
@@ -402,11 +402,12 @@ describe("catalog edge branches", () => {
     expect(parseProductPatch(null)).toMatchObject({ ok: false });
     expect(parseProductPatch({ fields: [] })).toMatchObject({ ok: false });
     expect(parseProductPatch({ title: "新鞋", cover: null }).ok).toBe(true);
-    expect(parseOptionBody(null)).toMatchObject({ ok: false });
+    expect(parseAxisBody(null)).toMatchObject({ ok: false });
     expect(parseVariantBody(null)).toMatchObject({ ok: false });
-    expect(parseVariantBody({ options: [] })).toMatchObject({ ok: false });
-    expect(parseVariantBody({ options: { size: 1 } })).toMatchObject({ ok: false });
-    expect(parseVariantBody({ options: {} })).toMatchObject({ ok: false });
+    expect(parseVariantBody({ options: { size: "42" }, price: 1 })).toMatchObject({ ok: false });
+    expect(parseVariantBody({ option_values: [] })).toMatchObject({ ok: false });
+    expect(parseVariantBody({ option_values: { size: 1 } })).toMatchObject({ ok: false });
+    expect(parseVariantBody({ option_values: {} })).toMatchObject({ ok: false });
     expect(parseVariantPatch(null)).toMatchObject({ ok: false });
     expect(parseVariantPatch({ stock: null, sku: null, cover: null }).ok).toBe(true);
   });

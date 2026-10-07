@@ -1,18 +1,18 @@
 import { createPublicId } from "../../shared/id";
 import {
   detectImage,
+  imageUploadPolicyName,
+  maxImageBytes,
   mediaImageId,
   mediaUrl,
   type ImageContentType,
 } from "../../domain/catalog/images";
 import { catalogFail, catalogOk, type CatalogResult } from "../../domain/catalog/result";
 import type { ObjectStoragePort } from "../../ports/object-storage";
-import { imageUploadPolicies, type RateLimitPort } from "../../ports/rate-limit";
+import type { RateLimitPort } from "../../ports/rate-limit";
 import { apiError } from "../../shared/errors";
 import { lockCatalog, ownedCatalog, type Db, type Sql } from "./db";
 import { mediaRuntime } from "./media-runtime";
-
-const imageUploadPolicy = Object.keys(imageUploadPolicies)[0] ?? "image-upload";
 
 export type StoredImage = {
   id: string;
@@ -89,7 +89,7 @@ export async function uploadCatalogImage(
   if (runtime === undefined) {
     return imageFail("dependency_unavailable", "上传服务暂时不可用。");
   }
-  const limited = await consumeUpload(runtime.rateLimit, merchantId);
+  const limited = await consumeUpload(runtime.rateLimit, runtime.clock, merchantId);
   if (!limited.ok) {
     return limited;
   }
@@ -188,13 +188,14 @@ function binaryBody(bytes: Uint8Array): ArrayBuffer {
 
 async function consumeUpload(
   rateLimit: RateLimitPort,
+  clock: { now: () => Date },
   merchantId: string,
 ): Promise<ImageResult<true>> {
   try {
     const decision = await rateLimit.reserve({
       subject: merchantId,
-      policies: [imageUploadPolicy],
-      now: new Date(),
+      policies: [imageUploadPolicyName],
+      now: clock.now(),
     });
     if (!decision.ok) {
       if (decision.error === "limited") {
@@ -232,7 +233,7 @@ async function readImageFile(request: Request): Promise<ImageResult<Uint8Array>>
   if (file === undefined || file.size === 0) {
     return imageFail("validation_error", "图片不能为空。");
   }
-  if (file.size > 5 * 1024 * 1024) {
+  if (file.size > maxImageBytes) {
     return imageFail("validation_error", "图片不能超过 5 MiB。");
   }
   return { ok: true, value: new Uint8Array(await file.arrayBuffer()) };

@@ -28,7 +28,7 @@ const merchantPaths = [
   "POST /api/v1/catalogs/{id}/products/{product_id}/unpublish",
   "DELETE /api/v1/catalogs/{id}/products/{product_id}",
   "POST /api/v1/catalogs/{id}/products/{product_id}/restore",
-  "POST /api/v1/catalogs/{id}/products/{product_id}/options",
+  "POST /api/v1/catalogs/{id}/products/{product_id}/axes",
   "POST /api/v1/catalogs/{id}/products/{product_id}/variants",
   "PATCH /api/v1/catalogs/{id}/variants/{variant_id}",
   "DELETE /api/v1/catalogs/{id}/variants/{variant_id}",
@@ -85,6 +85,9 @@ describe("ids and money", () => {
     const imageId = createPublicId("image");
     expect(hasIdPrefix(productId, "product")).toBe(true);
     expect(hasIdPrefix(orderId, "order")).toBe(true);
+    expect(hasIdPrefix(createPublicId("challenge"), "challenge")).toBe(true);
+    expect(createPublicId("challenge").startsWith("chg_")).toBe(true);
+    expect(createPublicId("challenge").startsWith("grn_")).toBe(false);
     expect(hasIdPrefix(imageId, "image")).toBe(true);
     expect(imageId.startsWith(idPrefixes.image)).toBe(true);
     expect(imageId).not.toContain("photo");

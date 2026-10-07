@@ -1,3 +1,4 @@
+import type { Clock } from "../../ports/clock";
 import type { ObjectStoragePort } from "../../ports/object-storage";
 import type { RateLimitPort } from "../../ports/rate-limit";
 
@@ -5,6 +6,7 @@ export type MediaRuntime = {
   rateLimit: RateLimitPort;
   objectStorage: ObjectStoragePort;
   mediaBaseUrl: string;
+  clock: Clock;
 };
 
 let current: MediaRuntime | undefined;

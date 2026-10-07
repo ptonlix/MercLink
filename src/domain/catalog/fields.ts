@@ -8,16 +8,16 @@ export type FieldType = (typeof fieldTypes)[number];
 
 export type FieldStatus = "active" | "retired";
 
-export type AttrValue = string | number | boolean;
+export type FieldValue = string | number | boolean;
 
-export type Attrs = Readonly<Record<string, AttrValue>>;
+export type Fields = Readonly<Record<string, FieldValue>>;
 
 export type FieldDefinition = {
   key: string;
   label: string;
   type: FieldType;
   required: boolean;
-  options: readonly string[];
+  choices: readonly string[];
   status: FieldStatus;
 };
 
@@ -28,12 +28,12 @@ export type FieldChange =
       label: string;
       type: FieldType;
       required: boolean;
-      options: readonly string[];
+      choices: readonly string[];
     }
   | { op: "rename_label"; key: string; label: string }
   | { op: "add_option"; key: string; option: string }
   | { op: "remove_option"; key: string; option: string }
-  | { op: "change_type"; key: string; type: FieldType; options: readonly string[] }
+  | { op: "change_type"; key: string; type: FieldType; choices: readonly string[] }
   | { op: "make_required"; key: string }
   | { op: "make_optional"; key: string }
   | { op: "retire"; key: string }
@@ -43,15 +43,15 @@ export type FieldProduct = {
   id: string;
   status: "on" | "off";
   deleted: boolean;
-  attrs: Attrs;
+  fields: Fields;
 };
 
 type ProductEffect = {
   productId: string;
-  nextAttrs: Attrs;
+  nextFields: Fields;
   nextStatus: "on" | "off";
   unpublish: boolean;
-  attrsChanged: boolean;
+  fieldsChanged: boolean;
   reason: string | null;
 };
 
@@ -95,7 +95,7 @@ export function planFieldChange(
   const effects = products.map((product) =>
     effectFor(product, fields, drafted.value.fields, change),
   );
-  const affectedCount = effects.filter((effect) => effect.unpublish || effect.attrsChanged).length;
+  const affectedCount = effects.filter((effect) => effect.unpublish || effect.fieldsChanged).length;
   return catalogOk({
     breaking: drafted.value.breaking,
     nextFields: drafted.value.fields,
@@ -104,21 +104,21 @@ export function planFieldChange(
   });
 }
 
-export function convertAttrValue(
-  value: AttrValue,
+export function convertFieldValue(
+  value: FieldValue,
   to: FieldType,
-  options: readonly string[],
-): AttrValue | undefined {
+  choices: readonly string[],
+): FieldValue | undefined {
   if (to === "text") {
-    return attrToText(value);
+    return fieldToText(value);
   }
   if (to === "number") {
-    return attrToNumber(value);
+    return fieldToNumber(value);
   }
   if (to === "boolean") {
-    return attrToBoolean(value);
+    return fieldToBoolean(value);
   }
-  return attrToOption(value, options);
+  return fieldToChoice(value, choices);
 }
 
 function draftFields(
@@ -200,9 +200,9 @@ function draftAdd(
   if (!label.ok) {
     return label;
   }
-  const options = parseOptions(change.type, change.options);
-  if (!options.ok) {
-    return options;
+  const choices = parseChoices(change.type, change.choices);
+  if (!choices.ok) {
+    return choices;
   }
   return catalogOk({
     breaking: change.required,
@@ -213,7 +213,7 @@ function draftAdd(
         label: label.value,
         type: change.type,
         required: change.required,
-        options: options.value,
+        choices: choices.value,
         status: "active",
       },
     ],
@@ -232,12 +232,12 @@ function draftAddOption(
   if (!parsed.ok) {
     return parsed;
   }
-  if (current.options.includes(parsed.value)) {
+  if (current.choices.includes(parsed.value)) {
     return catalogFail("conflict", "选项已存在。");
   }
   return catalogOk({
     breaking: false,
-    fields: replaceField(fields, { ...current, options: [...current.options, parsed.value] }),
+    fields: replaceField(fields, { ...current, choices: [...current.choices, parsed.value] }),
   });
 }
 
@@ -249,14 +249,14 @@ function draftRemoveOption(
   if (current.type !== "single-select") {
     return catalogFail("validation_error", "只有单选字段可以删除选项。");
   }
-  if (!current.options.includes(option)) {
+  if (!current.choices.includes(option)) {
     return catalogFail("validation_error", "选项不存在。");
   }
   return catalogOk({
     breaking: true,
     fields: replaceField(fields, {
       ...current,
-      options: current.options.filter((item) => item !== option),
+      choices: current.choices.filter((item) => item !== option),
     }),
   });
 }
@@ -269,13 +269,13 @@ function draftTypeChange(
   if (current.type === change.type) {
     return catalogFail("validation_error", "字段类型没有变化。");
   }
-  const options = parseOptions(change.type, change.options);
-  if (!options.ok) {
-    return options;
+  const choices = parseChoices(change.type, change.choices);
+  if (!choices.ok) {
+    return choices;
   }
   return catalogOk({
     breaking: true,
-    fields: replaceField(fields, { ...current, type: change.type, options: options.value }),
+    fields: replaceField(fields, { ...current, type: change.type, choices: choices.value }),
   });
 }
 
@@ -285,31 +285,31 @@ function effectFor(
   after: readonly FieldDefinition[],
   change: Exclude<FieldChange, { op: "rename_key" }>,
 ): ProductEffect {
-  let nextAttrs: Record<string, AttrValue> = { ...product.attrs };
-  let attrsChanged = false;
+  let nextFields: Record<string, FieldValue> = { ...product.fields };
+  let fieldsChanged = false;
   let reason: string | null = null;
   const previous = before.find((field) => field.key === change.key);
   const next = after.find((field) => field.key === change.key);
 
   if (change.op === "change_type" && previous !== undefined && next !== undefined) {
-    const converted = rewriteTypedValue(nextAttrs, change.key, next.type, next.options);
-    nextAttrs = converted.attrs;
-    attrsChanged = converted.changed;
+    const converted = rewriteTypedValue(nextFields, change.key, next.type, next.choices);
+    nextFields = converted.fields;
+    fieldsChanged = converted.changed;
     reason = converted.reason;
   }
-  if (change.op === "remove_option" && product.attrs[change.key] === change.option) {
-    nextAttrs = omitAttr(nextAttrs, change.key);
-    attrsChanged = true;
+  if (change.op === "remove_option" && product.fields[change.key] === change.option) {
+    nextFields = omitField(nextFields, change.key);
+    fieldsChanged = true;
     reason = "removed_option";
   }
-  if (change.op === "retire" && Object.prototype.hasOwnProperty.call(product.attrs, change.key)) {
-    nextAttrs = omitAttr(nextAttrs, change.key);
-    attrsChanged = true;
+  if (change.op === "retire" && Object.prototype.hasOwnProperty.call(product.fields, change.key)) {
+    nextFields = omitField(nextFields, change.key);
+    fieldsChanged = true;
     reason = "retired";
   }
 
   const missingRequired = activeFields(after).some(
-    (field) => field.required && nextAttrs[field.key] === undefined,
+    (field) => field.required && nextFields[field.key] === undefined,
   );
   const published = product.status === "on" && !product.deleted;
   const unpublish =
@@ -319,37 +319,37 @@ function effectFor(
   }
   return {
     productId: product.id,
-    nextAttrs,
+    nextFields,
     nextStatus: unpublish ? "off" : product.status,
     unpublish,
-    attrsChanged,
-    reason: unpublish || attrsChanged ? reason : null,
+    fieldsChanged,
+    reason: unpublish || fieldsChanged ? reason : null,
   };
 }
 
 function rewriteTypedValue(
-  attrs: Record<string, AttrValue>,
+  fields: Record<string, FieldValue>,
   key: string,
   to: FieldType,
-  options: readonly string[],
-): { attrs: Record<string, AttrValue>; changed: boolean; reason: string | null } {
-  const current = attrs[key];
+  choices: readonly string[],
+): { fields: Record<string, FieldValue>; changed: boolean; reason: string | null } {
+  const current = fields[key];
   if (current === undefined) {
-    return { attrs, changed: false, reason: null };
+    return { fields, changed: false, reason: null };
   }
-  const converted = convertAttrValue(current, to, options);
+  const converted = convertFieldValue(current, to, choices);
   if (converted === undefined) {
-    return { attrs: omitAttr(attrs, key), changed: true, reason: "conversion_failed" };
+    return { fields: omitField(fields, key), changed: true, reason: "conversion_failed" };
   }
   if (converted !== current) {
-    return { attrs: { ...attrs, [key]: converted }, changed: true, reason: null };
+    return { fields: { ...fields, [key]: converted }, changed: true, reason: null };
   }
-  return { attrs, changed: false, reason: null };
+  return { fields, changed: false, reason: null };
 }
 
-function omitAttr(attrs: Record<string, AttrValue>, key: string): Record<string, AttrValue> {
-  const next: Record<string, AttrValue> = {};
-  for (const [itemKey, value] of Object.entries(attrs)) {
+function omitField(fields: Record<string, FieldValue>, key: string): Record<string, FieldValue> {
+  const next: Record<string, FieldValue> = {};
+  for (const [itemKey, value] of Object.entries(fields)) {
     if (itemKey !== key) {
       next[itemKey] = value;
     }
@@ -357,7 +357,7 @@ function omitAttr(attrs: Record<string, AttrValue>, key: string): Record<string,
   return next;
 }
 
-function attrToText(value: AttrValue): string {
+function fieldToText(value: FieldValue): string {
   if (typeof value === "string") {
     return value;
   }
@@ -367,7 +367,7 @@ function attrToText(value: AttrValue): string {
   return String(value);
 }
 
-function attrToNumber(value: AttrValue): number | undefined {
+function fieldToNumber(value: FieldValue): number | undefined {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : undefined;
   }
@@ -382,7 +382,7 @@ function attrToNumber(value: AttrValue): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function attrToBoolean(value: AttrValue): boolean | undefined {
+function fieldToBoolean(value: FieldValue): boolean | undefined {
   if (typeof value === "boolean") {
     return value;
   }
@@ -395,9 +395,9 @@ function attrToBoolean(value: AttrValue): boolean | undefined {
   return undefined;
 }
 
-function attrToOption(value: AttrValue, options: readonly string[]): string | undefined {
-  const text = attrToText(value);
-  return options.includes(text) ? text : undefined;
+function fieldToChoice(value: FieldValue, choices: readonly string[]): string | undefined {
+  const text = fieldToText(value);
+  return choices.includes(text) ? text : undefined;
 }
 
 function replaceField(
@@ -426,18 +426,18 @@ export function parseLabel(value: string): CatalogResult<string> {
   return catalogOk(label);
 }
 
-export function parseOptions(
+export function parseChoices(
   type: FieldType,
-  options: readonly string[],
+  choices: readonly string[],
 ): CatalogResult<readonly string[]> {
   if (type !== "single-select") {
-    if (options.length > 0) {
+    if (choices.length > 0) {
       return catalogFail("validation_error", "只有单选字段可以带选项。");
     }
     return catalogOk([]);
   }
   const parsed: string[] = [];
-  for (const option of options) {
+  for (const option of choices) {
     const item = parseOption(option);
     if (!item.ok) {
       return item;
@@ -466,7 +466,7 @@ export function fieldSnapshot(field: FieldDefinition): {
   label: string;
   type: FieldType;
   required: boolean;
-  options: string[];
+  choices: string[];
   status: FieldStatus;
 } {
   return {
@@ -474,7 +474,7 @@ export function fieldSnapshot(field: FieldDefinition): {
     label: field.label,
     type: field.type,
     required: field.required,
-    options: [...field.options],
+    choices: [...field.choices],
     status: field.status,
   };
 }

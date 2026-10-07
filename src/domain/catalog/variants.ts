@@ -1,5 +1,5 @@
 import { missingRequired } from "./attributes";
-import type { Attrs } from "./fields";
+import type { Fields } from "./fields";
 import { isFieldKey, isSystemFieldKey, parseLabel, type FieldDefinition } from "./fields";
 import { catalogFail, catalogOk, type CatalogResult } from "./result";
 
@@ -94,14 +94,14 @@ export function validateVariantOptions(input: {
 
 export function assertPublishable(input: {
   deleted: boolean;
-  attrs: Attrs;
-  fields: readonly FieldDefinition[];
+  fields: Fields;
+  definitions: readonly FieldDefinition[];
   variants: readonly VariantState[];
 }): CatalogResult<void> {
   if (input.deleted) {
     return catalogFail("conflict", "已删除的商品不能上架。");
   }
-  const missing = missingRequired(input.fields, input.attrs);
+  const missing = missingRequired(input.definitions, input.fields);
   if (missing !== undefined) {
     return catalogFail("validation_error", `上架前必须填写 ${missing.label}。`);
   }

@@ -1,6 +1,8 @@
 import type { Sql } from "../../db/client";
+import { revokeMerchantAccess } from "../access/revoke";
 import {
   activePhoneAvailable,
+  disableMerchantEffects,
   merchantCanApproveAgent,
   merchantCanAuthenticate,
   provisionedMerchant,
@@ -96,25 +98,20 @@ export async function disableMerchant(
   if (merchant === null) {
     return failure(404, "not_found", "商家不存在。");
   }
+  const effects = disableMerchantEffects();
   await sql.begin(async (tx) => {
     await tx`
-      UPDATE merchants SET status = 'disabled', updated_at = now() WHERE id = ${merchantId}
+      UPDATE merchants SET status = ${effects.status}, updated_at = now() WHERE id = ${merchantId}
     `;
-    await tx`
-      UPDATE oauth_grants
-      SET revoked_at = now(), updated_at = now()
-      WHERE owner_type = 'merchant' AND owner_id = ${merchantId} AND revoked_at IS NULL
-    `;
-    await tx`
-      UPDATE api_keys
-      SET revoked_at = now(), updated_at = now()
-      WHERE owner_type = 'merchant' AND owner_id = ${merchantId} AND revoked_at IS NULL
-    `;
-    await tx`DELETE FROM oidc_records WHERE grant_id IN (
-      SELECT id FROM oauth_grants WHERE owner_type = 'merchant' AND owner_id = ${merchantId}
-    )`;
+    if (effects.revokeGrants || effects.revokeApiKeys) {
+      await revokeMerchantAccess(tx, merchantId);
+    }
   });
   return { ok: true };
+}
+
+export function unknownMerchantCopy(): string {
+  return unknownMerchantMessage;
 }
 
 export async function resetMerchantPassword(

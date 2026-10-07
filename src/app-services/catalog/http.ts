@@ -12,7 +12,7 @@ import { createCatalog, listCatalogs } from "./catalogs";
 import {
   createProduct,
   createVariant,
-  declareOption,
+  declareAxis,
   patchProduct,
   patchVariant,
   publishProduct,
@@ -359,12 +359,12 @@ export async function restoreProductRoute(
   );
 }
 
-export async function postOption(
+export async function postAxis(
   request: Request,
   catalogId: string,
   productId: string,
 ): Promise<Response> {
-  return mutateWithBody(request, catalogId, productId, declareOption);
+  return mutateWithBody(request, catalogId, productId, declareAxis);
 }
 
 export async function postVariant(
@@ -487,7 +487,7 @@ function fieldJson(field: FieldRecord) {
     label: field.label,
     type: field.type,
     required: field.required,
-    options: field.options,
+    choices: field.choices,
     status: field.status,
   };
 }
@@ -496,7 +496,7 @@ function variantJson(variant: VariantRecord) {
   return {
     id: variant.id,
     sku: variant.sku,
-    options: variant.optionValues,
+    option_values: variant.optionValues,
     price: variant.price,
     stock: variant.stock,
     status: variant.deleted ? "off" : variant.status,
@@ -512,12 +512,12 @@ function productJson(product: ProductRecord) {
     title: product.title,
     status: product.status,
     cover: product.cover,
-    fields: product.attrs,
+    fields: product.fields,
     schema_revision: product.schemaRevision,
     created_at: product.createdAt.toISOString(),
     updated_at: product.updatedAt.toISOString(),
     deleted_at: product.deletedAt?.toISOString() ?? null,
-    options: product.options,
+    axes: product.axes,
     variants: product.variants
       .filter((variant) => product.deletedAt !== null || !variant.deleted)
       .map(variantJson),
@@ -538,7 +538,7 @@ function publicProductJson(product: {
     currency: string;
     stock: number | null;
     availability: string;
-    options: Readonly<Record<string, string>>;
+    optionValues: Readonly<Record<string, string>>;
     sku: string | null;
   }[];
 }) {
@@ -550,6 +550,14 @@ function publicProductJson(product: {
     currency: product.currency,
     offer: product.offer,
     fields: product.fields,
-    variants: product.variants,
+    variants: product.variants.map((variant) => ({
+      id: variant.id,
+      price: variant.price,
+      currency: variant.currency,
+      stock: variant.stock,
+      availability: variant.availability,
+      option_values: variant.optionValues,
+      sku: variant.sku,
+    })),
   };
 }

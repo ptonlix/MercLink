@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { parseCover } from "./catalogs";
-import { detectImage, maxImageBytes, mediaImageId, mediaUrl } from "./images";
+import {
+  detectImage,
+  imageUploadLimit,
+  imageUploadPolicies,
+  imageUploadWindowMs,
+  maxImageBytes,
+  mediaImageId,
+  mediaUrl,
+} from "./images";
+import { imageUploadPolicies as redisUploadPolicies } from "../../ports/rate-limit";
 
 const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
@@ -30,6 +39,13 @@ describe("image signatures", () => {
     oversize.set(jpeg);
     expect(detectImage(oversize)).toMatchObject({ ok: false, error: "validation_error" });
     expect(detectImage(new Uint8Array(maxImageBytes))).toMatchObject({ ok: false });
+    expect(maxImageBytes).toBe(5 * 1024 * 1024);
+    expect(imageUploadPolicies()).toEqual({
+      "image-upload": { limit: imageUploadLimit, windowMs: imageUploadWindowMs },
+    });
+    expect(imageUploadLimit).toBe(30);
+    expect(imageUploadWindowMs).toBe(60_000);
+    expect(redisUploadPolicies).toEqual(imageUploadPolicies());
   });
 });
 

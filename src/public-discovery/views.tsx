@@ -229,7 +229,7 @@ function VariantList({ variants }: { variants: readonly PublicVariant[] }): Reac
             </span>
           </p>
           <p>库存 {variant.stock === null ? "不限" : String(variant.stock)}</p>
-          <p>选项 {optionText(variant.options)}</p>
+          <p>选项 {optionText(variant.optionValues)}</p>
           <p>SKU {variant.sku ?? "无"}</p>
         </li>
       ))}
@@ -253,8 +253,8 @@ function fieldText(value: string | number | boolean | null): string {
   return String(value);
 }
 
-function optionText(options: Readonly<Record<string, string>>): string {
-  const parts = Object.entries(options).map(([key, value]) => `${key}=${value}`);
+function optionText(optionValues: Readonly<Record<string, string>>): string {
+  const parts = Object.entries(optionValues).map(([key, value]) => `${key}=${value}`);
   return parts.length === 0 ? "无" : parts.join("，");
 }
 

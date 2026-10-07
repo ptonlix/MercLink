@@ -6,7 +6,7 @@ import {
   isPublicProductRead,
   anonymousProductSearch,
 } from "../../domain/access/guard";
-import { merchantCanAuthenticate } from "../../domain/identity/accounts";
+import { accountCanAuthenticate } from "../identity/can-authenticate";
 import { apiError } from "../../shared/errors";
 import {
   authenticate,
@@ -104,20 +104,6 @@ async function grantActive(
   return ownerActive(sql, ownerType, ownerId);
 }
 
-async function ownerActive(
-  sql: Sql,
-  ownerType: "merchant" | "buyer",
-  ownerId: string,
-): Promise<boolean> {
-  if (ownerType === "buyer") {
-    const rows = await sql<{ id: string }[]>`
-      SELECT id FROM buyers WHERE id = ${ownerId} AND deleted_at IS NULL
-    `;
-    return rows.length > 0;
-  }
-  const rows = await sql<{ status: "active" | "disabled"; deletedAt: Date | null }[]>`
-    SELECT status, deleted_at AS "deletedAt" FROM merchants WHERE id = ${ownerId}
-  `;
-  const merchant = rows[0];
-  return merchant !== undefined && merchantCanAuthenticate(merchant);
+function ownerActive(sql: Sql, ownerType: "merchant" | "buyer", ownerId: string): Promise<boolean> {
+  return accountCanAuthenticate(sql, { ownerType, ownerId });
 }

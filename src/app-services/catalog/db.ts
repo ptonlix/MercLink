@@ -9,7 +9,7 @@ import {
   schemaRevisions,
   variants,
 } from "../../db/schema/catalog";
-import type { Attrs, AttrValue, FieldDefinition, FieldType } from "../../domain/catalog/fields";
+import type { Fields, FieldValue, FieldDefinition, FieldType } from "../../domain/catalog/fields";
 import { catalogFail, type CatalogFailure } from "../../domain/catalog/result";
 
 export type Sql = postgres.Sql;
@@ -44,7 +44,7 @@ export type FieldRow = {
   label: string;
   type: string;
   required: boolean;
-  options: unknown;
+  choices: unknown;
   status: string;
   retired_at: Date | null;
 };
@@ -55,7 +55,7 @@ export type ProductRow = {
   title: string;
   status: string;
   cover: string | null;
-  attrs: unknown;
+  fields: unknown;
   schema_revision: number;
   created_at: Date;
   updated_at: Date;
@@ -85,22 +85,22 @@ export type VariantRow = {
   deleted_at: Date | null;
 };
 
-export function readAttrs(value: unknown): Attrs {
+export function readFields(value: unknown): Fields {
   if (!isRecord(value)) {
     return {};
   }
-  const attrs: Record<string, AttrValue> = {};
+  const fields: Record<string, FieldValue> = {};
   for (const [key, item] of Object.entries(value)) {
     if (typeof item === "string" || typeof item === "boolean") {
-      attrs[key] = item;
+      fields[key] = item;
     } else if (typeof item === "number" && Number.isFinite(item)) {
-      attrs[key] = item;
+      fields[key] = item;
     }
   }
-  return attrs;
+  return fields;
 }
 
-function readOptions(value: unknown): string[] {
+function readChoices(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -111,13 +111,13 @@ export function readOptionValues(value: unknown): Record<string, string> {
   if (!isRecord(value)) {
     return {};
   }
-  const options: Record<string, string> = {};
+  const values: Record<string, string> = {};
   for (const [key, item] of Object.entries(value)) {
     if (typeof item === "string") {
-      options[key] = item;
+      values[key] = item;
     }
   }
-  return options;
+  return values;
 }
 
 export function toField(row: FieldRow): FieldDefinition {
@@ -126,7 +126,7 @@ export function toField(row: FieldRow): FieldDefinition {
     label: row.label,
     type: row.type as FieldType,
     required: row.required,
-    options: readOptions(row.options),
+    choices: readChoices(row.choices),
     status: row.status === "retired" ? "retired" : "active",
   };
 }
@@ -183,7 +183,7 @@ export function ownedCatalog(
 
 export async function loadFields(db: Db, catalogId: string): Promise<FieldRow[]> {
   return db<FieldRow[]>`
-    SELECT id, catalog_id, key, label, type, required, options, status, retired_at
+    SELECT id, catalog_id, key, label, type, required, choices, status, retired_at
     FROM product_fields
     WHERE catalog_id = ${catalogId}
     ORDER BY created_at, key
@@ -192,7 +192,7 @@ export async function loadFields(db: Db, catalogId: string): Promise<FieldRow[]>
 
 export async function lockProducts(db: Db, catalogId: string): Promise<ProductRow[]> {
   return db<ProductRow[]>`
-    SELECT id, catalog_id, title, status, cover, attrs, schema_revision, created_at, updated_at, deleted_at
+    SELECT id, catalog_id, title, status, cover, fields, schema_revision, created_at, updated_at, deleted_at
     FROM products
     WHERE catalog_id = ${catalogId}
     ORDER BY id
@@ -202,7 +202,7 @@ export async function lockProducts(db: Db, catalogId: string): Promise<ProductRo
 
 export async function findProduct(db: Db, productId: string): Promise<ProductRow | undefined> {
   const rows = await db<ProductRow[]>`
-    SELECT id, catalog_id, title, status, cover, attrs, schema_revision, created_at, updated_at, deleted_at
+    SELECT id, catalog_id, title, status, cover, fields, schema_revision, created_at, updated_at, deleted_at
     FROM products
     WHERE id = ${productId}
   `;
@@ -211,7 +211,7 @@ export async function findProduct(db: Db, productId: string): Promise<ProductRow
 
 export async function lockProduct(db: Db, productId: string): Promise<ProductRow | undefined> {
   const rows = await db<ProductRow[]>`
-    SELECT id, catalog_id, title, status, cover, attrs, schema_revision, created_at, updated_at, deleted_at
+    SELECT id, catalog_id, title, status, cover, fields, schema_revision, created_at, updated_at, deleted_at
     FROM products
     WHERE id = ${productId}
     FOR UPDATE

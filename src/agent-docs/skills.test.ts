@@ -105,6 +105,12 @@ describe("merchant skill", () => {
       expect(body).toContain("`paid`");
       expect(body).toContain("`forbidden`");
       expect(body).toContain("/api/v1/catalogs/{id}/images");
+      expect(body).toContain("/api/v1/catalogs/{id}/products/{product_id}/axes");
+      expect(body).toContain("option_values");
+      expect(body).toContain("choices");
+      expect(body).toContain("fields");
+      expect(body).not.toContain("/options");
+      expect(body).not.toContain('"options"');
       expect(body).toContain("先上传图片");
       expect(body).not.toContain(sentinel);
       expect(body).not.toContain("prd_private");

@@ -12,7 +12,7 @@ import {
   lockCatalog,
   lockProducts,
   ownedCatalog,
-  readAttrs,
+  readFields,
   toField,
   type Db,
   type FieldRow,
@@ -123,7 +123,7 @@ async function applyChange(
         id: row.id,
         status: row.status === "on" ? ("on" as const) : ("off" as const),
         deleted: row.deleted_at !== null,
-        attrs: readAttrs(row.attrs),
+        fields: readFields(row.fields),
       }));
       const plan = planFieldChange(fields, products, change);
       if (!plan.ok) {
@@ -143,12 +143,12 @@ async function applyChange(
       const revision = catalog.schema_revision + 1;
       await writeFields(tx, catalogId, fieldRows, plan.value.nextFields);
       for (const effect of plan.value.effects) {
-        if (!effect.attrsChanged && !effect.unpublish) {
+        if (!effect.fieldsChanged && !effect.unpublish) {
           continue;
         }
         await tx`
           UPDATE products
-          SET attrs = ${tx.json(effect.nextAttrs)},
+          SET fields = ${tx.json(effect.nextFields)},
               status = ${effect.nextStatus},
               schema_revision = ${revision},
               updated_at = now()
@@ -198,10 +198,10 @@ async function writeFields(
   const byKey = new Map(current.map((row) => [row.key, row]));
   for (const field of next) {
     const existing = byKey.get(field.key);
-    const options = field.options.length === 0 ? null : tx.json([...field.options]);
+    const choices = field.choices.length === 0 ? null : tx.json([...field.choices]);
     if (existing === undefined) {
       await tx`
-        INSERT INTO product_fields (id, catalog_id, key, label, type, required, options, status)
+        INSERT INTO product_fields (id, catalog_id, key, label, type, required, choices, status)
         VALUES (
           ${createPublicId("field")},
           ${catalogId},
@@ -209,7 +209,7 @@ async function writeFields(
           ${field.label},
           ${field.type},
           ${field.required},
-          ${options},
+          ${choices},
           ${field.status}
         )
       `;
@@ -220,7 +220,7 @@ async function writeFields(
       SET label = ${field.label},
           type = ${field.type},
           required = ${field.required},
-          options = ${options},
+          choices = ${choices},
           status = ${field.status},
           retired_at = ${field.status === "retired" ? tx`now()` : null},
           updated_at = now()

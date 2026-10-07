@@ -2,14 +2,16 @@ import type Provider from "oidc-provider";
 import { registerAccessAuthenticator } from "../app-services/access/authenticate";
 import { parseAccountId } from "../app-services/access/grants";
 import { authorizationIssuer, createAccessProvider } from "../app-services/access/provider";
+import { listMerchantCatalogIds } from "../app-services/catalog/catalogs";
 import { registerCatalog } from "../app-services/catalog/register";
 import { registerCatalogOwnership } from "../app-services/commerce/runtime";
 import { getDatabase, type Sql } from "../db/client";
 import { ensureSuperAdmin } from "../app-services/identity/admin";
-import { findMerchant } from "../app-services/identity/merchants";
+import { accountCanAuthenticate } from "../app-services/identity/can-authenticate";
 import { appRuntime } from "../app-services/identity/runtime";
 import { getRedisClient } from "../adapters/redis/client";
 import { createRedisRateLimit } from "../adapters/redis/limiter";
+import { systemClock } from "../ports/clock";
 import { imageUploadPolicies } from "../ports/rate-limit";
 import { createObjectStorageClient, createS3ObjectStorage } from "../adapters/s3";
 import { bindMediaRuntime } from "../app-services/catalog/media-runtime";
@@ -27,13 +29,7 @@ export function isCompositionReady(): boolean {
 export function registerSlices(input: { sql: Sql; provider: Provider }): void {
   registerAccessAuthenticator(input.sql, input.provider);
   registerCatalog(input.sql);
-  registerCatalogOwnership(async (merchantId) => {
-    const rows = await input.sql<{ id: string }[]>`
-      SELECT id FROM catalogs
-      WHERE merchant_id = ${merchantId} AND deleted_at IS NULL
-    `;
-    return rows.map((row) => row.id);
-  });
+  registerCatalogOwnership((merchantId) => listMerchantCatalogIds(input.sql, merchantId));
 }
 
 export async function registerAll(source: NodeJS.ProcessEnv = process.env): Promise<void> {
@@ -111,6 +107,7 @@ async function bindObjectStorage(env: AppEnv): Promise<void> {
     }),
     objectStorage,
     mediaBaseUrl: env.APP_BASE_URL,
+    clock: systemClock,
   });
 }
 
@@ -119,12 +116,5 @@ async function accountIsActive(sql: Sql, accountId: string): Promise<boolean> {
   if (parsed === null) {
     return false;
   }
-  if (parsed.ownerType === "buyer") {
-    const rows = await sql<{ id: string }[]>`
-      SELECT id FROM buyers WHERE id = ${parsed.ownerId} AND deleted_at IS NULL
-    `;
-    return rows.length > 0;
-  }
-  const merchant = await findMerchant(sql, parsed.ownerId);
-  return merchant !== null && merchant.status === "active" && merchant.deletedAt === null;
+  return accountCanAuthenticate(sql, parsed);
 }

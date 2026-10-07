@@ -44,30 +44,6 @@ export function smsSendLimited(reason: "interval" | "daily"): {
   return { ok: false, error: "sms_rate_limited", message: "今日发送次数已达上限。" };
 }
 
-export function smsSendAllowed(input: {
-  now: Date;
-  sentAt: readonly Date[];
-}): RegistrationDecision {
-  const now = input.now.getTime();
-  const inWindow = input.sentAt.filter(
-    (sent) => now - sent.getTime() >= 0 && now - sent.getTime() < smsWindowMs,
-  );
-  let latest: number | null = null;
-  for (const sent of inWindow) {
-    const time = sent.getTime();
-    if (latest === null || time > latest) {
-      latest = time;
-    }
-  }
-  if (latest !== null && now - latest < smsMinIntervalMs) {
-    return smsSendLimited("interval");
-  }
-  if (inWindow.length >= smsDailyCap) {
-    return smsSendLimited("daily");
-  }
-  return { ok: true };
-}
-
 export function buyerPhoneOutcome(activeBuyerExists: boolean): "login" | "register" {
   return activeBuyerExists ? "login" : "register";
 }

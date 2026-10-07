@@ -9,7 +9,7 @@ import {
 } from "../../domain/identity/registration";
 import { nextPasswordAccepted, passwordIsHashed } from "../../domain/identity/password";
 import { isLoginPhone, normalizePhone } from "../../domain/identity/phone";
-import { tokenHash } from "../../domain/access/tokens";
+import { tokenHash } from "../../shared/token-hash";
 import type { Clock } from "../../ports/clock";
 import type { CaptchaPort } from "../../ports/captcha";
 import type { RateLimitPort } from "../../ports/rate-limit";
@@ -84,7 +84,7 @@ export async function requestBuyerSms(
   }
   await flow.sql`
     INSERT INTO registration_challenges (id, phone, captcha_hash)
-    VALUES (${createPublicId("grant")}, ${phone}, ${captchaHash})
+    VALUES (${createPublicId("challenge")}, ${phone}, ${captchaHash})
   `;
   const existing = await findActiveBuyerByPhone(flow.sql, phone);
   return { ok: true, mode: beginBuyerPhone(existing !== null) };

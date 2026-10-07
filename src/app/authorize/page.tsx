@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { selectAuthorizationPage } from "../../domain/access/scopes";
+import { authorizationPageFor } from "../../app-services/access/pages";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export default async function AuthorizePage({
   searchParams: Promise<{ scope?: string; uid?: string }>;
 }): Promise<never> {
   const params = await searchParams;
-  const page = selectAuthorizationPage((params.scope ?? "").split(" "));
+  const page = authorizationPageFor((params.scope ?? "").split(" "));
   const uid = params.uid === undefined ? "" : `&uid=${encodeURIComponent(params.uid)}`;
   redirect(
     page === "merchant"

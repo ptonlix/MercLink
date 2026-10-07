@@ -63,11 +63,35 @@ export function validateSingleLine(
   return { ok: true, line };
 }
 
-export function rejectCallerPrice(supplied: boolean): { ok: true } | CommerceFailure {
-  if (supplied) {
+const callerPriceKeys = new Set([
+  "price",
+  "unit_price",
+  "unitPrice",
+  "amount",
+  "total_amount",
+  "totalAmount",
+]);
+
+export function rejectCallerPrice(body: unknown): { ok: true } | CommerceFailure {
+  if (containsCallerPrice(body)) {
     return commerceFailure("validation_error", "不能传入价格。");
   }
   return { ok: true };
+}
+
+function containsCallerPrice(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => containsCallerPrice(item));
+  }
+  for (const [key, nested] of Object.entries(value)) {
+    if (callerPriceKeys.has(key) || containsCallerPrice(nested)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function lineAmount(unitPrice: MinorUnits, qty: number): MinorUnits {

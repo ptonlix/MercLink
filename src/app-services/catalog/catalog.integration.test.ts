@@ -16,7 +16,7 @@ import { registerCatalog } from "./register";
 import {
   createProduct,
   createVariant,
-  declareOption,
+  declareAxis,
   patchVariant,
   publishProduct,
   restoreProduct,
@@ -42,26 +42,42 @@ describe("catalog management", () => {
     bindCatalogSql(undefined);
   });
 
-  it("migrates catalog tables without a merchants foreign key and stores attrs as jsonb", async () => {
+  it("migrates catalog tables without a merchants foreign key and stores fields as jsonb", async () => {
     const source = await readFile(
       path.join(process.cwd(), "src/db/migrations/030_catalog.sql"),
       "utf8",
     );
+    const rename = await readFile(
+      path.join(process.cwd(), "src/db/migrations/080_fields_and_choices.sql"),
+      "utf8",
+    );
     expect(source).not.toMatch(/references\s+merchants/i);
-    expect(source).toContain("attrs jsonb");
+    expect(rename).toContain("RENAME COLUMN attrs TO fields");
+    expect(rename).toContain("RENAME COLUMN options TO choices");
     await withCatalogDb(async (sql) => {
       const columns = await sql<{ table_name: string; column_name: string; data_type: string }[]>`
         SELECT table_name, column_name, data_type
         FROM information_schema.columns
         WHERE table_schema = current_schema()
           AND (
-            (table_name = 'products' AND column_name = 'attrs')
+            (table_name = 'products' AND column_name = 'fields')
             OR (table_name = 'variants' AND column_name = 'option_values')
             OR (table_name = 'schema_revisions' AND column_name IN ('before', 'after'))
+            OR (table_name = 'product_fields' AND column_name = 'choices')
           )
       `;
       expect(columns.every((column) => column.data_type === "jsonb")).toBe(true);
-      expect(columns).toHaveLength(4);
+      expect(columns).toHaveLength(5);
+      const retired = await sql<{ column_name: string }[]>`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND (
+            (table_name = 'products' AND column_name = 'attrs')
+            OR (table_name = 'product_fields' AND column_name = 'options')
+          )
+      `;
+      expect(retired).toEqual([]);
       const composed = await sql<{ name: string }[]>`
         SELECT con.conname AS name
         FROM pg_constraint con
@@ -143,11 +159,11 @@ describe("catalog management", () => {
       }
       expect(preview.value.affected.map((item) => item.productId)).toContain(created.value.id);
       const unchanged = await sql<
-        { attrs: { weight_g?: number }; status: string; schema_revision: number }[]
+        { fields: { weight_g?: number }; status: string; schema_revision: number }[]
       >`
-        SELECT attrs, status, schema_revision FROM products WHERE id = ${created.value.id}
+        SELECT fields, status, schema_revision FROM products WHERE id = ${created.value.id}
       `;
-      expect(unchanged[0]).toMatchObject({ status: "on", attrs: {} });
+      expect(unchanged[0]).toMatchObject({ status: "on", fields: {} });
       const revisionRows = await sql<{ revision: number }[]>`
         SELECT revision FROM schema_revisions WHERE catalog_id = ${catalog.id} ORDER BY revision
       `;
@@ -201,10 +217,10 @@ describe("catalog management", () => {
           confirm: true,
         });
         expect(numeric.ok && numeric.value.applied).toBe(true);
-        const attrs = await sql<{ attrs: { weight_g?: number }; status: string }[]>`
-          SELECT attrs, status FROM products WHERE id = ${textProduct.value.id}
+        const stored = await sql<{ fields: { weight_g?: number }; status: string }[]>`
+          SELECT fields, status FROM products WHERE id = ${textProduct.value.id}
         `;
-        expect(attrs[0]).toMatchObject({ status: "on", attrs: { weight_g: 480 } });
+        expect(stored[0]).toMatchObject({ status: "on", fields: { weight_g: 480 } });
       }
 
       await changeFields(sql, "mch_a", catalog.id, {
@@ -274,19 +290,19 @@ describe("catalog management", () => {
         return;
       }
       expect(ready.value.variants[0]?.stock).toBeNull();
-      await declareOption(sql, "mch_a", catalog.id, ready.value.id, { key: "size", label: "尺码" });
+      await declareAxis(sql, "mch_a", catalog.id, ready.value.id, { key: "size", label: "尺码" });
       const sized = await createVariant(sql, "mch_a", catalog.id, ready.value.id, {
-        options: { size: "40" },
+        option_values: { size: "40" },
         price: 159900,
         stock: 2,
       });
       const other = await createVariant(sql, "mch_a", catalog.id, ready.value.id, {
-        options: { size: "42" },
+        option_values: { size: "42" },
         price: 169900,
         stock: 3,
       });
       const mixed = await createVariant(sql, "mch_a", catalog.id, ready.value.id, {
-        options: { color: "黑" },
+        option_values: { color: "黑" },
         price: 100,
       });
       expect(sized.ok && other.ok).toBe(true);
@@ -406,17 +422,17 @@ describe("catalog management", () => {
       if (!product.ok) {
         return;
       }
-      await declareOption(sql, "mch_a", catalog.id, product.value.id, {
+      await declareAxis(sql, "mch_a", catalog.id, product.value.id, {
         key: "size",
         label: "尺码",
       });
       await createVariant(sql, "mch_a", catalog.id, product.value.id, {
-        options: { size: "40" },
+        option_values: { size: "40" },
         price: 159900,
         stock: 4,
       });
       await createVariant(sql, "mch_a", catalog.id, product.value.id, {
-        options: { size: "42" },
+        option_values: { size: "42" },
         price: 169900,
         stock: 1,
       });
@@ -431,11 +447,11 @@ describe("catalog management", () => {
       expect(seam.items).toHaveLength(1);
       expect(
         seam.items[0]?.variants.every(
-          (variant) => variant.options.size === "40" || variant.options.size === "42",
+          (variant) => variant.optionValues.size === "40" || variant.optionValues.size === "42",
         ),
       ).toBe(true);
       expect(
-        seam.items[0]?.variants.some((variant) => Object.keys(variant.options).length === 0),
+        seam.items[0]?.variants.some((variant) => Object.keys(variant.optionValues).length === 0),
       ).toBe(false);
       const detail = await publicProducts.get(product.value.id);
       expect(detail.ok).toBe(true);

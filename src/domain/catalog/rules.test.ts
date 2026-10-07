@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buyerActor, merchantActor, scriptActor } from "../../shared/actor";
 import { canReadSchema, requireMerchantScope } from "./access";
-import { missingRequired, publicAttrs, validateAttrs } from "./attributes";
+import { missingRequired, publicFields, validateFields } from "./attributes";
 import {
   defaultCatalogName,
   defaultCatalogPlan,
@@ -14,7 +14,7 @@ import {
 } from "./catalogs";
 import {
   activeFields,
-  convertAttrValue,
+  convertFieldValue,
   fieldSnapshot,
   isFieldKey,
   isSystemFieldKey,
@@ -27,7 +27,7 @@ import {
   parseCatalogBody,
   parseFieldChangeBody,
   parseFieldCreateBody,
-  parseOptionBody,
+  parseAxisBody,
   parseProductBody,
   parseVariantBody,
   parseVariantPatch,
@@ -63,7 +63,7 @@ const weight: FieldDefinition = {
   label: "重量",
   type: "number",
   required: false,
-  options: [],
+  choices: [],
   status: "active",
 };
 const color: FieldDefinition = {
@@ -71,16 +71,16 @@ const color: FieldDefinition = {
   label: "颜色",
   type: "single-select",
   required: false,
-  options: ["黑", "白"],
+  choices: ["黑", "白"],
   status: "active",
 };
 
 function product(
   id: string,
   status: "on" | "off",
-  attrs: FieldProduct["attrs"] = {},
+  fields: FieldProduct["fields"] = {},
 ): FieldProduct {
-  return { id, status, deleted: false, attrs };
+  return { id, status, deleted: false, fields };
 }
 
 function variant(optionValues: Record<string, string>, status: "on" | "off" = "on"): VariantState {
@@ -98,7 +98,7 @@ function candidate(overrides: Partial<LockCandidate> = {}): LockCandidate {
     stock: 4,
     sku: null,
     optionValues: {},
-    attrs: {},
+    fields: {},
     schemaRevision: 1,
     variantStatus: "on",
     productStatus: "on",
@@ -117,7 +117,7 @@ describe("catalog field rules", () => {
       label: "备注",
       type: "text",
       required: false,
-      options: [],
+      choices: [],
     });
     expect(plan.ok).toBe(true);
     if (!plan.ok) {
@@ -127,7 +127,7 @@ describe("catalog field rules", () => {
     expect(plan.value.effects[0]).toMatchObject({
       nextStatus: "on",
       unpublish: false,
-      attrsChanged: false,
+      fieldsChanged: false,
     });
     expect(activeFields(plan.value.nextFields).map((field) => field.key)).toEqual([
       "weight_g",
@@ -143,7 +143,7 @@ describe("catalog field rules", () => {
       label: "重量",
       type: "number",
       required: true,
-      options: [],
+      choices: [],
     });
     expect(plan.ok).toBe(true);
     if (!plan.ok) {
@@ -153,7 +153,7 @@ describe("catalog field rules", () => {
     expect(plan.value.effects.find((effect) => effect.productId === "prd_on")).toMatchObject({
       unpublish: true,
       reason: "missing_required",
-      nextAttrs: {},
+      nextFields: {},
     });
     expect(plan.value.effects.find((effect) => effect.productId === "prd_off")?.unpublish).toBe(
       false,
@@ -161,15 +161,15 @@ describe("catalog field rules", () => {
   });
 
   it("converts text 480 to number and clears values that cannot convert", () => {
-    expect(convertAttrValue("480", "number", [])).toBe(480);
-    expect(convertAttrValue("nope", "number", [])).toBeUndefined();
-    expect(convertAttrValue(true, "text", [])).toBe("true");
-    expect(convertAttrValue("true", "boolean", [])).toBe(true);
-    expect(convertAttrValue("黑", "single-select", ["黑"])).toBe("黑");
+    expect(convertFieldValue("480", "number", [])).toBe(480);
+    expect(convertFieldValue("nope", "number", [])).toBeUndefined();
+    expect(convertFieldValue(true, "text", [])).toBe("true");
+    expect(convertFieldValue("true", "boolean", [])).toBe(true);
+    expect(convertFieldValue("黑", "single-select", ["黑"])).toBe("黑");
     const plan = planFieldChange(
       [{ ...weight, type: "text" }],
       [product("prd_ok", "on", { weight_g: "480" }), product("prd_bad", "on", { weight_g: "abc" })],
-      { op: "change_type", key: "weight_g", type: "number", options: [] },
+      { op: "change_type", key: "weight_g", type: "number", choices: [] },
     );
     expect(plan.ok).toBe(true);
     if (!plan.ok) {
@@ -177,12 +177,12 @@ describe("catalog field rules", () => {
     }
     expect(plan.value.effects.find((effect) => effect.productId === "prd_ok")).toMatchObject({
       nextStatus: "on",
-      nextAttrs: { weight_g: 480 },
+      nextFields: { weight_g: 480 },
     });
     expect(plan.value.effects.find((effect) => effect.productId === "prd_bad")).toMatchObject({
       nextStatus: "off",
       reason: "conversion_failed",
-      nextAttrs: {},
+      nextFields: {},
     });
   });
 
@@ -197,7 +197,7 @@ describe("catalog field rules", () => {
       label: "重量",
       type: "number",
       required: false,
-      options: [],
+      choices: [],
     });
     expect(reuse).toMatchObject({ ok: false, error: "conflict" });
     expect(planFieldChange([weight], [], { op: "retire", key: "title" })).toMatchObject({
@@ -237,7 +237,7 @@ describe("catalog field rules", () => {
     expect(retired.ok).toBe(true);
     if (retired.ok) {
       expect(retired.value.nextFields[0]?.status).toBe("retired");
-      expect(retired.value.effects[0]?.nextAttrs).toEqual({});
+      expect(retired.value.effects[0]?.nextFields).toEqual({});
       expect(retired.value.effects[0]?.unpublish).toBe(false);
     }
     expect(planFieldChange([], [], { op: "make_required", key: "missing" })).toMatchObject({
@@ -251,28 +251,28 @@ describe("catalog field rules", () => {
 });
 
 describe("attributes, variants, and visibility", () => {
-  it("rejects unknown keys and price stored as attrs", () => {
-    expect(validateAttrs([weight], { missing: 1 })).toMatchObject({
+  it("rejects unknown keys and price stored as fields", () => {
+    expect(validateFields([weight], { missing: 1 })).toMatchObject({
       ok: false,
       error: "unknown_field",
     });
-    expect(validateAttrs([weight], { price: 10 })).toMatchObject({
+    expect(validateFields([weight], { price: 10 })).toMatchObject({
       ok: false,
       error: "validation_error",
     });
-    expect(validateAttrs([retiredField()], { weight_g: 1 })).toMatchObject({
+    expect(validateFields([retiredField()], { weight_g: 1 })).toMatchObject({
       ok: false,
       error: "field_retired",
     });
-    expect(validateAttrs([color], { color: "红" })).toMatchObject({
+    expect(validateFields([color], { color: "红" })).toMatchObject({
       ok: false,
       error: "validation_error",
     });
-    expect(validateAttrs([weight], { weight_g: 480 }).ok).toBe(true);
-    expect(validateAttrs([{ ...weight, type: "text" }], { weight_g: "棉" }).ok).toBe(true);
-    expect(validateAttrs([{ ...weight, type: "boolean" }], { weight_g: true }).ok).toBe(true);
+    expect(validateFields([weight], { weight_g: 480 }).ok).toBe(true);
+    expect(validateFields([{ ...weight, type: "text" }], { weight_g: "棉" }).ok).toBe(true);
+    expect(validateFields([{ ...weight, type: "boolean" }], { weight_g: true }).ok).toBe(true);
     expect(missingRequired([{ ...weight, required: true }], {})?.key).toBe("weight_g");
-    expect(publicAttrs([weight, retiredField()], { weight_g: 1, color: "黑" })).toEqual({
+    expect(publicFields([weight, retiredField()], { weight_g: 1, color: "黑" })).toEqual({
       weight_g: 1,
     });
   });
@@ -294,21 +294,21 @@ describe("attributes, variants, and visibility", () => {
     ).toBe(true);
     const blocked = assertPublishable({
       deleted: false,
-      attrs: {},
-      fields: [],
+      fields: {},
+      definitions: [],
       variants: [variant({}), variant({ size: "40" })],
     });
     expect(blocked).toMatchObject({ ok: false, error: "conflict" });
     expect(
       assertPublishable({
         deleted: false,
-        attrs: {},
-        fields: [{ ...weight, required: true }],
+        fields: {},
+        definitions: [{ ...weight, required: true }],
         variants: [variant({})],
       }),
     ).toMatchObject({ ok: false, error: "validation_error" });
     expect(
-      assertPublishable({ deleted: true, attrs: {}, fields: [], variants: [variant({})] }),
+      assertPublishable({ deleted: true, fields: {}, definitions: [], variants: [variant({})] }),
     ).toMatchObject({
       ok: false,
       error: "conflict",
@@ -316,8 +316,8 @@ describe("attributes, variants, and visibility", () => {
     expect(
       assertPublishable({
         deleted: false,
-        attrs: { weight_g: 1 },
-        fields: [{ ...weight, required: true }],
+        fields: { weight_g: 1 },
+        definitions: [{ ...weight, required: true }],
         variants: [variant({ size: "40" }), { ...variant({}), status: "off" }],
       }).ok,
     ).toBe(true);
@@ -503,8 +503,8 @@ describe("request parsing", () => {
       true,
     );
     expect(parseFieldChangeBody({ op: "nope" })).toMatchObject({ ok: false });
-    expect(parseOptionBody({ key: "size", label: "尺码" }).ok).toBe(true);
-    expect(parseVariantBody({ options: { size: "42" }, price: 100 }).ok).toBe(true);
+    expect(parseAxisBody({ key: "size", label: "尺码" }).ok).toBe(true);
+    expect(parseVariantBody({ option_values: { size: "42" }, price: 100 }).ok).toBe(true);
     expect(parseVariantPatch({ status: "off", restore: true }).ok).toBe(true);
     expect(parseVariantPatch({ status: "gone" })).toMatchObject({ ok: false });
     expect(parseProductBody({ title: 1 })).toMatchObject({ ok: false });

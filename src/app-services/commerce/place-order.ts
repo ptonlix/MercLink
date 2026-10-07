@@ -19,15 +19,6 @@ import { isUniqueViolation, type StoredGraph, type StoredItem } from "./reposito
 import type { CommerceRuntime } from "./runtime";
 import { httpStatus } from "./view";
 
-const priceKeys = new Set([
-  "price",
-  "unit_price",
-  "unitPrice",
-  "amount",
-  "total_amount",
-  "totalAmount",
-]);
-
 const itemSchema = z.strictObject({
   variant_id: z.string().trim().min(1).optional(),
   product_id: z.string().trim().min(1).optional(),
@@ -63,8 +54,9 @@ function parsePlaceOrderBody(raw: unknown):
   if (Array.isArray(record.items) && record.items.length > 1) {
     return { ok: false, error: "too_many_items", message: "订单只能包含一行。" };
   }
-  if (containsPrice(record)) {
-    return { ok: false, error: "validation_error", message: "不能传入价格。" };
+  const priced = rejectCallerPrice(raw);
+  if (!priced.ok) {
+    return priced;
   }
   const parsed = bodySchema.safeParse(raw);
   if (!parsed.success) {
@@ -73,10 +65,6 @@ function parsePlaceOrderBody(raw: unknown):
   const item = parsed.data.items[0];
   if (item === undefined) {
     return { ok: false, error: "validation_error", message: "订单必须包含一行。" };
-  }
-  const priced = rejectCallerPrice(false);
-  if (!priced.ok) {
-    return priced;
   }
   const line = validateSingleLine([
     {
@@ -244,17 +232,4 @@ function snapshotFields(
   return { ...fields };
 }
 
-function containsPrice(value: unknown): boolean {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-  for (const [key, nested] of Object.entries(value)) {
-    if (priceKeys.has(key)) {
-      return true;
-    }
-    if (key === "items" && Array.isArray(nested) && nested.some((item) => containsPrice(item))) {
-      return true;
-    }
-  }
-  return false;
-}
+

@@ -1,6 +1,6 @@
-import type { Attrs } from "../../domain/catalog/fields";
+import type { Fields } from "../../domain/catalog/fields";
 import type { CatalogRow, FieldRow, OptionRow, ProductRow, VariantRow } from "./db";
-import { readAttrs, readOptionValues, toField } from "./db";
+import { readFields, readOptionValues, toField } from "./db";
 
 export type CatalogRecord = {
   id: string;
@@ -38,12 +38,12 @@ export type ProductRecord = {
   title: string;
   status: "on" | "off";
   cover: string | null;
-  attrs: Attrs;
+  fields: Fields;
   schemaRevision: number;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
-  options: OptionRecord[];
+  axes: OptionRecord[];
   variants: VariantRecord[];
 };
 
@@ -78,7 +78,7 @@ export function variantRecord(row: VariantRow): VariantRecord {
 
 export function productRecord(
   row: ProductRow,
-  options: readonly OptionRow[],
+  axes: readonly OptionRow[],
   variants: readonly VariantRow[],
 ): ProductRecord {
   return {
@@ -87,16 +87,16 @@ export function productRecord(
     title: row.title,
     status: row.status === "on" ? "on" : "off",
     cover: row.cover,
-    attrs: readAttrs(row.attrs),
+    fields: readFields(row.fields),
     schemaRevision: row.schema_revision,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
-    options: options.map((option) => ({
-      id: option.id,
-      key: option.key,
-      label: option.label,
-      position: option.position,
+    axes: axes.map((axis) => ({
+      id: axis.id,
+      key: axis.key,
+      label: axis.label,
+      position: axis.position,
     })),
     variants: variants.map(variantRecord),
   };

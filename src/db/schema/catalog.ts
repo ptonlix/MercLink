@@ -10,7 +10,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-export type CatalogAttrValue = string | number | boolean;
+export type CatalogFieldValue = string | number | boolean;
 
 // merchant_id stays a plain text column. Do not add a merchants foreign key here.
 export const catalogs = pgTable(
@@ -56,7 +56,7 @@ export const productFields = pgTable(
     label: text("label").notNull(),
     type: text("type").notNull(),
     required: boolean("required").notNull(),
-    options: jsonb("options").$type<readonly string[] | null>(),
+    choices: jsonb("choices").$type<readonly string[] | null>(),
     status: text("status").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -71,7 +71,7 @@ export const products = pgTable("products", {
   title: text("title").notNull(),
   status: text("status").notNull(),
   cover: text("cover"),
-  attrs: jsonb("attrs").$type<Record<string, CatalogAttrValue>>().notNull().default({}),
+  fields: jsonb("fields").$type<Record<string, CatalogFieldValue>>().notNull().default({}),
   schemaRevision: integer("schema_revision").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -1,31 +1,31 @@
 import {
   activeFields,
   isSystemFieldKey,
-  type Attrs,
-  type AttrValue,
   type FieldDefinition,
+  type Fields,
+  type FieldValue,
 } from "./fields";
 import { catalogFail, catalogOk, type CatalogResult } from "./result";
 
-export function validateAttrs(
-  fields: readonly FieldDefinition[],
+export function validateFields(
+  definitions: readonly FieldDefinition[],
   input: Readonly<Record<string, unknown>>,
-): CatalogResult<Attrs> {
-  const active = activeFields(fields);
+): CatalogResult<Fields> {
+  const active = activeFields(definitions);
   const byKey = new Map(active.map((field) => [field.key, field]));
   const retired = new Set(
-    fields.filter((field) => field.status === "retired").map((field) => field.key),
+    definitions.filter((field) => field.status === "retired").map((field) => field.key),
   );
-  const attrs: Record<string, AttrValue> = {};
+  const fields: Record<string, FieldValue> = {};
   for (const [key, value] of Object.entries(input)) {
     if (value === undefined || value === null) {
       continue;
     }
     if (key === "price" || key === "stock") {
-      return catalogFail("validation_error", "价格和库存不能写入 attrs。");
+      return catalogFail("validation_error", "价格和库存不能写入商品字段。");
     }
     if (isSystemFieldKey(key)) {
-      return catalogFail("validation_error", "系统字段不能写入 attrs。");
+      return catalogFail("validation_error", "系统字段不能写入商品字段。");
     }
     if (retired.has(key)) {
       return catalogFail("field_retired", "字段已停用。");
@@ -34,29 +34,31 @@ export function validateAttrs(
     if (field === undefined) {
       return catalogFail("unknown_field", "字段不存在。");
     }
-    const parsed = parseAttrValue(field, value);
+    const parsed = parseFieldValue(field, value);
     if (!parsed.ok) {
       return parsed;
     }
-    attrs[key] = parsed.value;
+    fields[key] = parsed.value;
   }
-  return catalogOk(attrs);
+  return catalogOk(fields);
 }
 
 export function missingRequired(
-  fields: readonly FieldDefinition[],
-  attrs: Attrs,
+  definitions: readonly FieldDefinition[],
+  fields: Fields,
 ): FieldDefinition | undefined {
-  return activeFields(fields).find((field) => field.required && attrs[field.key] === undefined);
+  return activeFields(definitions).find(
+    (field) => field.required && fields[field.key] === undefined,
+  );
 }
 
-export function publicAttrs(
-  fields: readonly FieldDefinition[],
-  attrs: Attrs,
-): Record<string, AttrValue> {
-  const visible: Record<string, AttrValue> = {};
-  for (const field of activeFields(fields)) {
-    const value = attrs[field.key];
+export function publicFields(
+  definitions: readonly FieldDefinition[],
+  fields: Fields,
+): Record<string, FieldValue> {
+  const visible: Record<string, FieldValue> = {};
+  for (const field of activeFields(definitions)) {
+    const value = fields[field.key];
     if (value !== undefined) {
       visible[field.key] = value;
     }
@@ -64,7 +66,7 @@ export function publicAttrs(
   return visible;
 }
 
-function parseAttrValue(field: FieldDefinition, value: unknown): CatalogResult<AttrValue> {
+function parseFieldValue(field: FieldDefinition, value: unknown): CatalogResult<FieldValue> {
   if (field.type === "text") {
     if (typeof value !== "string" || value.trim().length === 0 || value.length > 2000) {
       return catalogFail("validation_error", "文本字段必须是非空字符串。");
@@ -83,7 +85,7 @@ function parseAttrValue(field: FieldDefinition, value: unknown): CatalogResult<A
     }
     return catalogOk(value);
   }
-  if (typeof value !== "string" || !field.options.includes(value)) {
+  if (typeof value !== "string" || !field.choices.includes(value)) {
     return catalogFail("validation_error", "单选值必须是已声明的选项。");
   }
   return catalogOk(value);

@@ -5,14 +5,14 @@ import type {
   RestoreSellableInput,
   RestoreSellableResult,
 } from "../../shared/seams/sellable-variants";
-import { publicAttrs } from "../../domain/catalog/attributes";
-import type { Attrs } from "../../domain/catalog/fields";
+import { publicFields } from "../../domain/catalog/attributes";
+import type { Fields } from "../../domain/catalog/fields";
 import {
   selectLockTarget,
   selectRestoreTarget,
   type LockCandidate,
 } from "../../domain/catalog/lock";
-import { loadFields, readAttrs, readOptionValues, toField } from "./db";
+import { loadFields, readFields, readOptionValues, toField } from "./db";
 
 type LockRow = {
   variant_id: string;
@@ -27,7 +27,7 @@ type LockRow = {
   title: string;
   product_status: string;
   product_deleted_at: Date | null;
-  attrs: unknown;
+  fields: unknown;
   currency: string;
   schema_revision: number;
   catalog_deleted_at: Date | null;
@@ -52,7 +52,7 @@ export async function lockSellable(input: LockSellableInput): Promise<LockSellab
       p.title,
       p.status AS product_status,
       p.deleted_at AS product_deleted_at,
-      p.attrs,
+      p.fields,
       c.currency,
       c.schema_revision,
       c.deleted_at AS catalog_deleted_at
@@ -93,7 +93,7 @@ export async function lockSellable(input: LockSellableInput): Promise<LockSellab
       stock: line.stock,
       sku: line.sku,
       optionValues: line.optionValues,
-      fields: line.attrs,
+      fields: line.fields,
       schemaRevision: line.schemaRevision,
     },
   };
@@ -122,8 +122,8 @@ export async function restoreSellable(input: RestoreSellableInput): Promise<Rest
 }
 
 async function candidate(tx: postgres.TransactionSql, row: LockRow): Promise<LockCandidate> {
-  const fields = (await loadFields(tx, row.catalog_id)).map(toField);
-  const attrs: Attrs = publicAttrs(fields, readAttrs(row.attrs));
+  const definitions = (await loadFields(tx, row.catalog_id)).map(toField);
+  const fields: Fields = publicFields(definitions, readFields(row.fields));
   return {
     variantId: row.variant_id,
     productId: row.product_id,
@@ -134,7 +134,7 @@ async function candidate(tx: postgres.TransactionSql, row: LockRow): Promise<Loc
     stock: row.stock,
     sku: row.sku,
     optionValues: readOptionValues(row.option_values),
-    attrs,
+    fields,
     schemaRevision: row.schema_revision,
     variantStatus: row.variant_status === "on" ? "on" : "off",
     productStatus: row.product_status === "on" ? "on" : "off",

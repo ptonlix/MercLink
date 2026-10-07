@@ -8,7 +8,7 @@ export type PublicVariant = {
   currency: string;
   stock: number | null;
   availability: PublicAvailability;
-  options: Readonly<Record<string, string>>;
+  optionValues: Readonly<Record<string, string>>;
   sku: string | null;
 };
 

@@ -11,9 +11,10 @@ import { runMigrations } from "../../db/migrate";
 import { buyerActor, merchantActor } from "../../shared/actor";
 import { registerAuthenticator, resetAuthenticator } from "../../shared/seams/authenticate";
 import { createClockRateLimit } from "../../adapters/redis/clock-rate-limit";
-import type { Clock } from "../../ports/clock";
+import { systemClock, type Clock } from "../../ports/clock";
 import type { ObjectStoragePort } from "../../ports/object-storage";
 import type { RateLimitPort } from "../../ports/rate-limit";
+import { imageUploadLimit, imageUploadWindowMs, maxImageBytes } from "../../domain/catalog/images";
 import { createCatalog } from "./catalogs";
 import { bindCatalogSql } from "./http";
 import { createProduct } from "./products";
@@ -122,11 +123,11 @@ describe("product images", () => {
       const storage = memoryStorage();
       let now = 10_000;
       const clock: Clock = { now: () => new Date(now) };
-      bind(sql, storage.port, createClockRateLimit(clock));
+      bind(sql, storage.port, createClockRateLimit(clock), clock);
       const catalog = await mustCatalog(sql, "mch_a");
       asMerchant("mch_a");
 
-      for (let attempt = 0; attempt < 30; attempt += 1) {
+      for (let attempt = 0; attempt < imageUploadLimit; attempt += 1) {
         const rejected = await uploadRoute(uploadRequest(catalog.id, svg), {
           params: Promise.resolve({ id: catalog.id }),
         });
@@ -140,7 +141,7 @@ describe("product images", () => {
       await expect(limited.json()).resolves.toMatchObject({ error: "rate_limited" });
       expect(storage.puts).toEqual([]);
 
-      now += 60_001;
+      now += imageUploadWindowMs + 1;
       const allowed = await uploadRoute(uploadRequest(catalog.id, png), {
         params: Promise.resolve({ id: catalog.id }),
       });
@@ -296,9 +297,14 @@ function asBuyer(): void {
   }));
 }
 
-function bind(sql: postgres.Sql, storage: ObjectStoragePort, rateLimit: RateLimitPort): void {
+function bind(
+  sql: postgres.Sql,
+  storage: ObjectStoragePort,
+  rateLimit: RateLimitPort,
+  clock: Clock = systemClock,
+): void {
   bindCatalogSql(sql);
-  bindMediaRuntime({ rateLimit, objectStorage: storage, mediaBaseUrl: origin });
+  bindMediaRuntime({ rateLimit, objectStorage: storage, mediaBaseUrl: origin, clock });
 }
 
 function uploadRequest(

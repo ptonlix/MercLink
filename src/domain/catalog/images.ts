@@ -1,6 +1,17 @@
 import { catalogFail, catalogOk, type CatalogResult } from "./result";
 
 export const maxImageBytes = 5 * 1024 * 1024;
+export const imageUploadLimit = 30;
+export const imageUploadWindowMs = 60_000;
+export const imageUploadPolicyName = "image-upload";
+
+export function imageUploadPolicies(): {
+  readonly "image-upload": { readonly limit: number; readonly windowMs: number };
+} {
+  return {
+    [imageUploadPolicyName]: { limit: imageUploadLimit, windowMs: imageUploadWindowMs },
+  };
+}
 
 const imageContentTypes = ["image/jpeg", "image/png", "image/webp"] as const;
 

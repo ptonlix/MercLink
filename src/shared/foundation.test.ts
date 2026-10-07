@@ -118,4 +118,36 @@ describe("domain boundaries", () => {
     const passed = await execFileAsync("pnpm", ["run", "boundaries"], { cwd: process.cwd() });
     expect(passed.stderr).not.toContain("domain-no-app-db-adapters");
   }, 60_000);
+
+  it("fails when a page imports a domain module", async () => {
+    const violation = path.join("src", "app", "_boundary_violation.ts");
+    await mkdir(path.dirname(violation), { recursive: true });
+    try {
+      await writeFile(
+        violation,
+        'import { selectAuthorizationPage } from "../domain/access/scopes";\n\nvoid selectAuthorizationPage;\n',
+      );
+      await expect(
+        execFileAsync("pnpm", ["run", "boundaries"], { cwd: process.cwd() }),
+      ).rejects.toThrow();
+    } finally {
+      await rm(violation, { force: true });
+    }
+  }, 60_000);
+
+  it("fails when identity imports an access domain module", async () => {
+    const violation = path.join("src", "app-services", "identity", "_boundary_violation.ts");
+    await mkdir(path.dirname(violation), { recursive: true });
+    try {
+      await writeFile(
+        violation,
+        'import { tokenHash } from "../../domain/access/tokens";\n\nvoid tokenHash;\n',
+      );
+      await expect(
+        execFileAsync("pnpm", ["run", "boundaries"], { cwd: process.cwd() }),
+      ).rejects.toThrow();
+    } finally {
+      await rm(violation, { force: true });
+    }
+  }, 60_000);
 });

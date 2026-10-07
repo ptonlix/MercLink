@@ -1,12 +1,11 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
+import { tokenHash } from "../../shared/token-hash";
 
 export const accessTokenTtlSeconds = 15 * 60;
 export const deviceCodeTtlSeconds = 10 * 60;
 export const refreshTokenTtlSeconds = 30 * 24 * 60 * 60;
 
-export function tokenHash(value: string): string {
-  return createHash("sha256").update(value).digest("base64url");
-}
+export { tokenHash };
 
 export function sameHash(left: string, right: string): boolean {
   const leftBytes = Buffer.from(left);

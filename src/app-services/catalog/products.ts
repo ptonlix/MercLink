@@ -1,5 +1,5 @@
 import { createPublicId } from "../../shared/id";
-import { validateAttrs } from "../../domain/catalog/attributes";
+import { validateFields } from "../../domain/catalog/attributes";
 import {
   parseCover,
   parseMinorPrice,
@@ -8,7 +8,7 @@ import {
   parseTitle,
 } from "../../domain/catalog/catalogs";
 import {
-  parseOptionBody,
+  parseAxisBody,
   parseProductBody,
   parseProductPatch,
   parseVariantBody,
@@ -35,7 +35,7 @@ import {
   lockProduct,
   lockVariants,
   ownedCatalog,
-  readAttrs,
+  readFields,
   toField,
   type Db,
   type Sql,
@@ -91,14 +91,14 @@ export async function createProduct(
         return acceptedCover;
       }
       const fields = (await loadFields(tx, catalogId)).map(toField);
-      const attrs = validateAttrs(fields, parsed.value.fields);
-      if (!attrs.ok) {
-        return attrs;
+      const values = validateFields(fields, parsed.value.fields);
+      if (!values.ok) {
+        return values;
       }
       const productId = createPublicId("product");
       await tx`
         INSERT INTO products (
-          id, catalog_id, title, status, cover, attrs, schema_revision
+          id, catalog_id, title, status, cover, fields, schema_revision
         )
         VALUES (
           ${productId},
@@ -106,7 +106,7 @@ export async function createProduct(
           ${title.value},
           'off',
           ${acceptedCover.value},
-          ${tx.json(attrs.value)},
+          ${tx.json(values.value)},
           ${catalog.schema_revision}
         )
       `;
@@ -171,18 +171,18 @@ export async function patchProduct(
         return acceptedCover;
       }
       const fields = (await loadFields(tx, catalogId)).map(toField);
-      const attrs =
+      const values =
         parsed.value.fields === undefined
-          ? catalogOk(readAttrs(loaded.value.attrs))
-          : validateAttrs(fields, parsed.value.fields);
-      if (!attrs.ok) {
-        return attrs;
+          ? catalogOk(readFields(loaded.value.fields))
+          : validateFields(fields, parsed.value.fields);
+      if (!values.ok) {
+        return values;
       }
       if (loaded.value.status === "on" && loaded.value.deleted_at === null) {
         const publishable = assertPublishable({
           deleted: false,
-          attrs: attrs.value,
-          fields,
+          fields: values.value,
+          definitions: fields,
           variants: (await loadVariants(tx, productId))
             .filter((row) => row.deleted_at === null)
             .map(variantState),
@@ -195,7 +195,7 @@ export async function patchProduct(
         UPDATE products
         SET title = ${title?.ok === true ? title.value : loaded.value.title},
             cover = ${acceptedCover === undefined ? loaded.value.cover : acceptedCover.value},
-            attrs = ${tx.json(attrs.value)},
+            fields = ${tx.json(values.value)},
             updated_at = now()
         WHERE id = ${productId}
       `;
@@ -224,8 +224,8 @@ export async function publishProduct(
     const variants = await lockVariants(tx, productId);
     const decision = assertPublishable({
       deleted: loaded.value.deleted_at !== null,
-      attrs: readAttrs(loaded.value.attrs),
-      fields,
+      fields: readFields(loaded.value.fields),
+      definitions: fields,
       variants: variants.filter((row) => row.deleted_at === null).map(variantState),
     });
     if (!decision.ok) {
@@ -307,14 +307,14 @@ export async function restoreProduct(
   });
 }
 
-export async function declareOption(
+export async function declareAxis(
   db: Sql,
   merchantId: string,
   catalogId: string,
   productId: string,
   input: unknown,
 ): Promise<CatalogResult<ProductRecord>> {
-  const parsed = parseOptionBody(input);
+  const parsed = parseAxisBody(input);
   if (!parsed.ok) {
     return parsed;
   }
@@ -394,7 +394,7 @@ export async function createVariant(
       const combination = validateVariantOptions({
         declaredAxes: options.map((option) => option.key),
         existing,
-        optionValues: parsed.value.options,
+        optionValues: parsed.value.optionValues,
       });
       if (!combination.ok) {
         return combination;
@@ -496,8 +496,8 @@ export async function patchVariant(
         const fields = (await loadFields(tx, catalogId)).map(toField);
         const publishable = assertPublishable({
           deleted: false,
-          attrs: readAttrs(loaded.value.attrs),
-          fields,
+          fields: readFields(loaded.value.fields),
+          definitions: fields,
           variants: projected.filter((item) => !item.deleted),
         });
         if (!publishable.ok) {

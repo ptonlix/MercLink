@@ -198,7 +198,7 @@ function publishedProduct(): PublicProduct {
         currency: "USD",
         stock: 4,
         availability: "in_stock",
-        options: { size: "42" },
+        optionValues: { size: "42" },
         sku: "SENTINEL-42",
       },
     ],

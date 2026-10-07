@@ -33,7 +33,7 @@ POST /api/v1/catalogs/{id}/products/{product_id}/publish
 POST /api/v1/catalogs/{id}/products/{product_id}/unpublish
 DELETE /api/v1/catalogs/{id}/products/{product_id}
 POST /api/v1/catalogs/{id}/products/{product_id}/restore
-POST /api/v1/catalogs/{id}/products/{product_id}/options
+POST /api/v1/catalogs/{id}/products/{product_id}/axes
 POST /api/v1/catalogs/{id}/products/{product_id}/variants
 PATCH /api/v1/catalogs/{id}/variants/{variant_id}
 DELETE /api/v1/catalogs/{id}/variants/{variant_id}
@@ -56,12 +56,16 @@ GET /api/v1/manage/orders
 
 ## 字段预览和确认
 
-目录字段描述整件商品。规格轴只描述可售差异。字段 key 不可改。类型是 text、number、boolean 或 single-select。
+目录字段描述整件商品。自定义商品值叫 `fields`。规格轴只描述可售差异，创建路径是 `/axes`。字段 key 不可改。类型是 text、number、boolean 或 single-select。单选允许值叫 `choices`，不是规格轴，也不是规格组合。
 
 `GET /api/v1/catalogs/{id}/fields` 列出字段。`POST /api/v1/catalogs/{id}/fields` 新增字段。
 
 ```json
 { "key": "weight_g", "label": "重量", "type": "number", "required": false }
+```
+
+```json
+{ "key": "color", "label": "颜色", "type": "single-select", "required": false, "choices": ["黑", "白"] }
 ```
 
 增加可选字段、改标签、增加单选项、把必填改为可选，会立即生效，已上架商品保持上架。
@@ -92,7 +96,7 @@ GET /api/v1/manage/orders
 
 有规格差异时，先声明规格轴，再只创建实际出售的组合。系统不会自动生成全部组合。同一商品的可售规格必须使用相同的轴。
 
-`POST /api/v1/catalogs/{id}/products/{product_id}/options`
+`POST /api/v1/catalogs/{id}/products/{product_id}/axes`
 
 ```json
 { "key": "size", "label": "尺码" }
@@ -101,7 +105,7 @@ GET /api/v1/manage/orders
 `POST /api/v1/catalogs/{id}/products/{product_id}/variants`
 
 ```json
-{ "options": { "size": "42" }, "price": 159900, "stock": 4 }
+{ "option_values": { "size": "42" }, "price": 159900, "stock": 4 }
 ```
 
 `PATCH /api/v1/catalogs/{id}/products/{product_id}` 编辑商品。`PATCH /api/v1/catalogs/{id}/variants/{variant_id}` 编辑规格。`DELETE /api/v1/catalogs/{id}/variants/{variant_id}` 软删除规格。恢复规格后它仍然不可售。

@@ -48,6 +48,11 @@ describe("buyer registration", () => {
       });
       expect(sent).toEqual({ ok: true, mode: "register" });
       expect(sms.sendCalls).toEqual(["13800138000"]);
+      const challenges = await sql<{ id: string }[]>`
+        SELECT id FROM registration_challenges WHERE phone = '13800138000'
+      `;
+      expect(challenges[0]?.id.startsWith("chg_")).toBe(true);
+      expect(challenges[0]?.id.startsWith("grn_")).toBe(false);
       const checked = await checkBuyerSms(flow, { phone: "13800138000", code: sms.acceptCode });
       expect(checked).toEqual({ ok: true, mode: "register" });
       const created = await completeBuyerRegistration(flow, {

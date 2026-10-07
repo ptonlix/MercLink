@@ -53,6 +53,15 @@ export async function listCatalogs(db: Db, merchantId: string): Promise<CatalogR
   return rows.map(catalogRecord);
 }
 
+export async function listMerchantCatalogIds(db: Db, merchantId: string): Promise<string[]> {
+  const rows = await db<{ id: string }[]>`
+    SELECT id FROM catalogs
+    WHERE merchant_id = ${merchantId} AND deleted_at IS NULL
+    ORDER BY created_at, id
+  `;
+  return rows.map((row) => row.id);
+}
+
 export async function readOwnCatalog(
   db: Db,
   merchantId: string,
