@@ -10,7 +10,7 @@ describe("commerce schema", () => {
   it("keeps payment channel off the order header and unique client numbers inside a buyer", async () => {
     const databaseUrl = process.env.DATABASE_URL;
     if (databaseUrl === undefined || databaseUrl.trim() === "") {
-      throw new Error("DATABASE_URL is required. Start compose.yaml and export DATABASE_URL.");
+      throw new Error("DATABASE_URL is required. Start compose.dev.yaml and export DATABASE_URL.");
     }
     const columnNames = Object.values(getTableColumns(orders)).map((column) => column.name);
     expect(columnNames).toEqual(

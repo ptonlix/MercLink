@@ -18,6 +18,7 @@ import {
   sessionTtlSeconds,
   signSession,
 } from "../../../../app-services/identity/session";
+import { devSmsCode, devStubsEnabled } from "../../../../shared/dev-stubs";
 
 export const dynamic = "force-dynamic";
 
@@ -42,9 +43,10 @@ export async function POST(request: Request): Promise<Response> {
     if (!result.ok) {
       return redirectTo(`/authorize/buyer?notice=${encodeURIComponent(result.message)}`);
     }
-    return redirectTo(
-      `/authorize/buyer?mode=${result.mode}&notice=${encodeURIComponent("验证码已发送。")}`,
-    );
+    const sent = devStubsEnabled(process.env)
+      ? `本地开发验证码是 ${devSmsCode}，未发送短信。`
+      : "验证码已发送。";
+    return redirectTo(`/authorize/buyer?mode=${result.mode}&notice=${encodeURIComponent(sent)}`);
   }
   if (intent === "check") {
     const result = await checkBuyerSms(flow, { phone, code: formValue(form, "code") });

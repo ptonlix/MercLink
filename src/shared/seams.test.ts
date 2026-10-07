@@ -4,6 +4,7 @@ import { minorUnits } from "./money";
 import { authenticate, resetAuthenticator } from "./seams/authenticate";
 import { defaultCatalog, resetDefaultCatalog } from "./seams/default-catalog";
 import { publicProducts, resetPublicProducts } from "./seams/public-products";
+import { publicStore, resetPublicStore } from "./seams/public-store";
 import { resetSellableVariants, sellableVariants } from "./seams/sellable-variants";
 
 describe("fail-closed seams", () => {
@@ -61,6 +62,11 @@ describe("fail-closed seams", () => {
     });
     expect(restored).toMatchObject({ ok: false, error: "dependency_unavailable" });
     expect(tx.calls).toBe(0);
+  });
+
+  it("returns no store profile when the public store seam is unregistered", async () => {
+    resetPublicStore();
+    await expect(publicStore.get()).resolves.toBeNull();
   });
 
   it("returns an empty public page and not found when unregistered", async () => {

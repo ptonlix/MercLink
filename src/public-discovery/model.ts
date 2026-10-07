@@ -1,23 +1,27 @@
 import type { PublicListQuery, PublicProduct } from "../shared/seams/public-products";
 import { publicProducts } from "../shared/seams/public-products";
+import { publicStore, type PublicStoreProfile } from "../shared/seams/public-store";
 import {
   absoluteUrl,
   emptyProductsNote,
   productSitemapEntry,
   publicBaseUrl,
-  serviceDescription,
   siteName,
   staticSitemapEntries,
+  storeExplanation,
   type SitemapEntry,
 } from "./site";
 
 const listLimit = 20;
 const sitemapPageLimit = 100;
 
+const metaDescriptionLimit = 150;
+
 export type LandingModel = {
   title: string;
   description: string;
   canonicalUrl: string;
+  store: PublicStoreProfile | null;
   products: readonly PublicProduct[];
   nextCursor: string | null;
   jsonLd: LandingJsonLd;
@@ -58,7 +62,7 @@ type JsonLdNode = {
 
 type LandingJsonLd = {
   "@context": "https://schema.org";
-  "@graph": [JsonLdNode, ItemListJsonLd];
+  "@graph": readonly JsonLdNode[];
 };
 
 type ItemListJsonLd = {
@@ -94,27 +98,34 @@ export function jsonLdScript(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
+function truncateChars(value: string, max: number): string {
+  return Array.from(value).slice(0, max).join("");
+}
+
 export async function loadLanding(): Promise<LandingModel> {
-  const page = await publicProducts.list({ limit: listLimit });
+  const [page, store] = await Promise.all([
+    publicProducts.list({ limit: listLimit }),
+    publicStore.get(),
+  ]);
   const origin = publicBaseUrl();
-  const description = serviceDescription;
+  const description =
+    store === null ? storeExplanation : truncateChars(store.summary, metaDescriptionLimit);
+  const title = store === null ? siteName : store.displayName;
+  const graph: JsonLdNode[] = [];
+  if (store !== null) {
+    graph.push(onlineStore(store, origin));
+  }
+  graph.push(itemList(page.items, origin));
   return {
-    title: siteName,
+    title,
     description,
     canonicalUrl: absoluteUrl("/", origin),
+    store,
     products: page.items,
     nextCursor: page.nextCursor,
     jsonLd: {
       "@context": "https://schema.org",
-      "@graph": [
-        {
-          "@type": "Organization",
-          name: siteName,
-          description,
-          url: absoluteUrl("/", origin),
-        },
-        itemList(page.items, origin),
-      ],
+      "@graph": graph,
     },
   };
 }
@@ -190,6 +201,31 @@ export async function publicSitemap(): Promise<readonly SitemapEntry[]> {
     cursor = page.nextCursor;
   }
   return entries;
+}
+
+function onlineStore(store: PublicStoreProfile, origin: string): JsonLdNode {
+  const node: JsonLdNode = {
+    "@type": "OnlineStore",
+    name: store.displayName,
+    description: store.summary,
+    url: absoluteUrl("/", origin),
+  };
+  if (store.logoUrl !== null && isHttpUrl(store.logoUrl)) {
+    node.logo = store.logoUrl;
+  }
+  if (store.websiteUrl !== null && isHttpUrl(store.websiteUrl)) {
+    node.sameAs = store.websiteUrl;
+  }
+  if (store.areaServed !== null && store.areaServed.length > 0) {
+    node.areaServed = store.areaServed;
+  }
+  if (store.address !== null && store.address.length > 0) {
+    node.address = {
+      "@type": "PostalAddress",
+      streetAddress: store.address,
+    };
+  }
+  return node;
 }
 
 function productDescription(product: PublicProduct): string {

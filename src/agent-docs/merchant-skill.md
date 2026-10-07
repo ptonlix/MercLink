@@ -14,11 +14,14 @@ Do not guide self-registration. Do not ask for a password, SMS code, or API key.
 
 ## 能做什么
 
-建目录，定义字段，做字段预览和确认，新建和编辑商品与规格，上架，下架，软删除，恢复，以及查看订单。不能修改其他商家的数据。
+建目录，定义字段，做字段预览和确认，新建和编辑商品与规格，上架，下架，软删除，恢复，查看订单，以及读取、保存、发布或撤回这一家店的公开介绍。不能修改其他商家的数据。没有商家目录，也不要调用 `/merchants`。
 
 ## 路由
 
 ```http
+GET /api/v1/merchant/profile
+PUT /api/v1/merchant/profile
+GET /api/v1/store
 GET /api/v1/catalogs
 POST /api/v1/catalogs
 GET /api/v1/catalogs/{id}/schema
@@ -40,7 +43,33 @@ DELETE /api/v1/catalogs/{id}/variants/{variant_id}
 GET /api/v1/manage/orders
 ```
 
-商家接口都要带目录 ID。令牌只能访问自己的目录。另一个商家的目录返回 not found 或 `forbidden`，并且不返回字段或商品数据。
+目录接口都要带目录 ID。令牌只能访问自己的目录和自己的店铺介绍。另一个商家的目录返回 not found 或 `forbidden`，并且不返回字段或商品数据。
+
+## 店铺介绍
+
+这一家店只有一份公开介绍，不是每本目录一份。用已有的商家访问令牌调用下面两个方法。不要在示例或请求里填写真实令牌。
+
+`GET /api/v1/merchant/profile` 读取自己的介绍，没有请求体。还没有保存时返回空草稿，不是 404。
+
+`PUT /api/v1/merchant/profile` 整份替换，正文必须是 `application/json`，并且令牌要有 `product:write`。请求字段只有这七个：`display_name`、`summary`、`website_url`、`logo_url`、`area_served`、`address`、`published`。
+
+```json
+{
+  "display_name": "示例商店",
+  "summary": "一段虚构简介，说明这家店卖什么。不是任何已保存的商家介绍。",
+  "website_url": "https://example.com",
+  "logo_url": null,
+  "area_served": "示例城市",
+  "address": null,
+  "published": false
+}
+```
+
+这只是请求形状，不是任何商家已保存的介绍。只有 `published` 为 `true` 时，落地页和公开接口才会显示这份介绍。把 `published` 改为 `false` 后，落地页立即不再显示。
+
+不要把登录手机号、密码、短信验证码或 API Key 提交为公开资料。不要把登录手机号写进 `website_url`、`summary` 或其他字段。
+
+公开读取是 `GET /api/v1/store`，不需要令牌。未发布、已撤回或商家停用时，它返回 `not_found`，不回显草稿。
 
 ## 目录
 

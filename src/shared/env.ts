@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  devStubsBlocked,
+  devStubsEnabled,
+  devUnusedCredential,
+  vendorCredentials,
+} from "./dev-stubs";
 
 const nonEmpty = z.string().trim().min(1);
 
@@ -66,7 +72,17 @@ function isPresent(value: string | undefined): value is string {
 }
 
 export function loadEnv(source: Readonly<Record<string, string | undefined>>): LoadEnvResult {
-  const missing = requiredEnvKeys.filter((key) => !isPresent(source[key]));
+  if (devStubsBlocked(source)) {
+    return {
+      ok: false,
+      missing: [],
+      message: "MERCLINK_DEV_STUBS cannot be enabled when NODE_ENV=production\n",
+    };
+  }
+  const skipped = devStubsEnabled(source)
+    ? new Set<string>(vendorCredentials())
+    : new Set<string>();
+  const missing = requiredEnvKeys.filter((key) => !skipped.has(key) && !isPresent(source[key]));
   if (missing.length > 0) {
     return {
       ok: false,
@@ -78,14 +94,19 @@ export function loadEnv(source: Readonly<Record<string, string | undefined>>): L
   const candidate: Record<string, string> = {};
   for (const key of requiredEnvKeys) {
     const value = source[key];
-    if (!isPresent(value)) {
-      return {
-        ok: false,
-        missing: [key],
-        message: `Missing required environment: ${key}\n`,
-      };
+    if (isPresent(value)) {
+      candidate[key] = value;
+      continue;
     }
-    candidate[key] = value;
+    if (skipped.has(key)) {
+      candidate[key] = devUnusedCredential;
+      continue;
+    }
+    return {
+      ok: false,
+      missing: [key],
+      message: `Missing required environment: ${key}\n`,
+    };
   }
 
   const parsed = envSchema.safeParse(candidate);

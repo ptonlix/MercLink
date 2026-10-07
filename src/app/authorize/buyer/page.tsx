@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import type { ReactNode } from "react";
+import { devStubsEnabled } from "../../../shared/dev-stubs";
 import { loadEnv } from "../../../shared/env";
 import { BuyerAuthorizeView } from "../views";
 import "../authorize.css";
@@ -22,6 +24,8 @@ export default async function BuyerAuthorizePage({
       mode={params.mode === "login" ? "login" : "register"}
       captchaPrefix={loaded.env.ALIYUN_CAPTCHA_PREFIX}
       captchaSceneId={loaded.env.ALIYUN_CAPTCHA_SCENE_ID}
+      devStubs={devStubsEnabled(process.env)}
+      captchaToken={randomUUID()}
     />
   );
 }

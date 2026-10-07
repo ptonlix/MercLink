@@ -1,5 +1,7 @@
 import { createAliyunCaptcha } from "../../adapters/aliyun-captcha/adapter";
 import { createAliyunSms } from "../../adapters/aliyun-sms/adapter";
+import { createDevCaptcha } from "../../adapters/dev/captcha";
+import { createDevSms } from "../../adapters/dev/sms";
 import { createRedisRateLimit } from "../../adapters/redis/limiter";
 import { getDatabase, type Sql } from "../../db/client";
 import { smsRateLimitPolicies } from "../../domain/identity/registration";
@@ -7,6 +9,7 @@ import { systemClock, type Clock } from "../../ports/clock";
 import type { CaptchaPort } from "../../ports/captcha";
 import type { RateLimitPort } from "../../ports/rate-limit";
 import type { SmsPort } from "../../ports/sms";
+import { devStubsEnabled } from "../../shared/dev-stubs";
 import { loadEnv, type AppEnv } from "../../shared/env";
 
 export type AppRuntime = {
@@ -23,21 +26,26 @@ export function appRuntime(): AppRuntime {
   if (!loaded.ok) {
     throw new Error(loaded.message.trim());
   }
+  const stubs = devStubsEnabled(process.env);
   return {
     env: loaded.env,
     sql: getDatabase(loaded.env.DATABASE_URL).sql,
     clock: systemClock,
-    captcha: createAliyunCaptcha({
-      accessKeyId: loaded.env.ALIYUN_CAPTCHA_ACCESS_KEY_ID,
-      accessKeySecret: loaded.env.ALIYUN_CAPTCHA_ACCESS_KEY_SECRET,
-      sceneId: loaded.env.ALIYUN_CAPTCHA_SCENE_ID,
-    }),
-    sms: createAliyunSms({
-      accessKeyId: loaded.env.ALIYUN_SMS_ACCESS_KEY_ID,
-      accessKeySecret: loaded.env.ALIYUN_SMS_ACCESS_KEY_SECRET,
-      signName: loaded.env.ALIYUN_SMS_SIGN_NAME,
-      templateCode: loaded.env.ALIYUN_SMS_TEMPLATE_CODE,
-    }),
+    captcha: stubs
+      ? createDevCaptcha()
+      : createAliyunCaptcha({
+          accessKeyId: loaded.env.ALIYUN_CAPTCHA_ACCESS_KEY_ID,
+          accessKeySecret: loaded.env.ALIYUN_CAPTCHA_ACCESS_KEY_SECRET,
+          sceneId: loaded.env.ALIYUN_CAPTCHA_SCENE_ID,
+        }),
+    sms: stubs
+      ? createDevSms()
+      : createAliyunSms({
+          accessKeyId: loaded.env.ALIYUN_SMS_ACCESS_KEY_ID,
+          accessKeySecret: loaded.env.ALIYUN_SMS_ACCESS_KEY_SECRET,
+          signName: loaded.env.ALIYUN_SMS_SIGN_NAME,
+          templateCode: loaded.env.ALIYUN_SMS_TEMPLATE_CODE,
+        }),
     rateLimit: createRedisRateLimit({
       url: loaded.env.REDIS_URL,
       policies: smsRateLimitPolicies(),

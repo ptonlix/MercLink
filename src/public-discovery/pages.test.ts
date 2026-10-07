@@ -12,7 +12,12 @@ import {
   resetPublicProducts,
   type PublicProduct,
 } from "../shared/seams/public-products";
-import { emptyProductsNote, merchantRegistrationNote, serviceDescription } from "./site";
+import {
+  publicStore,
+  resetPublicStore,
+  type PublicStoreProfile,
+} from "../shared/seams/public-store";
+import { emptyProductsNote, storeExplanation, storeSlogan, viewAllProductsLabel } from "./site";
 
 const origin = "https://merclink.example";
 
@@ -20,10 +25,12 @@ describe("public pages", () => {
   beforeEach(() => {
     process.env.APP_BASE_URL = origin;
     resetPublicProducts();
+    resetPublicStore();
   });
 
   afterEach(() => {
     resetPublicProducts();
+    resetPublicStore();
     delete process.env.APP_BASE_URL;
   });
 
@@ -35,28 +42,31 @@ describe("public pages", () => {
     const visible = visibleHtml(html);
     const metadata = await landingMetadata();
 
-    expect(visible).toContain(serviceDescription);
-    expect(visible).toContain(merchantRegistrationNote);
     expect(visible).toContain(product.title);
-    expect(visible).toContain(String(product.offer.price));
+    expect(visible).toContain("¥2599.00");
+    expect(visible).toContain("有货");
     expect(visible).toContain('href="/products"');
     expect(visible).toContain('href="/skill.md"');
     expect(visible).toContain('href="/merchant/skill.md"');
     expect(visible).toContain('href="/api/v1"');
     expect(visible).toContain('href="/llms.txt"');
     expect(visible).toContain('href="/sitemap.xml"');
+    expect(visible.indexOf(product.title)).toBeLessThan(visible.indexOf(storeSlogan));
+    expect(visible.indexOf(product.title)).toBeLessThan(visible.indexOf('href="/skill.md"'));
+    expect(visible).toContain(storeExplanation);
+    expect(visible).not.toContain("查询已上架商品并下单");
+    expect(visible).not.toContain("不能自助注册");
+    expect(visible).not.toContain("进入这一家的店");
+    expect(visible).not.toContain('href="/merchants');
     expect(metadata.title).toBe("MercLink");
-    expect(visible).toContain("<h1>MercLink</h1>");
-    expect(metadata.description).toBe(serviceDescription);
+    expect(visible).not.toContain("<h1>MercLink</h1>");
+    expect(metadata.description).toBe(storeExplanation);
     expect(metadata.alternates?.canonical).toBe(`${origin}/`);
 
     const graph = landingGraph(html);
-    const organization = graph.find((node) => node["@type"] === "Organization");
+    expect(graph.find((node) => node["@type"] === "Organization")).toBeUndefined();
+    expect(graph.find((node) => node["@type"] === "OnlineStore")).toBeUndefined();
     const itemList = graph.find((node) => node["@type"] === "ItemList");
-    expect(organization).toMatchObject({
-      name: "MercLink",
-      description: serviceDescription,
-    });
     expect(itemList).toMatchObject({
       numberOfItems: 1,
       itemListElement: [
@@ -162,8 +172,10 @@ describe("public pages", () => {
     const home = renderToStaticMarkup(await HomePage());
     const list = renderToStaticMarkup(await ProductsPage({}));
 
-    expect(visibleHtml(home)).toContain(serviceDescription);
+    expect(visibleHtml(home)).toContain(storeExplanation);
     expect(visibleHtml(home)).toContain(emptyProductsNote);
+    expect(visibleHtml(home)).not.toContain("查询已上架商品并下单");
+    expect(visibleHtml(home)).not.toContain("不能自助注册");
     expect(visibleHtml(list)).toContain(emptyProductsNote);
     expect(home).not.toContain("/products/prd_");
     expect(list).not.toContain("/products/prd_");
@@ -171,12 +183,162 @@ describe("public pages", () => {
       numberOfItems: 0,
       itemListElement: [],
     });
+    expect(landingGraph(home).find((node) => node["@type"] === "OnlineStore")).toBeUndefined();
 
     const metadata = await productMetadata({ params: Promise.resolve({ id: "prd_missing" }) });
     expect(metadata.robots).toEqual({ index: false, follow: false });
     await expectNoindexNotFound(ProductPage({ params: Promise.resolve({ id: "prd_missing" }) }));
   });
+
+  it("opens with the published store and keeps secrets out of the page", async () => {
+    const summary = "甲".repeat(160);
+    const store = publishedStore({
+      summary,
+      logoUrl: "https://cdn.example/logo.png",
+      areaServed: "杭州市",
+      address: "西湖区某某路 88 号",
+      websiteUrl: "https://shop.example",
+    });
+    publicStore.register({ get: () => Promise.resolve(store) });
+    const product = publishedProduct();
+    registerProducts([product]);
+
+    const html = renderToStaticMarkup(await HomePage());
+    const visible = visibleHtml(html);
+    const metadata = await landingMetadata();
+    const onlineStore = landingGraph(html).find((node) => node["@type"] === "OnlineStore");
+
+    expect(visible.indexOf(store.displayName)).toBeLessThan(visible.indexOf(store.summary));
+    expect(visible.indexOf(store.summary)).toBeLessThan(visible.indexOf(product.title));
+    expect(visible.indexOf(product.title)).toBeLessThan(visible.indexOf(storeSlogan));
+    expect(visible).toContain('<h1 class="store-name">南风商店</h1>');
+    expect(visible).toContain("https://cdn.example/logo.png");
+    expect(visible).toContain("杭州市");
+    expect(visible).toContain("西湖区某某路 88 号");
+    expect(visible).toContain("https://shop.example");
+    expect(visible).not.toContain("13800138000");
+    expect(visible).not.toContain("secret@example.com");
+    expect(visible).not.toContain("password_hash");
+    expect(visible).not.toContain("不能自助注册");
+    expect(visible).not.toContain("进入这一家的店");
+    expect(visible).not.toContain("/merchants/");
+    expect(metadata.title).toBe(store.displayName);
+    expect(metadata.description).toBe(Array.from(summary).slice(0, 150).join(""));
+    expect(String(metadata.description)).toHaveLength(150);
+    expect(visible).toContain(summary);
+    expect(metadata.alternates?.canonical).toBe(`${origin}/`);
+    expect(onlineStore).toMatchObject({
+      name: store.displayName,
+      description: summary,
+      url: `${origin}/`,
+      logo: store.logoUrl,
+      sameAs: store.websiteUrl,
+      areaServed: store.areaServed,
+      address: { "@type": "PostalAddress", streetAddress: store.address },
+    });
+    expect(JSON.stringify(onlineStore)).not.toContain("13800138000");
+  });
+
+  it("omits empty logo, area, address, and website", async () => {
+    publicStore.register({
+      get: () =>
+        Promise.resolve(
+          publishedStore({
+            logoUrl: null,
+            areaServed: null,
+            address: null,
+            websiteUrl: null,
+          }),
+        ),
+    });
+    const html = renderToStaticMarkup(await HomePage());
+    const visible = visibleHtml(html);
+    const onlineStore = landingGraph(html).find((node) => node["@type"] === "OnlineStore");
+    expect(visible).not.toContain('class="logo"');
+    expect(visible).not.toContain('class="area"');
+    expect(visible).not.toContain('class="address"');
+    expect(visible).not.toContain('class="website"');
+    expect(onlineStore).not.toHaveProperty("logo");
+    expect(onlineStore).not.toHaveProperty("sameAs");
+    expect(onlineStore).not.toHaveProperty("areaServed");
+    expect(onlineStore).not.toHaveProperty("address");
+  });
+
+  it("shows two product cards in yuan and keeps them without script", async () => {
+    const boots = publishedProduct();
+    boots.offer = { ...boots.offer, price: minorUnits(159900), availability: "in_stock" };
+    const cup = publishedProduct();
+    cup.id = "prd_cup";
+    cup.title = "哨兵杯子";
+    cup.cover = null;
+    cup.offer = { ...cup.offer, price: minorUnits(800), availability: "out_of_stock" };
+    registerProducts([boots, cup]);
+
+    const html = renderToStaticMarkup(await HomePage());
+    const visible = visibleHtml(html);
+
+    expect(visible).toContain("¥1599.00");
+    expect(visible).toContain("¥8.00");
+    expect(visible).toContain("有货");
+    expect(visible).toContain("缺货");
+    expect(visible).toContain(`href="/products/${boots.id}"`);
+    expect(visible).toContain(`href="/products/${cup.id}"`);
+    expect(visible).toContain("placeholder");
+    expect(visible).not.toContain(">无<");
+    expect(visible).not.toContain(viewAllProductsLabel);
+    expect(html).toContain("#f6f4ee");
+    expect(html).toContain("#1d1c19");
+    expect(html).toContain("#ffffff");
+    expect(html).toContain("#6e8b32");
+    expect(html).toContain("aspect-ratio: 1 / 1");
+    expect(html).toContain("overflow-x: auto");
+    expect(html).not.toContain("linear-gradient");
+    expect(html).not.toContain("autoplay");
+    expect(visible.indexOf(boots.title)).toBeLessThan(visible.indexOf(storeSlogan));
+  });
+
+  it("links to the product list when the shelf has another page", async () => {
+    const products = ["甲", "乙", "丙", "丁", "戊"].map((title, index) => {
+      const product = publishedProduct();
+      product.id = `prd_shelf_${String(index)}`;
+      product.title = title;
+      return product;
+    });
+    registerProducts(products);
+    const html = renderToStaticMarkup(await HomePage());
+    const visible = visibleHtml(html);
+    expect(visible).toContain(viewAllProductsLabel);
+    expect(visible).toContain('href="/products"');
+    expect(products.every((product) => visible.includes(`href="/products/${product.id}"`))).toBe(
+      true,
+    );
+  });
+
+  it("drops a withdrawn store profile from the landing page", async () => {
+    publicStore.register({ get: () => Promise.resolve(publishedStore()) });
+    const shown = visibleHtml(renderToStaticMarkup(await HomePage()));
+    expect(shown).toContain("南风商店");
+
+    resetPublicStore();
+    const html = renderToStaticMarkup(await HomePage());
+    const withdrawn = visibleHtml(html);
+    expect(withdrawn).not.toContain("南风商店");
+    expect(withdrawn).not.toContain("可以直接交给 Agent 购买");
+    expect(landingGraph(html).find((node) => node["@type"] === "OnlineStore")).toBeUndefined();
+  });
 });
+
+function publishedStore(overrides: Partial<PublicStoreProfile> = {}): PublicStoreProfile {
+  return {
+    displayName: "南风商店",
+    summary: "可以直接交给 Agent 购买。",
+    websiteUrl: null,
+    logoUrl: null,
+    areaServed: null,
+    address: null,
+    ...overrides,
+  };
+}
 
 function publishedProduct(): PublicProduct {
   return {

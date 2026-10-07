@@ -6,6 +6,7 @@ import { GET as merchantSkill } from "../app/agent-docs/merchant-skill/route";
 import { apiRoutes, routesFor } from "../shared/api-routes";
 import { minorUnits } from "../shared/money";
 import { publicProducts, resetPublicProducts } from "../shared/seams/public-products";
+import { publicStore, resetPublicStore } from "../shared/seams/public-store";
 
 const buyerFile = "src/agent-docs/skill.md";
 const merchantFile = "src/agent-docs/merchant-skill.md";
@@ -118,6 +119,49 @@ describe("merchant skill", () => {
       expect(body).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}/);
     } finally {
       resetPublicProducts();
+    }
+  });
+});
+
+describe("merchant profile skill", () => {
+  it("documents profile read, replace, publish, and withdraw without stored data", async () => {
+    const storedSummary = "stored-profile-summary-sentinel";
+    publicStore.register({
+      get: () =>
+        Promise.resolve({
+          displayName: "Stored Store",
+          summary: storedSummary,
+          websiteUrl: "https://stored.example/profile",
+          logoUrl: null,
+          areaServed: null,
+          address: null,
+        }),
+    });
+    try {
+      const body = await (await merchantSkill()).text();
+      expect(body).toContain("GET /api/v1/merchant/profile");
+      expect(body).toContain("PUT /api/v1/merchant/profile");
+      expect(body).toContain("GET /api/v1/store");
+      for (const field of [
+        "display_name",
+        "summary",
+        "website_url",
+        "logo_url",
+        "area_served",
+        "address",
+        "published",
+      ]) {
+        expect(body).toContain(field);
+      }
+      expect(body).toContain("只有 `published` 为 `true`");
+      expect(body).toContain("改为 `false` 后，落地页立即不再显示");
+      expect(body).toContain("不要把登录手机号、密码、短信验证码或 API Key 提交为公开资料");
+      expect(body).not.toContain(storedSummary);
+      expect(body).not.toContain("https://stored.example/profile");
+      expect(body).not.toMatch(/Bearer\s+[A-Za-z0-9\-._]{12,}/);
+      expect(body).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}/);
+    } finally {
+      resetPublicStore();
     }
   });
 });

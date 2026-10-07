@@ -5,6 +5,7 @@ import { authorizationIssuer, createAccessProvider } from "../app-services/acces
 import { listMerchantCatalogIds } from "../app-services/catalog/catalogs";
 import { registerCatalog } from "../app-services/catalog/register";
 import { registerCatalogOwnership } from "../app-services/commerce/runtime";
+import { registerMerchantProfile } from "../app-services/identity/profile-http";
 import { getDatabase, type Sql } from "../db/client";
 import { ensureSuperAdmin } from "../app-services/identity/admin";
 import { accountCanAuthenticate } from "../app-services/identity/can-authenticate";
@@ -29,6 +30,7 @@ export function isCompositionReady(): boolean {
 export function registerSlices(input: { sql: Sql; provider: Provider }): void {
   registerAccessAuthenticator(input.sql, input.provider);
   registerCatalog(input.sql);
+  registerMerchantProfile(input.sql);
   registerCatalogOwnership((merchantId) => listMerchantCatalogIds(input.sql, merchantId));
 }
 

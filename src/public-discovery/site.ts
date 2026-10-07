@@ -1,10 +1,12 @@
 const localOrigin = "http://localhost:3000";
 
-export const serviceDescription = "MercLink 让 Agent 查询已上架商品并下单。";
+export const storeSlogan = "在 AI 时代，让天下没有难做的生意";
 
-export const merchantRegistrationNote = "商家不能自助注册，需要管理员开通。";
+export const storeExplanation = "帮中小商家做自己的店，并让各种 Agent 直接找到商品、完成购买。";
 
 export const emptyProductsNote = "没有可展示的商品。";
+
+export const viewAllProductsLabel = "查看全部商品";
 
 export const siteName = "MercLink";
 
@@ -16,7 +18,7 @@ export const apiRootPath = "/api/v1";
 
 export const publicPagePaths = ["/", "/products", buyerSkillPath, merchantSkillPath] as const;
 
-export const disallowedPaths = ["/authorize", "/admin", "/oauth", "/api"] as const;
+export const disallowedPaths = ["/authorize", "/admin", "/oauth", "/api", "/dev"] as const;
 
 export function publicBaseUrl(
   source: Readonly<Record<string, string | undefined>> = process.env,
@@ -68,19 +70,25 @@ export function productSitemapEntry(id: string, origin = publicBaseUrl()): Sitem
   return { url: absoluteUrl(`/products/${id}`, origin) };
 }
 
-// llms.txt only points at entry documents. It does not accept catalog rows.
-export function llmsText(origin = publicBaseUrl()): string {
-  const lines = [
-    `# ${siteName}`,
-    "",
-    `> ${serviceDescription}`,
-    "",
-    `- [总落地页](${absoluteUrl("/", origin)}): 服务说明和已上架商品摘要`,
+export type StoreQuote = {
+  displayName: string;
+  summary: string;
+};
+
+// llms.txt points at entry documents. It may quote the published store name and summary.
+// It does not accept catalog rows or the rest of the profile.
+export function llmsText(origin = publicBaseUrl(), store: StoreQuote | null = null): string {
+  const lines = [`# ${siteName}`, "", `> ${storeExplanation}`, ""];
+  if (store !== null) {
+    lines.push(`店名：${store.displayName}`, `简介：${store.summary}`, "");
+  }
+  lines.push(
+    `- [总落地页](${absoluteUrl("/", origin)}): 这一家店和已上架商品`,
     `- [商品列表](${absoluteUrl("/products", origin)}): 当前已上架商品`,
     `- [购买 Skill](${absoluteUrl(buyerSkillPath, origin)}): 如何查询已上架商品并下单`,
     `- [商家 Skill](${absoluteUrl(merchantSkillPath, origin)}): 如何管理目录、字段、商品和规格`,
     `- [API](${absoluteUrl(apiRootPath, origin)}): HTTP API 根地址`,
     "",
-  ];
+  );
   return lines.join("\n");
 }

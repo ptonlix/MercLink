@@ -29,7 +29,7 @@ import { POST as publishRoute } from "../../app/api/v1/catalogs/[id]/products/[p
 
 const configuredDatabaseUrl = process.env.DATABASE_URL;
 if (configuredDatabaseUrl === undefined || configuredDatabaseUrl.trim() === "") {
-  throw new Error("DATABASE_URL is required. Start compose.yaml and export DATABASE_URL.");
+  throw new Error("DATABASE_URL is required. Start compose.dev.yaml and export DATABASE_URL.");
 }
 const databaseUrl: string = configuredDatabaseUrl;
 

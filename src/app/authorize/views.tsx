@@ -49,7 +49,10 @@ export function BuyerAuthorizeView(props: {
   mode: "login" | "register";
   captchaPrefix: string;
   captchaSceneId: string;
+  devStubs?: boolean;
+  captchaToken?: string;
 }): ReactNode {
+  const devStubs = props.devStubs === true;
   return (
     <main className="sheet">
       <p className="kicker">MercLink</p>
@@ -62,9 +65,17 @@ export function BuyerAuthorizeView(props: {
           手机号
           <input name="phone" inputMode="numeric" autoComplete="username" required />
         </label>
-        <BuyerCaptcha prefix={props.captchaPrefix} sceneId={props.captchaSceneId} />
-        <p className="hint">完成图形人机验证后再发送短信。验证参数由验证码组件回填，不要手改。</p>
-        <button id="captcha-send" type="submit" disabled>
+        {devStubs ? (
+          <input type="hidden" name="captchaVerifyParam" value={props.captchaToken ?? ""} />
+        ) : (
+          <BuyerCaptcha prefix={props.captchaPrefix} sceneId={props.captchaSceneId} />
+        )}
+        <p className="hint">
+          {devStubs
+            ? "本地开发不会发送短信。验证码填写 123456。"
+            : "完成图形人机验证后再发送短信。验证参数由验证码组件回填，不要手改。"}
+        </p>
+        <button id="captcha-send" type="submit" disabled={devStubs ? undefined : true}>
           发送验证码
         </button>
       </form>

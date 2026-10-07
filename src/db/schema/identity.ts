@@ -71,6 +71,19 @@ export const buyers = pgTable(
   ],
 );
 
+export const merchantProfiles = pgTable("merchant_profiles", {
+  merchantId: text("merchant_id").primaryKey(),
+  displayName: text("display_name").notNull(),
+  summary: text("summary").notNull(),
+  websiteUrl: text("website_url"),
+  logoUrl: text("logo_url"),
+  areaServed: text("area_served"),
+  address: text("address"),
+  published: boolean("published").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const apiKeys = pgTable("api_keys", {
   id: text("id").primaryKey(),
   ownerType: text("owner_type").notNull(),

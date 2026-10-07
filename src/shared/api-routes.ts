@@ -2,7 +2,7 @@ export const apiAudiences = ["buyer", "merchant"] as const;
 
 export type ApiAudience = (typeof apiAudiences)[number];
 
-export type ApiMethod = "GET" | "POST" | "PATCH" | "DELETE";
+export type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export type ApiRoute = {
   method: ApiMethod;
@@ -67,6 +67,11 @@ export const apiRoutes = [
   { method: "PATCH", path: "/api/v1/catalogs/{id}/variants/{variant_id}", audiences: merchant },
   { method: "DELETE", path: "/api/v1/catalogs/{id}/variants/{variant_id}", audiences: merchant },
   { method: "GET", path: "/api/v1/manage/orders", audiences: merchant },
+  // Profile writes reuse product:write. Do not add a profile scope.
+  { method: "GET", path: "/api/v1/merchant/profile", audiences: merchant },
+  { method: "PUT", path: "/api/v1/merchant/profile", audiences: merchant },
+  // Public read. Listed so the merchant skill documents the same path.
+  { method: "GET", path: "/api/v1/store", audiences: merchant },
   { method: "POST", path: "/api/v1/payments/alipay/notify", audiences: [] },
   { method: "GET", path: "/.well-known/oauth-protected-resource", audiences: [] },
 ] as const satisfies readonly ApiRoute[];

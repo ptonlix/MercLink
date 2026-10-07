@@ -1,44 +1,109 @@
+# 正式环境。在部署机准备 .env 后执行：docker compose up -d --build
+# Compose 用项目目录的 .env 做变量替换；应用容器也读取同一份 .env。
+# 不要把真实密码写进这个文件。POSTGRES_PASSWORD、REDIS_PASSWORD、MINIO_ROOT_PASSWORD
+# 使用 URL 安全字符，且 MinIO 密码至少 8 位。
+# 数据库、Redis、对象存储只在 compose 网络内。应用对外端口默认 3000。
+# 公网 HTTPS 由部署机上的反向代理提供。APP_BASE_URL 和 ALIPAY_NOTIFY_URL 必须是该公网地址。
+# 应用容器固定 NODE_ENV=production，并清空 MERCLINK_DEV_STUBS，避免部署 .env 打开本地模拟。
 name: merclink
 
 services:
+  app:
+    build: .
+    image: ${MERCLINK_IMAGE:-merclink:local}
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      NODE_ENV: production
+      MERCLINK_DEV_STUBS: ""
+      DATABASE_URL: postgres://merclink:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/merclink
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD}@redis:6379
+      OBJECT_STORAGE_ENDPOINT: http://minio:9000
+      OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-us-east-1}
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-merclink}
+      OBJECT_STORAGE_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      OBJECT_STORAGE_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+    ports:
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
   postgres:
     image: postgres:18.6
     environment:
       POSTGRES_USER: merclink
-      POSTGRES_PASSWORD: merclink
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: merclink
-    ports:
-      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U merclink -d merclink"]
-      interval: 2s
+      interval: 5s
       timeout: 5s
       retries: 30
+    restart: unless-stopped
 
   redis:
     image: redis:8.10.2
+    command:
+      [
+        "redis-server",
+        "--requirepass",
+        "${REDIS_PASSWORD:?set REDIS_PASSWORD}",
+        "--appendonly",
+        "yes",
+      ]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 2s
+      interval: 5s
       timeout: 5s
       retries: 30
+    restart: unless-stopped
 
   minio:
     image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
-      MINIO_ROOT_USER: merclink
-      MINIO_ROOT_PASSWORD: merclinkminio
-    ports:
-      - "9000:9000"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
-      interval: 2s
+      interval: 5s
       timeout: 5s
       retries: 30
+    restart: unless-stopped
 
   minio-init:
     image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-merclink}
     depends_on:
       minio:
         condition: service_healthy
@@ -46,6 +111,11 @@ services:
       [
         "/bin/sh",
         "-c",
-        "mc alias set local http://minio:9000 merclink merclinkminio && mc mb --ignore-existing local/merclink",
+        'mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" && mc mb --ignore-existing "local/$$OBJECT_STORAGE_BUCKET"',
       ]
     restart: "no"
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

@@ -1,7 +1,9 @@
 import { createAlipayPaymentPort } from "../../adapters/alipay";
+import { createDevPaymentPort } from "../../adapters/dev/payment";
 import { getDatabase } from "../../db/client";
 import { systemClock, type Clock } from "../../ports/clock";
 import type { PaymentPort } from "../../ports/payment";
+import { devStubsEnabled } from "../../shared/dev-stubs";
 import { loadEnv } from "../../shared/env";
 import { createDrizzleCommerceRepository } from "./drizzle-store";
 import type { CommerceRepository } from "./repository";
@@ -51,13 +53,18 @@ function createProductionRuntime(): CommerceRuntime {
   }
   return {
     repo: createDrizzleCommerceRepository(getDatabase(loaded.env.DATABASE_URL).db),
-    payment: createAlipayPaymentPort({
-      appId: loaded.env.ALIPAY_APP_ID,
-      privateKey: loaded.env.ALIPAY_PRIVATE_KEY,
-      alipayPublicKey: loaded.env.ALIPAY_PUBLIC_KEY,
-      notifyUrl: loaded.env.ALIPAY_NOTIFY_URL,
-      product: process.env.ALIPAY_PRODUCT === "alipayplus" ? "alipayplus" : "domestic",
-    }),
+    payment: devStubsEnabled(process.env)
+      ? createDevPaymentPort({
+          appBaseUrl: loaded.env.APP_BASE_URL,
+          signingSecret: loaded.env.OAUTH_SIGNING_SECRET,
+        })
+      : createAlipayPaymentPort({
+          appId: loaded.env.ALIPAY_APP_ID,
+          privateKey: loaded.env.ALIPAY_PRIVATE_KEY,
+          alipayPublicKey: loaded.env.ALIPAY_PUBLIC_KEY,
+          notifyUrl: loaded.env.ALIPAY_NOTIFY_URL,
+          product: process.env.ALIPAY_PRODUCT === "alipayplus" ? "alipayplus" : "domestic",
+        }),
     clock: systemClock,
     ownedCatalogs: (merchantId) => ownership(merchantId),
   };
