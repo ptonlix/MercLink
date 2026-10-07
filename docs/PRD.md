@@ -476,7 +476,7 @@ POST /api/v1/catalogs/{id}/products/{product_id}/publish
 POST /api/v1/catalogs/{id}/products/{product_id}/unpublish
 DELETE /api/v1/catalogs/{id}/products/{product_id}
 POST /api/v1/catalogs/{id}/products/{product_id}/restore
-POST /api/v1/catalogs/{id}/products/{product_id}/options
+POST /api/v1/catalogs/{id}/products/{product_id}/axes
 POST /api/v1/catalogs/{id}/products/{product_id}/variants
 PATCH /api/v1/catalogs/{id}/variants/{variant_id}
 DELETE /api/v1/catalogs/{id}/variants/{variant_id}
@@ -529,7 +529,7 @@ GET /api/v1/manage/orders?catalog_id=
 
 ```json
 {
-  "options": { "size": "42" },
+  "option_values": { "size": "42" },
   "price": 159900,
   "stock": 4
 }
@@ -563,8 +563,8 @@ merchants                     商家账号
   └── catalogs                注册时有一本，之后可以有多本
         └── schema_revisions  每次字段变更一条，只追加
         └── product_fields    这本目录的字段；停用的也留着，防止 key 被复用
-        └── products          商品，attrs 是整件商品共用的属性
-              └── product_options   规格轴，例如尺码、颜色
+        └── products          商品，fields 是整件商品共用的属性
+              └── product_axes   规格轴，例如尺码、颜色
               └── variants          可售规格，各自有价格和库存
         └── order_items       这个目录卖出的订单行
 
@@ -613,18 +613,18 @@ schema_revisions
   catalog_id -> catalogs.id
 
 product_fields
-  id, catalog_id, key, label, type, required, options, status,
+  id, catalog_id, key, label, type, required, choices, status,
   created_at, updated_at, retired_at
   status = active | retired
   unique(catalog_id, key)
   catalog_id -> catalogs.id
 
 products
-  id, catalog_id, title, status, cover, attrs, schema_revision,
+  id, catalog_id, title, status, cover, fields, schema_revision,
   created_at, updated_at, deleted_at
   catalog_id -> catalogs.id
 
-product_options
+product_axes
   id, product_id, key, label, position, created_at, updated_at
   unique(product_id, key)
   product_id -> products.id
@@ -660,13 +660,13 @@ payments
   status = pending | paid | closed
 ```
 
-`attrs` 是 JSON 对象，例如 `{ "weight_g": 480, "color": "黑" }`。不再为每个值单独建一行，也不为文本、数字、是否各留一个空列。
+`fields` 是 JSON 对象，例如 `{ "weight_g": 480, "color": "黑" }`。不再为每个值单独建一行，也不为文本、数字、是否各留一个空列。
 
 约束：
 
-- 写入 `attrs` 时，key 必须是该目录的 `active` 字段。类型必须匹配。单选值必须在 `options` 里。
-- 可选字段可以不出现在 `attrs` 里。这表示没填，不是字段不存在。
-- 上架时按当前 `required` 字段检查商品 `attrs`。价格和库存不在 `attrs` 里。
+- 写入 `fields` 时，key 必须是该目录的 `active` 字段。类型必须匹配。单选值必须在 `choices` 里。
+- 可选字段可以不出现在 `fields` 里。这表示没填，不是字段不存在。
+- 上架时按当前 `required` 字段检查商品 `fields`。价格和库存不在 `fields` 里。
 - `option_values` 的 key 必须是该商品已声明的规格轴。同一商品的未删除规格，组合不能重复。
 - 快照写在订单行上，不写在订单头上。`fields_snapshot` 保存下单时的目录字段。`variant_snapshot` 保存规格轴和 SKU。之后改字段或规格，旧订单行仍按快照解释。
 - 价格用整数分，记在规格上。订单行复制单价和行金额。订单头只保存各行合计。

@@ -1,7 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -29,7 +28,7 @@ import { addField, changeFields, listFields } from "../../src/app-services/catal
 import {
   createProduct,
   createVariant,
-  declareOption,
+  declareAxis,
   publishProduct,
   restoreProduct,
   softDeleteProduct,
@@ -170,7 +169,7 @@ describe("PRD section 12", () => {
         label: "颜色",
         type: "single-select",
         required: false,
-        options: ["黑", "白"],
+        choices: ["黑", "白"],
       });
       expect(numberField.ok && selectField.ok).toBe(true);
       const otherFields = await listFields(sql, first.merchantId, extra.value.id);
@@ -185,17 +184,17 @@ describe("PRD section 12", () => {
       if (!product.ok) {
         return;
       }
-      await declareOption(sql, first.merchantId, shoes.id, product.value.id, {
+      await declareAxis(sql, first.merchantId, shoes.id, product.value.id, {
         key: "size",
         label: "尺码",
       });
       const small = await createVariant(sql, first.merchantId, shoes.id, product.value.id, {
-        options: { size: "40" },
+        option_values: { size: "40" },
         price: 159900,
         stock: 2,
       });
       const large = await createVariant(sql, first.merchantId, shoes.id, product.value.id, {
-        options: { size: "42" },
+        option_values: { size: "42" },
         price: 169900,
         stock: 3,
       });
@@ -451,37 +450,27 @@ describe("PRD section 12", () => {
     });
   });
 
-  it("refuses foreign keys when an orphan row exists and does not delete it", async () => {
+  it("refuses an orphan catalog instead of inserting it", async () => {
     const admin = postgres(databaseUrl, { max: 1 });
     const schema = `fk_${randomBytes(4).toString("hex")}`;
     await admin.unsafe(`CREATE SCHEMA ${schema}`);
     await admin.end({ timeout: 5 });
-    const directory = path.join(process.cwd(), "src/db/migrations");
-    const names = (await readdir(directory)).filter((name) => name !== "050_foreign_keys.sql");
-    const temp = path.join(tmpdir(), schema);
-    await mkdir(temp);
     try {
-      for (const name of names) {
-        await writeFile(path.join(temp, name), await readFile(path.join(directory, name)));
-      }
-      await runMigrations({ databaseUrl, directory: temp, searchPath: schema });
+      await runMigrations({ databaseUrl, searchPath: schema });
       const sql = postgres(databaseUrl, { max: 1 });
       await sql.unsafe(`SET search_path TO ${schema}`);
-      await sql`
-        INSERT INTO catalogs (id, merchant_id, name)
-        VALUES ('cat_orphan', 'mch_missing', '孤立目录')
-      `;
-      const body = await readFile(path.join(directory, "050_foreign_keys.sql"), "utf8");
-      await expect(sql.begin(async (tx) => tx.unsafe(body).simple())).rejects.toThrow(
-        /orphan catalogs: cat_orphan/,
-      );
+      await expect(
+        sql`
+          INSERT INTO catalogs (id, merchant_id, name)
+          VALUES ('cat_orphan', 'mch_missing', '孤立目录')
+        `,
+      ).rejects.toThrow(/catalogs_merchant_id_fkey|foreign key/i);
       const remaining = await sql<
         { id: string }[]
       >`SELECT id FROM catalogs WHERE id = 'cat_orphan'`;
-      expect(remaining).toHaveLength(1);
+      expect(remaining).toHaveLength(0);
       await sql.end({ timeout: 5 });
     } finally {
-      await rm(temp, { recursive: true, force: true });
       const cleanup = postgres(databaseUrl, { max: 1 });
       await cleanup.unsafe(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
       await cleanup.end({ timeout: 5 });

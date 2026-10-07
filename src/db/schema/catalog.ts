@@ -78,8 +78,8 @@ export const products = pgTable("products", {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
-export const productOptions = pgTable(
-  "product_options",
+export const productAxes = pgTable(
+  "product_axes",
   {
     id: text("id").primaryKey(),
     productId: text("product_id").notNull(),
@@ -89,7 +89,7 @@ export const productOptions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex("product_options_product_key").on(table.productId, table.key)],
+  (table) => [uniqueIndex("product_axes_product_key").on(table.productId, table.key)],
 );
 
 export const productImages = pgTable("product_images", {

@@ -42,18 +42,16 @@ describe("catalog management", () => {
     bindCatalogSql(undefined);
   });
 
-  it("migrates catalog tables without a merchants foreign key and stores fields as jsonb", async () => {
+  it("migrates the final schema with fields, choices, and axes", async () => {
     const source = await readFile(
-      path.join(process.cwd(), "src/db/migrations/030_catalog.sql"),
+      path.join(process.cwd(), "src/db/migrations/010_schema.sql"),
       "utf8",
     );
-    const rename = await readFile(
-      path.join(process.cwd(), "src/db/migrations/080_fields_and_choices.sql"),
-      "utf8",
-    );
-    expect(source).not.toMatch(/references\s+merchants/i);
-    expect(rename).toContain("RENAME COLUMN attrs TO fields");
-    expect(rename).toContain("RENAME COLUMN options TO choices");
+    expect(source).toContain("CREATE TABLE product_axes");
+    expect(source).toContain("fields jsonb");
+    expect(source).toContain("choices jsonb");
+    expect(source).not.toContain("product_options");
+    expect(source).not.toContain("RENAME COLUMN");
     await withCatalogDb(async (sql) => {
       const columns = await sql<{ table_name: string; column_name: string; data_type: string }[]>`
         SELECT table_name, column_name, data_type

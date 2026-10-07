@@ -8,7 +8,7 @@ export const idPrefixes = {
   field: "fld_",
   revision: "rev_",
   product: "prd_",
-  option: "opt_",
+  axis: "axs_",
   variant: "var_",
   image: "img_",
   order: "ord_",

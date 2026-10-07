@@ -73,11 +73,12 @@ INSERT INTO exec_log (name) VALUES ('010_platform.sql');
 
   it("applies the real platform ledger once", async () => {
     const source = await readFile(
-      path.join(process.cwd(), "src/db/migrations/010_platform.sql"),
+      path.join(process.cwd(), "src/db/migrations/010_schema.sql"),
       "utf8",
     );
     expect(source).toContain("schema_migrations");
-    expect(source).not.toMatch(/CREATE TABLE(?! IF NOT EXISTS schema_migrations)/i);
+    expect(source).toContain("CREATE TABLE products");
+    expect(source).not.toContain("sms_sends");
 
     await withSchema(async (schema) => {
       const directory = path.join(process.cwd(), "src/db/migrations");

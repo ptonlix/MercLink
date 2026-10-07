@@ -38,12 +38,13 @@ describe("product images", () => {
 
   it("migrates product_images with a catalog foreign key and no deleted_at", async () => {
     const source = await readFile(
-      path.join(process.cwd(), "src/db/migrations/060_product_images.sql"),
+      path.join(process.cwd(), "src/db/migrations/010_schema.sql"),
       "utf8",
     );
-    expect(source).toContain("REFERENCES catalogs (id)");
-    expect(source).not.toContain("deleted_at");
-    expect(source).not.toMatch(/references\s+merchants/i);
+    const images = source.slice(source.indexOf("CREATE TABLE product_images"), source.indexOf("CREATE TABLE product_images") + 700);
+    expect(images).toContain("REFERENCES catalogs (id)");
+    expect(images.split(";")[0]).not.toContain("deleted_at");
+    expect(images.split(";")[0]).not.toMatch(/references\s+merchants/i);
     await withImageDb(async (sql, schema) => {
       const columns = await sql<{ column_name: string }[]>`
         SELECT column_name

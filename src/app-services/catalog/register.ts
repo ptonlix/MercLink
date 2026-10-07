@@ -11,7 +11,7 @@ const expectedTables = [
   "schema_revisions",
   "product_fields",
   "products",
-  "product_options",
+  "product_axes",
   "variants",
   "product_images",
 ] as const;

@@ -336,9 +336,9 @@ export async function declareAxis(
         return axis;
       }
       await tx`
-        INSERT INTO product_options (id, product_id, key, label, position)
+        INSERT INTO product_axes (id, product_id, key, label, position)
         VALUES (
-          ${createPublicId("option")},
+          ${createPublicId("axis")},
           ${productId},
           ${axis.value.key},
           ${axis.value.label},

@@ -355,7 +355,7 @@ describe("slice boundaries", () => {
       ...(await walk("src/app/api/v1/payments")),
       "src/jobs/close-expired-orders.ts",
       "src/db/schema/commerce.ts",
-      "src/db/migrations/040_commerce.sql",
+      "src/db/migrations/010_schema.sql",
     ];
     for (const file of files) {
       const source = await readFile(file, "utf8");

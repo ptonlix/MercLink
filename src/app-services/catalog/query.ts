@@ -289,7 +289,7 @@ async function assembleMerchant(
     { id: string; product_id: string; key: string; label: string; position: number }[]
   >`
     SELECT id, product_id, key, label, position
-    FROM product_options
+    FROM product_axes
     WHERE product_id = ${row.id}
     ORDER BY position, key
   `;

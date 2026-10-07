@@ -31,8 +31,8 @@ export type FieldChange =
       choices: readonly string[];
     }
   | { op: "rename_label"; key: string; label: string }
-  | { op: "add_option"; key: string; option: string }
-  | { op: "remove_option"; key: string; option: string }
+  | { op: "add_choice"; key: string; choice: string }
+  | { op: "remove_choice"; key: string; choice: string }
   | { op: "change_type"; key: string; type: FieldType; choices: readonly string[] }
   | { op: "make_required"; key: string }
   | { op: "make_optional"; key: string }
@@ -148,11 +148,11 @@ function draftFields(
       fields: replaceField(fields, { ...current, label: label.value }),
     });
   }
-  if (change.op === "add_option") {
-    return draftAddOption(fields, current, change.option);
+  if (change.op === "add_choice") {
+    return draftAddOption(fields, current, change.choice);
   }
-  if (change.op === "remove_option") {
-    return draftRemoveOption(fields, current, change.option);
+  if (change.op === "remove_choice") {
+    return draftRemoveOption(fields, current, change.choice);
   }
   if (change.op === "change_type") {
     return draftTypeChange(fields, current, change);
@@ -297,10 +297,10 @@ function effectFor(
     fieldsChanged = converted.changed;
     reason = converted.reason;
   }
-  if (change.op === "remove_option" && product.fields[change.key] === change.option) {
+  if (change.op === "remove_choice" && product.fields[change.key] === change.choice) {
     nextFields = omitField(nextFields, change.key);
     fieldsChanged = true;
-    reason = "removed_option";
+    reason = "removed_choice";
   }
   if (change.op === "retire" && Object.prototype.hasOwnProperty.call(product.fields, change.key)) {
     nextFields = omitField(nextFields, change.key);
@@ -313,7 +313,7 @@ function effectFor(
   );
   const published = product.status === "on" && !product.deleted;
   const unpublish =
-    published && (reason === "conversion_failed" || reason === "removed_option" || missingRequired);
+    published && (reason === "conversion_failed" || reason === "removed_choice" || missingRequired);
   if (unpublish && reason === null) {
     reason = "missing_required";
   }

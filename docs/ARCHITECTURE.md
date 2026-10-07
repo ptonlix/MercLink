@@ -169,7 +169,7 @@ Agent 调用下单接口
 - `orders` 的 `(buyer_id, client_order_no)` 唯一。
 - `payments.provider_trade_no` 在非空时唯一，用来挡住重复通知。
 - 下单和关闭订单时，对 `variants` 行使用 `SELECT FOR UPDATE`。
-- `attrs` 和快照使用 `jsonb`。过滤数字字段时用表达式索引，等出现慢查询再加，不预先拆表。
+- `fields` 和快照使用 `jsonb`。过滤数字字段时用表达式索引，等出现慢查询再加，不预先拆表。
 - 订单行和变更记录没有 `deleted_at`，应用层也不提供删除方法。
 
 价格在进入领域层之前就变成整数分。领域层不接受元或浮点。

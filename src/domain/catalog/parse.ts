@@ -47,10 +47,10 @@ export function parseFieldChangeBody(input: unknown): CatalogResult<ParsedFieldC
   if (op === "rename_label") {
     return catalogOk({ confirm, change: { op, key, label: readString(record, "label") ?? "" } });
   }
-  if (op === "add_option" || op === "remove_option") {
+  if (op === "add_choice" || op === "remove_choice") {
     return catalogOk({
       confirm,
-      change: { op, key, option: readString(record, "option") ?? "" },
+      change: { op, key, choice: readString(record, "choice") ?? "" },
     });
   }
   if (op === "change_type") {

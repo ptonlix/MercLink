@@ -160,28 +160,28 @@ describe("catalog edge branches", () => {
       }),
     ).toMatchObject({ ok: false });
     expect(
-      planFieldChange([weight], [], { op: "add_option", key: "weight_g", option: "大" }),
+      planFieldChange([weight], [], { op: "add_choice", key: "weight_g", choice: "大" }),
     ).toMatchObject({
       ok: false,
     });
     expect(
-      planFieldChange([color], [], { op: "add_option", key: "color", option: "黑" }),
+      planFieldChange([color], [], { op: "add_choice", key: "color", choice: "黑" }),
     ).toMatchObject({
       ok: false,
       error: "conflict",
     });
     expect(
-      planFieldChange([color], [], { op: "add_option", key: "color", option: "" }),
+      planFieldChange([color], [], { op: "add_choice", key: "color", choice: "" }),
     ).toMatchObject({
       ok: false,
     });
     expect(
-      planFieldChange([weight], [], { op: "remove_option", key: "weight_g", option: "黑" }),
+      planFieldChange([weight], [], { op: "remove_choice", key: "weight_g", choice: "黑" }),
     ).toMatchObject({
       ok: false,
     });
     expect(
-      planFieldChange([color], [], { op: "remove_option", key: "color", option: "白" }),
+      planFieldChange([color], [], { op: "remove_choice", key: "color", choice: "白" }),
     ).toMatchObject({
       ok: false,
     });
@@ -379,7 +379,7 @@ describe("catalog edge branches", () => {
     expect(parseFieldChangeBody({ op: "rename_label", key: "weight_g", label: "克重" }).ok).toBe(
       true,
     );
-    expect(parseFieldChangeBody({ op: "add_option", key: "color", option: "灰" }).ok).toBe(true);
+    expect(parseFieldChangeBody({ op: "add_choice", key: "color", choice: "灰" }).ok).toBe(true);
     expect(parseFieldChangeBody({ op: "change_type", key: "weight_g", type: "text" }).ok).toBe(
       true,
     );

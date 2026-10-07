@@ -213,17 +213,17 @@ describe("catalog field rules", () => {
     expect(
       planFieldChange([weight], [], { op: "rename_label", key: "weight_g", label: "克重" }).ok,
     ).toBe(true);
-    expect(planFieldChange([color], [], { op: "add_option", key: "color", option: "灰" }).ok).toBe(
+    expect(planFieldChange([color], [], { op: "add_choice", key: "color", choice: "灰" }).ok).toBe(
       true,
     );
     const removed = planFieldChange([color], [product("prd_1", "on", { color: "黑" })], {
-      op: "remove_option",
+      op: "remove_choice",
       key: "color",
-      option: "黑",
+      choice: "黑",
     });
     expect(removed.ok).toBe(true);
     if (removed.ok) {
-      expect(removed.value.effects[0]).toMatchObject({ unpublish: true, reason: "removed_option" });
+      expect(removed.value.effects[0]).toMatchObject({ unpublish: true, reason: "removed_choice" });
     }
     expect(planFieldChange([weight], [], { op: "make_required", key: "weight_g" }).ok).toBe(true);
     expect(

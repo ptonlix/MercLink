@@ -4,7 +4,7 @@ import {
   catalogs,
   productFields,
   productImages,
-  productOptions,
+  productAxes,
   products,
   schemaRevisions,
   variants,
@@ -21,7 +21,7 @@ export const catalogTableNames = [
   getTableName(schemaRevisions),
   getTableName(productFields),
   getTableName(products),
-  getTableName(productOptions),
+  getTableName(productAxes),
   getTableName(variants),
   getTableName(productImages),
 ] as const;
@@ -140,13 +140,13 @@ export function conflictFor(error: unknown): CatalogFailure {
   if (constraint === "variants_catalog_sku_active") {
     return catalogFail("conflict", "SKU 已存在。");
   }
-  if (constraint === "variants_product_options_active") {
+  if (constraint === "variants_product_axes_active") {
     return catalogFail("conflict", "这个规格组合已经存在。");
   }
   if (constraint === "product_fields_catalog_key") {
     return catalogFail("conflict", "字段 key 已存在。");
   }
-  if (constraint === "product_options_product_key") {
+  if (constraint === "product_axes_product_key") {
     return catalogFail("conflict", "规格轴已存在。");
   }
   return catalogFail("conflict", "记录冲突。");
@@ -222,7 +222,7 @@ export async function lockProduct(db: Db, productId: string): Promise<ProductRow
 export async function loadOptions(db: Db, productId: string): Promise<OptionRow[]> {
   return db<OptionRow[]>`
     SELECT id, product_id, key, label, position
-    FROM product_options
+    FROM product_axes
     WHERE product_id = ${productId}
     ORDER BY position, key
   `;
