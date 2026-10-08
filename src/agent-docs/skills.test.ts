@@ -147,6 +147,11 @@ describe("merchant skill", () => {
       expect(body).not.toContain("/options");
       expect(body).not.toContain('"options"');
       expect(body).toContain("先上传图片");
+      expect(body).toContain("不直接写对象存储");
+      expect(body).toContain("dependency_unavailable` `50301` 时停止");
+      expect(body).toContain("不要把外部地址、生成图地址或本地文件写进 `cover`");
+      expect(body).toContain("匿名浏览器不带登录、签名或 Cookie 就能打开");
+      expect(body).not.toContain("或外部 http(s) URL");
       expect(body).not.toContain(sentinel);
       expect(body).not.toContain("prd_private");
       expect(body).not.toMatch(/Bearer\s+[A-Za-z0-9\-._]{12,}/);

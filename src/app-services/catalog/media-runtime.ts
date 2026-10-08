@@ -9,21 +9,33 @@ export type MediaRuntime = {
   clock: Clock;
 };
 
-let current: MediaRuntime | undefined;
+// Next bundles instrumentation and route handlers separately. A module-local
+// binding set at startup is invisible to the upload route, so every upload
+// looks like the storage dependency is down.
+const slotKey = Symbol.for("merclink.mediaRuntime");
+
+type MediaSlot = { current?: MediaRuntime };
+
+function slot(): MediaSlot {
+  const globalSlot = globalThis as typeof globalThis & { [slotKey]?: MediaSlot };
+  globalSlot[slotKey] ??= {};
+  return globalSlot[slotKey];
+}
 
 export function bindMediaRuntime(runtime: MediaRuntime): void {
-  current = runtime;
+  slot().current = runtime;
 }
 
 export function resetMediaRuntime(): void {
-  current = undefined;
+  slot().current = undefined;
 }
 
 export function mediaRuntime(): MediaRuntime | undefined {
-  return current;
+  return slot().current;
 }
 
 export function mediaBaseUrl(): string {
+  const current = slot().current;
   if (current !== undefined && current.mediaBaseUrl.trim() !== "") {
     return current.mediaBaseUrl;
   }
