@@ -100,10 +100,12 @@ describe("order placement", () => {
     expect(first.graph.order.amount).toBe(319800);
     expect(first.graph.items[0]?.amount).toBe(319800);
     expect(first.graph.payment.provider).toBe("alipay");
+    expect(first.graph.payment.channel).toBe("desktop");
     expect(first.graph.payment.status).toBe("pending");
     expect(first.action).toBe(`https://pay.example/${first.graph.payment.id}`);
     expect(harness.stock("var_1")).toBe(3);
     expect("provider" in first.graph.order).toBe(false);
+    expect("channel" in first.graph.order).toBe(false);
 
     const second = await placeOrder({
       actor: buyer(),
@@ -130,6 +132,172 @@ describe("order placement", () => {
     }
     expect(other.graph.order.id).not.toBe(first.graph.order.id);
     expect(harness.stock("var_1")).toBe(2);
+    expect(harness.channels()).toEqual(["desktop", "desktop", "desktop"]);
+  });
+
+  it("stores a channel once, ignores User-Agent, and does not switch on repeat", async () => {
+    const placeSource = await readFile("src/app-services/commerce/place-order.ts", "utf8");
+    const routeSource = await readFile("src/app/api/v1/orders/route.ts", "utf8");
+    const domainSource = await readFile("src/domain/commerce/order.ts", "utf8");
+    for (const source of [placeSource, routeSource, domainSource]) {
+      expect(source.toLowerCase()).not.toContain("user-agent");
+      expect(source.toLowerCase()).not.toContain("sec-ch-ua");
+      expect(source.toLowerCase()).not.toContain("x-forwarded-for");
+    }
+
+    const harness = harnessFor({ var_1: variant({ stock: 5 }) });
+    useCommerceRuntime(harness.runtime);
+    registerAuthenticator(() => ({ ok: true, actor: buyer() }));
+    const omitted = await placeRoute(
+      new Request("https://merclink.example/api/v1/orders", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer buyer",
+          "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
+          "sec-ch-ua-mobile": "?1",
+          "x-forwarded-for": "203.0.113.10",
+        },
+        body: JSON.stringify({
+          client_order_no: "ua-1",
+          items: [{ variant_id: "var_1", qty: 1 }],
+        }),
+      }),
+    );
+    expect(omitted.status).toBe(200);
+    const omittedId = harness.graphs()[0]?.payment.id;
+    const omittedBody: unknown = await omitted.json();
+    expect(omittedBody).toMatchObject({
+      payment: {
+        channel: "desktop",
+        action: `https://pay.example/${omittedId ?? ""}`,
+      },
+    });
+    expect(harness.stock("var_1")).toBe(4);
+    expect(harness.channels()).toEqual(["desktop"]);
+
+    const hinted = await placeOrder({
+      actor: buyer(),
+      body: {
+        client_order_no: "hint",
+        user_agent: "Mobile",
+        items: [{ variant_id: "var_1", qty: 1 }],
+      },
+      runtime: harness.runtime,
+    });
+    expect(hinted).toMatchObject({ ok: false, error: "validation_error" });
+    expect(harness.stock("var_1")).toBe(4);
+    expect(harness.graphs()).toHaveLength(1);
+
+    const invalid = await placeRoute(
+      new Request("https://merclink.example/api/v1/orders", {
+        method: "POST",
+        headers: { authorization: "Bearer buyer" },
+        body: JSON.stringify({
+          client_order_no: "bad-channel",
+          payment_channel: "app",
+          items: [{ variant_id: "var_1", qty: 1 }],
+        }),
+      }),
+    );
+    expect(invalid.status).toBe(400);
+    await expect(invalid.json()).resolves.toMatchObject({ error: "validation_error" });
+    expect(harness.stock("var_1")).toBe(4);
+    expect(harness.locks()).toBe(1);
+    expect(harness.graphs().some((graph) => graph.order.clientOrderNo === "bad-channel")).toBe(
+      false,
+    );
+
+    const mobile = await placeOrder({
+      actor: buyer(),
+      body: {
+        client_order_no: "mob-1",
+        payment_channel: "mobile",
+        items: [{ variant_id: "var_1", qty: 1 }],
+      },
+      runtime: harness.runtime,
+    });
+    expect(mobile.ok).toBe(true);
+    if (!mobile.ok) {
+      return;
+    }
+    expect(mobile.graph.payment.channel).toBe("mobile");
+    expect("channel" in mobile.graph.order).toBe(false);
+    expect(harness.stock("var_1")).toBe(3);
+
+    const repeated = await placeOrder({
+      actor: buyer(),
+      body: {
+        client_order_no: "mob-1",
+        payment_channel: "desktop",
+        items: [{ variant_id: "var_1", qty: 1 }],
+      },
+      runtime: harness.runtime,
+    });
+    expect(repeated.ok).toBe(true);
+    if (!repeated.ok) {
+      return;
+    }
+    expect(repeated.graph.order.id).toBe(mobile.graph.order.id);
+    expect(repeated.graph.payment.channel).toBe("mobile");
+    expect(harness.stock("var_1")).toBe(3);
+    expect(harness.locks()).toBe(2);
+    expect(harness.channels()).toEqual(["desktop", "mobile", "mobile"]);
+    expect(harness.paymentIds()).toEqual([
+      omittedId,
+      mobile.graph.payment.id,
+      mobile.graph.payment.id,
+    ]);
+
+    const read = await getOrder(
+      new Request(`https://merclink.example/api/v1/orders/${mobile.graph.order.id}`, {
+        headers: { authorization: "Bearer buyer" },
+      }),
+      { params: { id: mobile.graph.order.id } },
+    );
+    expect(read.status).toBe(200);
+    await expect(read.json()).resolves.toMatchObject({
+      id: mobile.graph.order.id,
+      payment: { channel: "mobile", action: null },
+    });
+  });
+
+  it("keeps a pending mobile order when payment creation is rejected", async () => {
+    const harness = harnessFor({ var_1: variant({ stock: 2 }) }, { failCreate: true });
+    const failed = await placeOrder({
+      actor: buyer(),
+      body: {
+        client_order_no: "wap-retry",
+        payment_channel: "mobile",
+        items: [{ variant_id: "var_1", qty: 1 }],
+      },
+      runtime: harness.runtime,
+    });
+    expect(failed).toMatchObject({ ok: false, error: "payment_retryable" });
+    expect(harness.graphs()).toHaveLength(1);
+    expect(harness.graphs()[0]?.order.status).toBe("pending");
+    expect(harness.graphs()[0]?.payment.status).toBe("pending");
+    expect(harness.graphs()[0]?.payment.channel).toBe("mobile");
+    expect(harness.stock("var_1")).toBe(1);
+
+    harness.controls.failCreate = false;
+    const retried = await placeOrder({
+      actor: buyer(),
+      body: {
+        client_order_no: "wap-retry",
+        payment_channel: "desktop",
+        items: [{ variant_id: "var_1", qty: 1 }],
+      },
+      runtime: harness.runtime,
+    });
+    expect(retried.ok).toBe(true);
+    if (!retried.ok) {
+      return;
+    }
+    expect(retried.graph.payment.channel).toBe("mobile");
+    expect(retried.graph.order.status).toBe("pending");
+    expect(harness.stock("var_1")).toBe(1);
+    expect(harness.locks()).toBe(1);
+    expect(harness.channels()).toEqual(["mobile", "mobile"]);
   });
 
   it("does not decrement unlimited stock and does not write an order when stock is short", async () => {
@@ -356,6 +524,7 @@ describe("slice boundaries", () => {
       "src/jobs/close-expired-orders.ts",
       "src/db/schema/commerce.ts",
       "src/db/migrations/010_schema.sql",
+      "src/db/migrations/012_payment_channel.sql",
     ];
     for (const file of files) {
       const source = await readFile(file, "utf8");
@@ -461,12 +630,13 @@ function harnessFor(
   locks: () => number;
   restores: () => number;
   paymentIds: () => readonly string[];
+  channels: () => readonly string[];
   queries: () => number;
   cancels: () => number;
   writes: () => string[][];
   graphs: () => readonly {
     order: { clientOrderNo: string; status: string };
-    payment: { status: string; id: string };
+    payment: { status: string; id: string; channel: string };
   }[];
   controls: { failCreate: boolean };
   verify: VerifyNotificationResult;
@@ -478,6 +648,7 @@ function harnessFor(
   let lockCalls = 0;
   let restoreCalls = 0;
   const paymentIds: string[] = [];
+  const channels: string[] = [];
   let queries = 0;
   let cancels = 0;
   const writes: string[][] = [];
@@ -541,6 +712,7 @@ function harnessFor(
   const payment: PaymentPort = {
     createPayment: (input) => {
       paymentIds.push(input.paymentId);
+      channels.push(input.channel);
       if (state.failCreate) {
         return Promise.resolve({
           ok: false,
@@ -581,6 +753,7 @@ function harnessFor(
     locks: () => lockCalls,
     restores: () => restoreCalls,
     paymentIds: () => paymentIds,
+    channels: () => channels,
     queries: () => queries,
     cancels: () => cancels,
     writes: () => writes,

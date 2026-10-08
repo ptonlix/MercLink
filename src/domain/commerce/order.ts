@@ -7,6 +7,8 @@ const orderLifetimeMs = 30 * 60 * 1000;
 
 export type OrderStatus = "pending" | "paid" | "closed";
 
+export type PaymentChannel = "desktop" | "mobile";
+
 export type VariantSnapshot = {
   sku: string | null;
   optionValues: Readonly<Record<string, string>>;
@@ -40,6 +42,22 @@ export type ProviderTransition = {
 
 function commerceFailure(error: ErrorCode, message: string): CommerceFailure {
   return { ok: false, error, message };
+}
+
+export function parsePaymentChannel(
+  body: unknown,
+): { ok: true; channel: PaymentChannel } | CommerceFailure {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return commerceFailure("validation_error", "请求无效。");
+  }
+  if (!("payment_channel" in body)) {
+    return { ok: true, channel: "desktop" };
+  }
+  const value = (body as { payment_channel?: unknown }).payment_channel;
+  if (value === "desktop" || value === "mobile") {
+    return { ok: true, channel: value };
+  }
+  return commerceFailure("validation_error", "支付渠道无效。");
 }
 
 export function validateSingleLine(

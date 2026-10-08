@@ -5,6 +5,7 @@ import {
   assertBuyerPlaces,
   lineAmount,
   orderExpiresAt,
+  parsePaymentChannel,
   rejectCallerPrice,
   validateSingleLine,
   type CommerceFailure,
@@ -27,6 +28,7 @@ const itemSchema = z.strictObject({
 
 const bodySchema = z.strictObject({
   client_order_no: z.string().trim().min(1).max(128),
+  payment_channel: z.unknown().optional(),
   items: z.array(itemSchema).min(1),
 });
 
@@ -44,6 +46,7 @@ function parsePlaceOrderBody(raw: unknown):
       clientOrderNo: string;
       variantId?: string;
       productId?: string;
+      channel: "desktop" | "mobile";
       qty: number;
     }
   | CommerceFailure {
@@ -62,6 +65,10 @@ function parsePlaceOrderBody(raw: unknown):
   if (!parsed.success) {
     return { ok: false, error: "validation_error", message: "请求无效。" };
   }
+  const channel = parsePaymentChannel(raw);
+  if (!channel.ok) {
+    return channel;
+  }
   const item = parsed.data.items[0];
   if (item === undefined) {
     return { ok: false, error: "validation_error", message: "订单必须包含一行。" };
@@ -79,6 +86,7 @@ function parsePlaceOrderBody(raw: unknown):
   return {
     ok: true,
     clientOrderNo: parsed.data.client_order_no,
+    channel: channel.channel,
     ...(line.line.variantId === undefined ? {} : { variantId: line.line.variantId }),
     ...(line.line.productId === undefined ? {} : { productId: line.line.productId }),
     qty: line.line.qty,
@@ -152,6 +160,7 @@ export async function placeOrder(input: {
           id: createPaymentId(),
           orderId,
           provider: "alipay",
+          channel: parsed.channel,
           providerTradeNo: null,
           status: "pending",
           amount,
@@ -191,6 +200,7 @@ export async function placeOrder(input: {
     amount: minorUnits(graph.order.amount),
     currency: graph.order.currency,
     subject,
+    channel: graph.payment.channel,
   });
   if (!created.ok) {
     return {
@@ -231,5 +241,3 @@ function snapshotFields(
 ): FieldsSnapshot {
   return { ...fields };
 }
-
-

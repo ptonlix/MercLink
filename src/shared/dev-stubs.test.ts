@@ -55,12 +55,31 @@ describe("development stubs", () => {
       amount: 159900 as never,
       currency: "CNY",
       subject: "鞋",
+      channel: "desktop",
     });
     expect(created).toEqual({
       ok: true,
-      action: "http://127.0.0.1:3000/dev/pay/pay_dev",
+      action: "https://127.0.0.1:3000/dev/pay/pay_dev?channel=desktop",
       providerTradeNo: "dev_pay_dev",
     });
+    const mobile = await payment.createPayment({
+      paymentId: "pay_mobile",
+      orderId: "ord_mobile",
+      amount: 159900 as never,
+      currency: "CNY",
+      subject: "鞋",
+      channel: "mobile",
+    });
+    expect(mobile).toEqual({
+      ok: true,
+      action: "https://127.0.0.1:3000/dev/pay/pay_mobile?channel=mobile",
+      providerTradeNo: "dev_pay_mobile",
+    });
+    if (created.ok && mobile.ok) {
+      expect(created.action).not.toBe(mobile.action);
+      expect(created.action).not.toContain("openapi.alipay.com");
+      expect(mobile.action).not.toContain("openapi.alipay.com");
+    }
 
     const forged = await payment.verifyNotification({
       body: devPaidNotification({

@@ -37,6 +37,21 @@ describe("buyer skill", () => {
     expect(body).toContain("分");
     expect(body).toContain("client_order_no");
     expect(body).toContain("payment.action");
+    expect(body).toContain("payment_channel");
+    expect(body).toContain("send `payment_channel` `mobile` on the first order request");
+    expect(body).toContain("including an agent built-in page that can navigate");
+    expect(body).toContain(
+      "Open the complete `payment.action` URL with top-level navigation rather than an iframe or a truncated URL.",
+    );
+    expect(body).toContain("The default channel is the PC cashier.");
+    expect(body).toContain("Repeating `client_order_no` does not switch channel.");
+    expect(body).toContain("A new `client_order_no` must not be used only to switch channel.");
+    expect(body).toContain("Do not ask for an Alipay password.");
+    expect(body).toContain("顶层");
+    expect(body).toContain("iframe");
+    expect(body).toContain("不要向用户索要支付宝密码");
+    expect(body).toContain("不会切换渠道");
+    expect(body).toContain("电脑收银台");
     expect(body).toContain("`paid`");
     expect(body).toContain("商品不存在");
     expect(body).toContain("已下架");

@@ -1,12 +1,18 @@
+import type { PaymentChannel } from "../../ports/payment";
+
 export const alipayGateway = "https://openapi.alipay.com/gateway.do";
 
 export const alipayMethods = {
   create: "alipay.trade.page.pay",
+  createMobile: "alipay.trade.wap.pay",
   query: "alipay.trade.query",
   close: "alipay.trade.close",
 } as const;
 
-const productCode = "FAST_INSTANT_TRADE_PAY";
+const productCodes = {
+  desktop: "FAST_INSTANT_TRADE_PAY",
+  mobile: "QUICK_WAP_WAY",
+} as const satisfies Record<PaymentChannel, string>;
 
 function yuanFromMinor(amount: number): string | null {
   if (!Number.isSafeInteger(amount) || amount <= 0) {
@@ -27,6 +33,7 @@ export function pagePayBizContent(input: {
   paymentId: string;
   amount: number;
   subject: string;
+  channel: PaymentChannel;
 }): string | null {
   const totalAmount = yuanFromMinor(input.amount);
   if (totalAmount === null) {
@@ -36,7 +43,7 @@ export function pagePayBizContent(input: {
     out_trade_no: input.paymentId,
     total_amount: totalAmount,
     subject: sanitizeSubject(input.subject),
-    product_code: productCode,
+    product_code: productCodes[input.channel],
   });
 }
 

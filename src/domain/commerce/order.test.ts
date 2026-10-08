@@ -13,6 +13,7 @@ import {
   lineAmount,
   merchantOwnsLines,
   orderExpiresAt,
+  parsePaymentChannel,
   rejectCallerPrice,
   restoreQuantity,
   validateSingleLine,
@@ -47,15 +48,42 @@ describe("place order rules", () => {
       error: "validation_error",
     });
     expect(rejectCallerPrice({ price: 1 })).toMatchObject({ ok: false, error: "validation_error" });
-    expect(rejectCallerPrice({ items: [{ variant_id: "var_1", qty: 1, price: 1 }] })).toMatchObject({
-      ok: false,
-      error: "validation_error",
-    });
+    expect(rejectCallerPrice({ items: [{ variant_id: "var_1", qty: 1, price: 1 }] })).toMatchObject(
+      {
+        ok: false,
+        error: "validation_error",
+      },
+    );
     expect(rejectCallerPrice({ items: [{ variant_id: "var_1", qty: 1 }] })).toEqual({ ok: true });
     expect(validateSingleLine([{ variantId: "var_1", qty: 2 }])).toMatchObject({
       ok: true,
       line: { qty: 2 },
     });
+  });
+
+  it("defaults payment channel to desktop and rejects any other value", () => {
+    expect(parsePaymentChannel({ client_order_no: "a-1" })).toEqual({
+      ok: true,
+      channel: "desktop",
+    });
+    expect(parsePaymentChannel({ payment_channel: "desktop" })).toEqual({
+      ok: true,
+      channel: "desktop",
+    });
+    expect(parsePaymentChannel({ payment_channel: "mobile" })).toEqual({
+      ok: true,
+      channel: "mobile",
+    });
+    expect(
+      parsePaymentChannel({ user_agent: "Mozilla/5.0 (iPhone)", "sec-ch-ua-mobile": "?1" }),
+    ).toEqual({ ok: true, channel: "desktop" });
+    for (const paymentChannel of ["app", "wap", "DESKTOP", " mobile", "", null, 1, ["mobile"]]) {
+      expect(parsePaymentChannel({ payment_channel: paymentChannel })).toMatchObject({
+        ok: false,
+        error: "validation_error",
+      });
+    }
+    expect(parsePaymentChannel(null)).toMatchObject({ ok: false, error: "validation_error" });
   });
 
   it("prices a line from the variant and expires in 30 minutes", () => {

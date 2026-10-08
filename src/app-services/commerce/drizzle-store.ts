@@ -2,7 +2,12 @@ import { and, eq, inArray, lte, sql } from "drizzle-orm";
 
 import type { Database } from "../../db/client";
 import { orderItems, orders, payments } from "../../db/schema/commerce";
-import type { FieldsSnapshot, OrderStatus, VariantSnapshot } from "../../domain/commerce/order";
+import type {
+  FieldsSnapshot,
+  OrderStatus,
+  PaymentChannel,
+  VariantSnapshot,
+} from "../../domain/commerce/order";
 import { expiryDue } from "../../domain/commerce/order";
 import type {
   CommerceRepository,
@@ -259,6 +264,7 @@ function paymentValues(payment: StoredPayment): typeof payments.$inferInsert {
     id: payment.id,
     orderId: payment.orderId,
     provider: payment.provider,
+    channel: payment.channel,
     providerTradeNo: payment.providerTradeNo,
     status: payment.status,
     amount: payment.amount,
@@ -308,6 +314,7 @@ function mapPayment(row: PaymentRow): StoredPayment {
     id: row.id,
     orderId: row.orderId,
     provider: row.provider,
+    channel: paymentChannel(row.channel),
     providerTradeNo: row.providerTradeNo,
     status: asStatus(row.status),
     amount: row.amount,
@@ -323,6 +330,13 @@ function asStatus(value: string): OrderStatus {
     return value;
   }
   throw new Error(`Unexpected commerce status: ${value}`);
+}
+
+function paymentChannel(value: string): PaymentChannel {
+  if (value === "desktop" || value === "mobile") {
+    return value;
+  }
+  throw new Error(`Unexpected payment channel: ${value}`);
 }
 
 function readVariantSnapshot(value: unknown): VariantSnapshot {

@@ -85,15 +85,20 @@ export function createAlipayPaymentPort(config: AlipayAdapterConfig): PaymentPor
         paymentId: input.paymentId,
         amount: input.amount,
         subject: input.subject,
+        channel: input.channel,
       });
       if (bizContent === null) {
         return Promise.resolve(retryable("支付创建失败，请重试。"));
       }
+      const method = input.channel === "mobile" ? alipayMethods.createMobile : alipayMethods.create;
       try {
-        const action = client.pageExecute(alipayMethods.create, "GET", {
+        const action = client.pageExecute(method, "GET", {
           bizContent: JSON.parse(bizContent) as Record<string, string>,
           notifyUrl: config.notifyUrl,
         });
+        if (!isAbsoluteHttpsUrl(action)) {
+          return Promise.resolve(retryable("支付创建失败，请重试。"));
+        }
         return Promise.resolve({ ok: true, action, providerTradeNo: null });
       } catch {
         return Promise.resolve(retryable("支付创建失败，请重试。"));
@@ -191,6 +196,17 @@ export function createAlipaySdk(config: AlipayAdapterConfig): AlipayOpenApi {
     exec: async (method, params) => sdk.exec(method, params),
     checkNotifySign: (postData) => sdk.checkNotifySign(postData),
   };
+}
+
+function isAbsoluteHttpsUrl(value: string): boolean {
+  if (!value.startsWith("https://")) {
+    return false;
+  }
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function closedInternationalPort(): PaymentPort {

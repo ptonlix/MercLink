@@ -25,8 +25,18 @@ export function resetDevPayments(): void {
   payments.clear();
 }
 
-function devPaymentAction(appBaseUrl: string, paymentId: string): string {
-  return `${appBaseUrl.replace(/\/$/, "")}/dev/pay/${paymentId}`;
+function devPaymentAction(
+  appBaseUrl: string,
+  paymentId: string,
+  channel: CreatePaymentInput["channel"],
+): string {
+  const trimmed = appBaseUrl.replace(/\/$/, "");
+  const httpsBase = trimmed.startsWith("http://")
+    ? `https://${trimmed.slice("http://".length)}`
+    : trimmed.startsWith("https://")
+      ? trimmed
+      : `https://${trimmed}`;
+  return `${httpsBase}/dev/pay/${paymentId}?channel=${channel}`;
 }
 
 export function devPaidNotification(input: {
@@ -54,7 +64,7 @@ export function createDevPaymentPort(config: DevPaymentConfig): PaymentPort {
       payments.set(input.paymentId, { status: "pending", providerTradeNo });
       return Promise.resolve({
         ok: true,
-        action: devPaymentAction(config.appBaseUrl, input.paymentId),
+        action: devPaymentAction(config.appBaseUrl, input.paymentId, input.channel),
         providerTradeNo,
       });
     },

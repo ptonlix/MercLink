@@ -1,9 +1,11 @@
 import { randomBytes } from "node:crypto";
+import { copyFile, mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import postgres from "postgres";
 import { describe, expect, it } from "vitest";
 import { getTableColumns } from "drizzle-orm";
-import { orders } from "../../db/schema/commerce";
+import { orders, payments } from "../../db/schema/commerce";
 import { runMigrations } from "../../db/migrate";
 
 describe("commerce schema", () => {
@@ -33,6 +35,18 @@ describe("commerce schema", () => {
     ]) {
       expect(columnNames).not.toContain(forbidden);
     }
+    const paymentColumns = Object.values(getTableColumns(payments)).map((column) => column.name);
+    expect(paymentColumns).toContain("channel");
+    expect(paymentColumns).not.toContain("payment_channel");
+
+    const migration = await readFile(
+      path.join(process.cwd(), "src/db/migrations/012_payment_channel.sql"),
+      "utf8",
+    );
+    expect(migration).toContain("ADD COLUMN channel text NOT NULL DEFAULT 'desktop'");
+    expect(migration).toContain("payments_channel_check");
+    expect(migration).toContain("CHECK (channel IN ('desktop', 'mobile'))");
+    expect(migration).not.toMatch(/ALTER TABLE orders/i);
 
     await withSchema(databaseUrl, async (sql) => {
       const columns = await sql<{ column_name: string }[]>`
@@ -85,10 +99,96 @@ describe("commerce schema", () => {
         FROM orders
         WHERE buyer_id = 'byr_2'
       `;
+      const storedChannels = await sql<{ id: string; channel: string }[]>`
+        SELECT id, channel FROM payments ORDER BY id
+      `;
+      expect(storedChannels).toEqual([
+        { id: "pay_a", channel: "desktop" },
+        { id: "pay_b", channel: "desktop" },
+      ]);
+      await expect(
+        sql`UPDATE payments SET channel = 'tablet' WHERE id = 'pay_a'`,
+      ).rejects.toThrow();
+      await sql`UPDATE payments SET channel = 'mobile' WHERE id = 'pay_a'`;
+
       await expect(sql`
         UPDATE payments SET provider_trade_no = 'trade_same'
       `).rejects.toThrow();
     });
+  });
+
+  it("backfills payments created before the channel column as desktop", async () => {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (databaseUrl === undefined || databaseUrl.trim() === "") {
+      throw new Error("DATABASE_URL is required. Start compose.dev.yaml and export DATABASE_URL.");
+    }
+    const staging = await mkdtemp(path.join(tmpdir(), "merclink-pay-channel-"));
+    const schema = `cm_${randomBytes(4).toString("hex")}`;
+    const admin = postgres(databaseUrl, { max: 1 });
+    await admin.unsafe(`CREATE SCHEMA ${schema}`);
+    await admin.end({ timeout: 5 });
+    try {
+      await copyFile(
+        path.join(process.cwd(), "src/db/migrations/010_schema.sql"),
+        path.join(staging, "010_schema.sql"),
+      );
+      await copyFile(
+        path.join(process.cwd(), "src/db/migrations/011_merchant_profiles.sql"),
+        path.join(staging, "011_merchant_profiles.sql"),
+      );
+      await runMigrations({ databaseUrl, directory: staging, searchPath: schema });
+      const sql = postgres(databaseUrl, { max: 1, onnotice: () => undefined });
+      try {
+        await sql`SET search_path TO ${sql(schema)}`;
+        const before = await sql<{ column_name: string }[]>`
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'payments'
+        `;
+        expect(before.map((column) => column.column_name)).not.toContain("channel");
+        await sql`
+          INSERT INTO buyers (id, phone, password_hash)
+          VALUES ('byr_old', '13900000009', 'hash')
+        `;
+        await insertOrder(sql, "byr_old", "before-channel");
+        await sql`
+          INSERT INTO payments (
+            id, order_id, provider, provider_trade_no, status, amount, currency, created_at, updated_at
+          )
+          SELECT 'pay_old', id, 'alipay', NULL, 'pending', amount, currency, created_at, updated_at
+          FROM orders
+          WHERE buyer_id = 'byr_old'
+        `;
+        await copyFile(
+          path.join(process.cwd(), "src/db/migrations/012_payment_channel.sql"),
+          path.join(staging, "012_payment_channel.sql"),
+        );
+        await runMigrations({ databaseUrl, directory: staging, searchPath: schema });
+        const rows = await sql<
+          { channel: string }[]
+        >`SELECT channel FROM payments WHERE id = 'pay_old'`;
+        expect(rows).toEqual([{ channel: "desktop" }]);
+        const orderColumns = await sql<{ column_name: string }[]>`
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'orders'
+            AND column_name IN ('channel', 'payment_channel')
+        `;
+        expect(orderColumns).toEqual([]);
+        await expect(
+          sql`UPDATE payments SET channel = 'app' WHERE id = 'pay_old'`,
+        ).rejects.toThrow();
+      } finally {
+        await sql.end({ timeout: 5 });
+      }
+    } finally {
+      const cleanup = postgres(databaseUrl, { max: 1 });
+      await cleanup.unsafe(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      await cleanup.end({ timeout: 5 });
+      await rm(staging, { recursive: true, force: true });
+    }
   });
 });
 

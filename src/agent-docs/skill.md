@@ -2,7 +2,7 @@
 
 这份文档公开。未登录可以查询已上架商品。下单和查询自己的订单前，用设备码让用户在浏览器里注册或批准。
 
-Do not ask the user for a password, SMS code, or API key. Use the device authorization grant. Do not use a public callback URL. Query published products without login. A product is not a sellable variant. Order by variant id, or by product id only when one sellable variant exists. Price is in minor units. `client_order_no` is idempotent. Use `payment.action` to pay, then look up order status. Only status `paid` means success.
+Do not ask the user for a password, SMS code, or API key. Use the device authorization grant. Do not use a public callback URL. Query published products without login. A product is not a sellable variant. Order by variant id, or by product id only when one sellable variant exists. Price is in minor units. `client_order_no` is idempotent. On a phone, including an agent built-in page that can navigate, send `payment_channel` `mobile` on the first order request. The default channel is the PC cashier. Repeating `client_order_no` does not switch channel. A new `client_order_no` must not be used only to switch channel. Open the complete `payment.action` URL with top-level navigation rather than an iframe or a truncated URL. Do not ask for an Alipay password. Use `payment.action` to pay, then look up order status. Only status `paid` means success.
 
 ## 不要索要凭证
 
@@ -57,7 +57,23 @@ GET /api/v1/orders/{id}
 }
 ```
 
-返回的 `amount` 和行金额都是分。`payment.action` 是交给付款人完成支付的链接或参数。打开 `payment.action` 不等于支付成功。支付创建失败且可以重试时，错误码是 `payment_retryable`，订单保持 `pending`。
+手机付款人，包括能做 HTTPS 跳转的 Agent 内置页，必须在第一次下单请求里传 `payment_channel` 为 `mobile`。
+
+```json
+{
+  "client_order_no": "agent-20260516-002",
+  "payment_channel": "mobile",
+  "items": [{ "variant_id": "var_example", "qty": 1 }]
+}
+```
+
+电脑付款人可以不传 `payment_channel`。缺省渠道是电脑收银台。The default channel is the PC cashier.
+
+返回的 `amount` 和行金额都是分。`payment.channel` 是已保存的渠道。`payment.action` 是完整的 `https` URL。用顶层导航打开整段 URL，不要放进 iframe，也不要截断或改写。Open the complete `payment.action` URL with top-level navigation rather than an iframe or a truncated URL. 打开 `payment.action` 不等于支付成功。不要向用户索要支付宝密码。Do not ask for an Alipay password.
+
+重复同一个 `client_order_no` 不会切换渠道。Repeating `client_order_no` does not switch channel. 不要只为了换渠道而新开一个 `client_order_no`，那会再扣库存。A new `client_order_no` must not be used only to switch channel.
+
+支付创建失败且可以重试时，错误码是 `payment_retryable`，订单保持 `pending`。
 
 ## 查询订单状态
 

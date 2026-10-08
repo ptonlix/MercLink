@@ -55,6 +55,7 @@ export const payments = pgTable(
       .unique()
       .references(() => orders.id),
     provider: text("provider").notNull(),
+    channel: text("channel").notNull().default("desktop"),
     providerTradeNo: text("provider_trade_no"),
     status: text("status").notNull(),
     amount: integer("amount").notNull(),

@@ -1,4 +1,7 @@
+import type { PaymentChannel } from "../domain/commerce/order";
 import type { MinorUnits } from "../shared/money";
+
+export type { PaymentChannel };
 
 export type PaymentViewStatus = "pending" | "paid" | "closed";
 
@@ -8,6 +11,7 @@ export type CreatePaymentInput = {
   amount: MinorUnits;
   currency: string;
   subject: string;
+  channel: PaymentChannel;
 };
 
 export type CreatePaymentResult =

@@ -1,5 +1,10 @@
 import type { SeamTransaction } from "../../shared/seams/sellable-variants";
-import type { FieldsSnapshot, OrderStatus, VariantSnapshot } from "../../domain/commerce/order";
+import type {
+  FieldsSnapshot,
+  OrderStatus,
+  PaymentChannel,
+  VariantSnapshot,
+} from "../../domain/commerce/order";
 
 export type StoredOrder = {
   id: string;
@@ -35,6 +40,7 @@ export type StoredPayment = {
   id: string;
   orderId: string;
   provider: string;
+  channel: PaymentChannel;
   providerTradeNo: string | null;
   status: OrderStatus;
   amount: number;

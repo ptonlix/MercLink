@@ -39,6 +39,7 @@ export function orderJson(
   payment: {
     id: string;
     provider: string;
+    channel: StoredPayment["channel"];
     status: StoredPayment["status"];
     action: unknown;
   } | null;
@@ -61,6 +62,7 @@ export function orderJson(
         : {
             id: payment.id,
             provider: payment.provider,
+            channel: payment.channel,
             status: payment.status,
             action,
           },

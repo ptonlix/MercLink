@@ -36,6 +36,7 @@ function graph(status: "pending" | "closed"): StoredGraph {
       id: "pay_dev",
       orderId: "ord_dev",
       provider: "alipay",
+      channel: "desktop",
       providerTradeNo: "dev_pay_dev",
       status,
       amount: 100,

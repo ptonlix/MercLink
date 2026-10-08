@@ -241,19 +241,25 @@ v1 的接口只允许一行。多出来的行直接拒绝。表结构不按一�
 
 ### 7.2 支付宝
 
-支付只使用支付宝官方的 AI 支付能力。本系统负责创建订单和接收结果，不自己做收银台。
+支付使用支付宝官方收银台。本系统负责创建订单和接收结果，不自己做收银台，也不根据 User-Agent、客户端提示或 IP 猜测付款设备。商户私钥只放在服务端。
 
-实现时以当时的官方文档为准。国内商户用支付宝面向 AI / 智能体的支付产品。若账号是国际 Alipay+ 商户，则用官方 Agent 支付接口，对应能力至少包括创建支付、查询支付、取消支付和支付结果通知。官方已有的参考实现是 [AlipayPlus MCP](https://github.com/alipay/global-alipayplus-mcp)，其中 `create_payment`、`query_payment`、`cancel_payment` 和支付回调就是这一层。商户私钥只放在服务端。
+国内电脑渠道调用 `alipay.trade.page.pay`，产品码 `FAST_INSTANT_TRADE_PAY`。国内手机渠道调用 `alipay.trade.wap.pay`，产品码 `QUICK_WAP_WAY`。买家在第一次下单时用 `payment_channel` 选择 `desktop` 或 `mobile`。不传则是 `desktop`。其他值是 `validation_error`，不创建订单，也不改库存。渠道写在这一条支付记录上，不写进订单头。已有支付记录视为 `desktop`。
+
+两种渠道的 `payment.action` 都是服务端 `pageExecute` GET 得到的完整 `https` URL，不是 HTML 表单，也不是本系统拼接的 `alipays://`。响应里的 `payment.channel` 是已保存的渠道。手机付款人，包括能做 HTTPS 跳转的 Agent 内置页，必须在第一次请求传 `mobile`，并用顶层导航打开完整 URL，不要放进 iframe，也不要截断。打开链接不等于支付成功。电脑付款人打开电脑收银台，用支付宝 App 扫页面上的付款码。缺省渠道就是这台电脑收银台。
+
+同一买家重复同一个 `client_order_no` 时，不切换渠道，不调用另一个支付宝方法，也不再次扣库存。若支付仍是 `pending`，只按已保存的渠道重新生成 URL。不要只为了换渠道而使用新的 `client_order_no`。
+
+查询、关闭和异步通知仍走 `alipay.trade.query`、`alipay.trade.close` 和 `POST /api/v1/payments/alipay/notify`。不新增回跳页，不做退款，不做 App 支付。国际 Alipay+ 对两种渠道都保持关闭。网关拒绝创建时仍是 `payment_retryable`，订单保持 `pending`。
 
 v1 要接上的动作：
 
-1. 创建订单后，向支付宝创建支付。
-2. 把支付链接或支付参数返回给调用方。
+1. 创建订单后，按支付记录上的渠道向支付宝创建支付。
+2. 把支付 URL 和 `payment.channel` 返回给调用方。
 3. 接收支付宝异步通知，验签后把支付记录改为 `paid`，再把订单头改为 `paid`。
 4. 调用方可以主动查询订单；订单仍是 `pending` 时，向支付宝再查一次，并以支付记录为准更新订单头。
 5. 超时未支付则关闭支付记录和订单头，并调用支付宝取消支付。
 
-v1 不做退款。一笔订单 v1 只创建一条支付记录。换支付方式时新增支付记录，不往订单头加字段。
+一笔订单 v1 只创建一条支付记录。不往订单头加渠道字段，也不为换渠道新增第二条支付记录。
 
 两份 Skill 都必须写明：只有订单状态为 `paid` 才算支付成功。支付链接被打开，不等于成功。
 
@@ -445,13 +451,14 @@ GET /api/v1/products?field.weight_g.lte=500
   "payment": {
     "id": "pay_1",
     "provider": "alipay",
+    "channel": "desktop",
     "status": "pending",
     "action": "https://..."
   }
 }
 ```
 
-`payment.action` 是支付宝返回给付款人完成支付的链接或参数。具体形状跟官方接口走，Skill 里按实际返回写。
+`payment.action` 是所选渠道的完整 `https` URL。`payment.channel` 是支付记录上已保存的渠道。打开链接不等于支付成功。
 
 ### 商家侧
 
@@ -649,10 +656,11 @@ order_items
   variant_id -> variants.id
 
 payments
-  id, order_id, provider, provider_trade_no, status, amount, currency,
+  id, order_id, provider, channel, provider_trade_no, status, amount, currency,
   created_at, updated_at, paid_at
   order_id -> orders.id
   status = pending | paid | closed
+  channel = desktop | mobile
 ```
 
 `fields` 是 JSON 对象，例如 `{ "weight_g": 480, "color": "黑" }`。不再为每个值单独建一行，也不为文本、数字、是否各留一个空列。
