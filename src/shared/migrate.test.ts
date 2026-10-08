@@ -130,8 +130,52 @@ INSERT INTO exec_log (name) VALUES ('010_platform.sql');
 
   it("opens a database client against the compose database", async () => {
     const handle = getDatabase(databaseUrl);
-    const rows = await handle.sql<{ ok: number }[]>`SELECT 1 AS ok`;
-    expect(rows[0]?.ok).toBe(1);
+    try {
+      const rows = await handle.sql<{ ok: number }[]>`SELECT 1 AS ok`;
+      expect(rows[0]?.ok).toBe(1);
+    } finally {
+      await closeDatabase(databaseUrl);
+    }
+  });
+
+  it("does not reuse a pool opened for a different database url", async () => {
+    const otherUrl = `${databaseUrl}${databaseUrl.includes("?") ? "&" : "?"}application_name=merclink_other_pool`;
+    const first = getDatabase(databaseUrl);
+    const other = getDatabase(otherUrl);
+    try {
+      expect(other).not.toBe(first);
+      expect(getDatabase(databaseUrl)).toBe(first);
+      expect(getDatabase(otherUrl)).toBe(other);
+    } finally {
+      await closeDatabase();
+    }
+  });
+
+  it("stringifies sql.json objects and dates without double-encoding drizzle values", async () => {
+    const handle = getDatabase(databaseUrl);
+    try {
+      const objectValue = { a: 1, nested: { ok: true } };
+      const drizzleValue = { b: 2 };
+      const at = new Date("2026-10-07T00:00:00.000Z");
+      const rows = await handle.sql.begin(async (tx) => {
+        await tx`CREATE TEMP TABLE json_probe (value jsonb, at timestamptz) ON COMMIT DROP`;
+        await tx`INSERT INTO json_probe (value, at) VALUES (${tx.json(objectValue)}, ${at})`;
+        await tx.unsafe("INSERT INTO json_probe (value, at) VALUES ($1, $2)", [
+          JSON.stringify(drizzleValue),
+          at.toISOString(),
+        ]);
+        return tx<{ value: unknown; at: Date | string }[]>`SELECT value, at FROM json_probe`;
+      });
+      expect(rows.map((row) => row.value)).toEqual(
+        expect.arrayContaining([objectValue, drizzleValue]),
+      );
+      expect(rows.map((row) => new Date(row.at).toISOString())).toEqual([
+        at.toISOString(),
+        at.toISOString(),
+      ]);
+    } finally {
+      await closeDatabase(databaseUrl);
+    }
   });
 });
 

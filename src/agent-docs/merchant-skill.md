@@ -6,9 +6,9 @@ Do not guide self-registration. Do not ask for a password, SMS code, or API key.
 
 ## 认证
 
-打开商家授权页 `/authorize`。只允许已开通的商家登录并批准。商家授权页没有注册。没有账号时，页面写明请联系管理员开通。
+默认使用设备码。Agent 向 `POST /oauth/device/auth` 申请短码，自己保存 `device_code`，只把 `user_code` 和 `verification_uri` 给用户。用户在浏览器确认短码后登录并批准。只允许已开通的商家登录。商家授权页没有注册。没有账号时，页面写明请联系管理员开通。
 
-不要引导用户自助注册。不要向用户索要密码、短信验证码或 API Key。不要让用户把访问令牌或刷新令牌复制进对话。授权使用 OAuth 2.1 授权码加 PKCE，或设备码。不使用密码模式。
+不要引导用户自助注册。不要向用户索要密码、短信验证码或 API Key。不要让用户把访问令牌或刷新令牌复制进对话。不要使用公网回调地址。Agent 在内网，没有独立的公网服务。不使用密码模式。
 
 商家批准的权限是 `field:write`、`product:write`、`product:read`、`order:read`。这里没有访问令牌、刷新令牌或 API Key 的示例值。
 
@@ -94,7 +94,13 @@ GET /api/v1/manage/orders
 ```
 
 ```json
-{ "key": "color", "label": "颜色", "type": "single-select", "required": false, "choices": ["黑", "白"] }
+{
+  "key": "color",
+  "label": "颜色",
+  "type": "single-select",
+  "required": false,
+  "choices": ["黑", "白"]
+}
 ```
 
 增加可选字段、改标签、增加单选项、把必填改为可选，会立即生效，已上架商品保持上架。

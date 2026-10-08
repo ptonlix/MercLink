@@ -24,7 +24,9 @@ describe("buyer skill", () => {
     expect(missingAssignedPaths(body, routesFor("buyer"))).toEqual([]);
     expect(body).toContain("未登录");
     expect(body).toContain("已上架");
-    expect(body).toContain("/authorize");
+    expect(body).toContain("/oauth/device/auth");
+    expect(body).toContain("设备码");
+    expect(body).toContain("不要使用公网回调地址");
     expect(body).toContain("注册");
     expect(body).toContain("不要向用户索要密码、短信验证码或 API Key");
     expect(body).toContain("Do not ask the user for a password, SMS code, or API key.");

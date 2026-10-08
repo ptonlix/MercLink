@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { createMemoryRateLimit } from "../../adapters/redis/memory";
 import {
+  registrationChallengeTtlMs,
   smsDailyCap,
   smsMinIntervalMs,
   smsRateLimitPolicies,
@@ -14,10 +15,15 @@ import type { SmsPort } from "../../ports/sms";
 import {
   checkBuyerSms,
   completeBuyerRegistration,
+  existingBuyerMustLogin,
   findBuyerByEmail,
+  loginBuyerWithPassword,
+  registrationAccountSession,
   requestBuyerSms,
   type BuyerFlow,
 } from "./buyers";
+import { hashPassword } from "./passwords";
+import { createPublicId } from "../../shared/id";
 import { withIdentityDatabase } from "./database";
 import { fakeCaptcha, fakeSms } from "./fakes";
 
@@ -74,7 +80,12 @@ describe("buyer registration", () => {
         registrationFlow(sql, smsMinIntervalMs, sms, openLimiter(), captcha),
         { phone: "13800138000", password: "another-password" },
       );
-      expect(duplicate).toMatchObject({ ok: true, created: false, mode: "login" });
+      expect(duplicate).toMatchObject({
+        ok: false,
+        error: "conflict",
+        message: existingBuyerMustLogin,
+      });
+      expect(registrationAccountSession(duplicate)).toBeNull();
       const count = await sql<{ count: string }[]>`SELECT count(*) FROM buyers`;
       expect(count[0]?.count).toBe("1");
     });
@@ -205,6 +216,138 @@ describe("buyer registration", () => {
       const after = await checkBuyerSms(flow, { phone: "13800138000", code: sms.acceptCode });
       expect(after).toMatchObject({ ok: false, error: "captcha_required" });
       expect(sms.checkCalls).toHaveLength(5);
+    });
+  });
+
+  it("does not authenticate intent=register after SMS verification once a buyer exists", async () => {
+    await withIdentityDatabase(async (sql) => {
+      const sms = fakeSms();
+      const flow = registrationFlow(sql, 0, sms, openLimiter());
+      await requestBuyerSms(flow, { phone: "13800138000", captchaVerifyParam: "captcha-1" });
+      expect(await checkBuyerSms(flow, { phone: "13800138000", code: sms.acceptCode })).toEqual({
+        ok: true,
+        mode: "register",
+      });
+      const created = await completeBuyerRegistration(flow, {
+        phone: "13800138000",
+        password: "buyer-password",
+      });
+      expect(created).toMatchObject({ ok: true, created: true });
+
+      const phoneOnly = await completeBuyerRegistration(flow, {
+        phone: "13800138000",
+        password: "",
+      });
+      expect(phoneOnly.ok).toBe(false);
+      expect(registrationAccountSession(phoneOnly)).toBeNull();
+      expect(phoneOnly).not.toHaveProperty("buyerId");
+
+      const replay = await completeBuyerRegistration(flow, {
+        phone: "13800138000",
+        password: "buyer-password",
+      });
+      expect(replay.ok).toBe(false);
+      expect(registrationAccountSession(replay)).toBeNull();
+      const spent = await sql<{ open: string }[]>`
+        SELECT count(*) AS open
+        FROM registration_challenges
+        WHERE phone = '13800138000' AND invalidated_at IS NULL
+      `;
+      expect(spent[0]?.open).toBe("0");
+
+      const buyerId = createPublicId("buyer");
+      const passwordHash = await hashPassword("stored-password");
+      await sql`
+        INSERT INTO buyers (id, phone, password_hash, phone_verified_at)
+        VALUES (${buyerId}, '13900139000', ${passwordHash}, ${flow.clock.now()})
+      `;
+      await sql`
+        INSERT INTO registration_challenges (
+          id, phone, captcha_hash, sms_verified_at, created_at
+        ) VALUES (
+          ${createPublicId("challenge")}, '13900139000', 'captcha-hash',
+          ${flow.clock.now()}, ${flow.clock.now()}
+        )
+      `;
+      const bypass = await completeBuyerRegistration(flow, {
+        phone: "13900139000",
+        password: "not-the-password",
+      });
+      expect(bypass).toMatchObject({
+        ok: false,
+        error: "conflict",
+        message: existingBuyerMustLogin,
+      });
+      expect(registrationAccountSession(bypass)).toBeNull();
+      const route = await readFile("src/app/authorize/buyer/submit/route.ts", "utf8");
+      const registerBranch = route.slice(
+        route.indexOf('intent === "register"'),
+        route.indexOf('intent === "password"'),
+      );
+      expect(registerBranch).toContain("registrationAccountSession");
+      expect(registerBranch.indexOf("registrationAccountSession")).toBeLessThan(
+        registerBranch.indexOf("accountRedirect"),
+      );
+
+      const wrongPassword = await loginBuyerWithPassword(flow, {
+        phone: "13900139000",
+        password: "not-the-password",
+      });
+      expect(wrongPassword.ok).toBe(false);
+      const loggedIn = await loginBuyerWithPassword(flow, {
+        phone: "13900139000",
+        password: "stored-password",
+      });
+      expect(loggedIn).toMatchObject({ ok: true, buyer: { id: buyerId } });
+      const consumed = await sql<{ open: string }[]>`
+        SELECT count(*) AS open
+        FROM registration_challenges
+        WHERE phone = '13900139000' AND invalidated_at IS NULL
+      `;
+      expect(consumed[0]?.open).toBe("0");
+    });
+  });
+
+  it("does not log in the loser of a registration unique-violation race", async () => {
+    await withIdentityDatabase(async (sql) => {
+      const sms = fakeSms();
+      const flow = registrationFlow(sql, 0, sms, openLimiter());
+      await requestBuyerSms(flow, { phone: "13700137000", captchaVerifyParam: "captcha-1" });
+      await checkBuyerSms(flow, { phone: "13700137000", code: sms.acceptCode });
+      const [first, second] = await Promise.all([
+        completeBuyerRegistration(flow, { phone: "13700137000", password: "buyer-password" }),
+        completeBuyerRegistration(flow, { phone: "13700137000", password: "buyer-password" }),
+      ]);
+      const successes = [first, second].filter((result) => result.ok);
+      expect(successes).toHaveLength(1);
+      for (const result of [first, second]) {
+        if (!result.ok) {
+          expect(registrationAccountSession(result)).toBeNull();
+          expect(result).not.toHaveProperty("buyerId");
+        }
+      }
+      const buyers = await sql<{ count: string }[]>`
+        SELECT count(*) FROM buyers WHERE phone = '13700137000'
+      `;
+      expect(buyers[0]?.count).toBe("1");
+    });
+  });
+
+  it("rejects a registration challenge once it reaches the 10 minute TTL", async () => {
+    await withIdentityDatabase(async (sql) => {
+      const sms = fakeSms();
+      const limiter = openLimiter();
+      const started = registrationFlow(sql, 0, sms, limiter);
+      await requestBuyerSms(started, { phone: "13600136000", captchaVerifyParam: "captcha-1" });
+      await checkBuyerSms(started, { phone: "13600136000", code: sms.acceptCode });
+      const expired = await completeBuyerRegistration(
+        registrationFlow(sql, registrationChallengeTtlMs, sms, limiter),
+        { phone: "13600136000", password: "buyer-password" },
+      );
+      expect(expired).toMatchObject({ ok: false, error: "captcha_required" });
+      expect(registrationAccountSession(expired)).toBeNull();
+      const buyers = await sql<{ count: string }[]>`SELECT count(*) FROM buyers`;
+      expect(buyers[0]?.count).toBe("0");
     });
   });
 });

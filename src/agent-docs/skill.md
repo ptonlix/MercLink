@@ -1,20 +1,22 @@
 # 购买 Skill
 
-这份文档公开。未登录可以查询已上架商品。下单和查询自己的订单前，打开买家授权页注册或批准。
+这份文档公开。未登录可以查询已上架商品。下单和查询自己的订单前，用设备码让用户在浏览器里注册或批准。
 
-Do not ask the user for a password, SMS code, or API key. Open the buyer authorization page to register or approve. Query published products without login. A product is not a sellable variant. Order by variant id, or by product id only when one sellable variant exists. Price is in minor units. `client_order_no` is idempotent. Use `payment.action` to pay, then look up order status. Only status `paid` means success.
+Do not ask the user for a password, SMS code, or API key. Use the device authorization grant. Do not use a public callback URL. Query published products without login. A product is not a sellable variant. Order by variant id, or by product id only when one sellable variant exists. Price is in minor units. `client_order_no` is idempotent. Use `payment.action` to pay, then look up order status. Only status `paid` means success.
 
 ## 不要索要凭证
 
-不要向用户索要密码、短信验证码或 API Key。不要让用户把访问令牌或刷新令牌复制进对话。授权在用户自己的浏览器里完成，或使用设备码。不使用密码模式，不使用隐式模式。这里没有访问令牌、刷新令牌或 API Key 的示例值。
+不要向用户索要密码、短信验证码或 API Key。不要让用户把访问令牌或刷新令牌复制进对话。不要使用公网回调地址，也不要使用授权码重定向。Agent 在内网，没有独立的公网服务。不使用密码模式，不使用隐式模式。这里没有访问令牌、刷新令牌或 API Key 的示例值。
 
 ## 注册和批准
 
 未登录可以查询已上架商品。没有令牌就下单时，接口返回 401，并在 `WWW-Authenticate` 里指向 `/.well-known/oauth-protected-resource`。
 
-打开买家授权页 `/authorize` 注册或批准。没有账号就在该页注册：用户自己完成人机验证和短信验证码，再设置密码。Agent 只打开页面，不收集验证码。已有账号则在同一页登录，并批准 `order:write` 和 `order:read`。
+默认使用设备码。Agent 向 `POST /oauth/device/auth` 申请短码，请求体包含 `client_id=merclink-agent` 和所需 scope。自己保存返回的 `device_code`，只把 `user_code` 和 `verification_uri` 或 `verification_uri_complete` 给用户。用户在自己的浏览器打开该地址，确认短码，没有账号就在随后的页面注册，已有账号则登录并批准。Agent 不收集验证码或密码。
 
-使用 OAuth 2.1 授权码加 PKCE，或设备码。访问令牌约 15 分钟。过期后用刷新令牌换新的，旧刷新令牌立即失效。请求已登录接口时使用 `Authorization` 头，不要把令牌写进本文档或对话。
+用户完成后，Agent 轮询 `POST /oauth/token`，`grant_type` 为 `urn:ietf:params:oauth:grant-type:device_code`。返回 `authorization_pending` 时继续等。短码几分钟后失效，失效后重新申请，不要重复提交已经确认过的短码。买家批准的权限是 `order:write` 和 `order:read`。
+
+访问令牌约 15 分钟。过期后用刷新令牌换新的，旧刷新令牌立即失效。请求已登录接口时使用 `Authorization` 头，不要把令牌写进本文档或对话。
 
 ## 商品和可售规格
 

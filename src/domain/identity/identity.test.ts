@@ -17,12 +17,15 @@ import {
   provisionAllowed,
 } from "./password";
 import { isLoginPhone, normalizePhone } from "./phone";
+import { deviceCodeTtlSeconds } from "../access/tokens";
 import {
   buyerPhoneOutcome,
   canSetPassword,
   captchaParamAccepted,
   emailCanLogin,
   recordWrongSmsCheck,
+  registrationChallengeExpired,
+  registrationChallengeTtlMs,
   smsDailyCap,
   smsMaxWrongChecks,
   smsMinIntervalMs,
@@ -161,11 +164,28 @@ describe("buyer registration rules", () => {
       wrongChecks: smsMaxWrongChecks,
       invalidated: true,
     });
-    expect(canSetPassword({ smsVerified: false, invalidated: false })).toMatchObject({
+    const now = new Date("2026-05-16T00:10:00.000Z");
+    const fresh = new Date(now.getTime() - 1_000);
+    expect(
+      canSetPassword({ smsVerified: false, invalidated: false, createdAt: fresh, now }),
+    ).toMatchObject({
       ok: false,
       error: "captcha_required",
     });
-    expect(canSetPassword({ smsVerified: true, invalidated: true })).toMatchObject({ ok: false });
-    expect(canSetPassword({ smsVerified: true, invalidated: false })).toEqual({ ok: true });
+    expect(
+      canSetPassword({ smsVerified: true, invalidated: true, createdAt: fresh, now }),
+    ).toMatchObject({ ok: false });
+    expect(
+      canSetPassword({ smsVerified: true, invalidated: false, createdAt: fresh, now }),
+    ).toEqual({
+      ok: true,
+    });
+    const expiredAt = new Date(now.getTime() - registrationChallengeTtlMs);
+    expect(
+      canSetPassword({ smsVerified: true, invalidated: false, createdAt: expiredAt, now }),
+    ).toMatchObject({ ok: false, error: "captcha_required" });
+    expect(registrationChallengeTtlMs).toBe(deviceCodeTtlSeconds * 1000);
+    expect(registrationChallengeExpired(fresh, now)).toBe(false);
+    expect(registrationChallengeExpired(expiredAt, now)).toBe(true);
   });
 });

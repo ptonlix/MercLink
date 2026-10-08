@@ -1,5 +1,6 @@
 import { getAccessProvider } from "../../../../app-services/access/runtime";
 import { approveAgent } from "../../../../app-services/access/grants";
+import { missingInteraction } from "../../../../app-services/access/provider";
 import {
   changeMerchantPassword,
   loginMerchant,
@@ -82,15 +83,24 @@ export async function POST(request: Request): Promise<Response> {
       return redirectTo(`/authorize/merchant?notice=${encodeURIComponent(allowed.message)}`);
     }
     const provider = await getAccessProvider();
-    const approved = await approveAgent({
-      provider,
-      sql: runtime.sql,
-      cookieHeader: request.headers.get("cookie") ?? "",
-      page: "merchant",
-      ownerType: "merchant",
-      ownerId: merchant.id,
-    });
-    return redirectTo(approved.returnTo);
+    try {
+      const approved = await approveAgent({
+        provider,
+        sql: runtime.sql,
+        cookieHeader: request.headers.get("cookie") ?? "",
+        page: "merchant",
+        ownerType: "merchant",
+        ownerId: merchant.id,
+      });
+      return redirectTo(approved.returnTo);
+    } catch (error: unknown) {
+      if (!missingInteraction(error)) {
+        throw error;
+      }
+      return redirectTo(
+        `/authorize/merchant?notice=${encodeURIComponent("当前没有待批准的授权请求。请从 Agent 重新发起授权。")}`,
+      );
+    }
   }
 
   return redirectTo("/authorize/merchant");

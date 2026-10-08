@@ -4,49 +4,64 @@ import { BuyerCaptcha } from "./buyer-captcha";
 export function MerchantAuthorizeView(props: {
   notice: string | null;
   mustChangePassword: boolean;
+  account?: { name: string; phone: string } | null;
 }): ReactNode {
+  const account = props.account ?? null;
   return (
     <main className="sheet">
       <p className="kicker">MercLink</p>
-      <h1>商家登录</h1>
+      <h1>{account === null ? "商家登录" : "批准 Agent"}</h1>
       <p className="lede">已开通的商家在这里登录并批准 Agent。没有账号时，请联系管理员开通。</p>
       {props.notice === null ? null : <p className="notice">{props.notice}</p>}
-      <form action="/authorize/merchant/submit" method="post" className="stack">
-        <label>
-          手机号
-          <input name="phone" inputMode="numeric" autoComplete="username" required />
-        </label>
-        <label>
-          密码
-          <input name="password" type="password" autoComplete="current-password" required />
-        </label>
-        <button type="submit">登录</button>
-      </form>
-      {props.mustChangePassword ? (
+      {account === null ? (
         <form action="/authorize/merchant/submit" method="post" className="stack">
-          <input type="hidden" name="intent" value="change-password" />
           <label>
-            当前密码
-            <input name="currentPassword" type="password" required />
+            手机号
+            <input name="phone" inputMode="numeric" autoComplete="username" required />
           </label>
           <label>
-            新密码
-            <input name="nextPassword" type="password" required />
+            密码
+            <input name="password" type="password" autoComplete="current-password" required />
           </label>
-          <button type="submit">修改密码</button>
+          <button type="submit">登录</button>
         </form>
-      ) : null}
-      <form action="/authorize/merchant/submit" method="post">
-        <input type="hidden" name="intent" value="approve" />
-        <button type="submit">批准</button>
-      </form>
+      ) : (
+        <>
+          <p>
+            当前登录 {account.name} {account.phone}
+          </p>
+          {props.mustChangePassword ? (
+            <form action="/authorize/merchant/submit" method="post" className="stack">
+              <input type="hidden" name="intent" value="change-password" />
+              <label>
+                当前密码
+                <input name="currentPassword" type="password" required />
+              </label>
+              <label>
+                新密码
+                <input name="nextPassword" type="password" required />
+              </label>
+              <button type="submit">修改密码</button>
+            </form>
+          ) : null}
+          <form action="/authorize/merchant/submit" method="post">
+            <input type="hidden" name="intent" value="approve" />
+            <button type="submit">批准</button>
+          </form>
+        </>
+      )}
     </main>
   );
 }
 
+export type BuyerAuthorizeStep = "phone" | "code" | "password" | "approve";
+
 export function BuyerAuthorizeView(props: {
   notice: string | null;
+  step: BuyerAuthorizeStep;
   mode: "login" | "register";
+  phone: string;
+  pendingApproval?: boolean;
   captchaPrefix: string;
   captchaSceneId: string;
   devStubs?: boolean;
@@ -56,78 +71,129 @@ export function BuyerAuthorizeView(props: {
   return (
     <main className="sheet">
       <p className="kicker">MercLink</p>
-      <h1>{props.mode === "register" ? "买家注册" : "买家登录"}</h1>
-      <p className="lede">用手机号完成人机验证和短信核验。邮箱不是登录标识。</p>
+      <h1>{buyerHeading(props.step, props.mode)}</h1>
+      <p className="lede">
+        {buyerLede(props.step, props.mode, props.phone, props.pendingApproval === true)}
+      </p>
       {props.notice === null ? null : <p className="notice">{props.notice}</p>}
-      <form action="/authorize/buyer/submit" method="post" className="stack">
-        <input type="hidden" name="intent" value="sms" />
-        <label>
-          手机号
-          <input name="phone" inputMode="numeric" autoComplete="username" required />
-        </label>
-        {devStubs ? (
-          <input type="hidden" name="captchaVerifyParam" value={props.captchaToken ?? ""} />
-        ) : (
-          <BuyerCaptcha prefix={props.captchaPrefix} sceneId={props.captchaSceneId} />
-        )}
-        <p className="hint">
-          {devStubs
-            ? "本地开发不会发送短信。验证码填写 123456。"
-            : "完成图形人机验证后再发送短信。验证参数由验证码组件回填，不要手改。"}
-        </p>
-        <button id="captcha-send" type="submit" disabled={devStubs ? undefined : true}>
-          发送验证码
-        </button>
-      </form>
-      <form action="/authorize/buyer/submit" method="post" className="stack">
-        <input type="hidden" name="intent" value="check" />
-        <label>
-          手机号
-          <input name="phone" inputMode="numeric" required />
-        </label>
-        <label>
-          短信验证码
-          <input name="code" inputMode="numeric" required />
-        </label>
-        <button type="submit">核验短信</button>
-      </form>
-      {props.mode === "register" ? (
+      {props.step === "approve" ? (
+        <>
+          {props.pendingApproval === true ? (
+            <form action="/authorize/buyer/submit" method="post" className="stack">
+              <input type="hidden" name="intent" value="approve" />
+              <button type="submit">批准</button>
+            </form>
+          ) : null}
+          <form action="/authorize/buyer/submit" method="post">
+            <input type="hidden" name="intent" value="logout" />
+            <button type="submit">退出登录</button>
+          </form>
+        </>
+      ) : null}
+      {props.step === "phone" ? (
         <form action="/authorize/buyer/submit" method="post" className="stack">
-          <input type="hidden" name="intent" value="register" />
+          <input type="hidden" name="intent" value="sms" />
           <label>
             手机号
-            <input name="phone" inputMode="numeric" required />
+            <input name="phone" inputMode="numeric" autoComplete="username" required />
           </label>
-          <label>
-            密码
-            <input name="password" type="password" autoComplete="new-password" required />
-          </label>
-          <label>
-            邮箱（可选）
-            <input name="email" type="email" autoComplete="email" />
-          </label>
-          <button type="submit">设置密码</button>
+          {devStubs ? (
+            <input type="hidden" name="captchaVerifyParam" value={props.captchaToken ?? ""} />
+          ) : (
+            <BuyerCaptcha prefix={props.captchaPrefix} sceneId={props.captchaSceneId} />
+          )}
+          <p className="hint">
+            {devStubs
+              ? "本地开发不会发送短信。验证码填写 123456。"
+              : "完成图形人机验证后再发送短信。验证参数由验证码组件回填，不要手改。"}
+          </p>
+          <button id="captcha-send" type="submit" disabled={devStubs ? undefined : true}>
+            发送验证码
+          </button>
         </form>
-      ) : (
+      ) : null}
+      {props.step === "code" ? (
         <form action="/authorize/buyer/submit" method="post" className="stack">
-          <input type="hidden" name="intent" value="password" />
+          <input type="hidden" name="intent" value="check" />
+          <input type="hidden" name="phone" value={props.phone} />
           <label>
-            手机号
-            <input name="phone" inputMode="numeric" required />
+            短信验证码
+            <input name="code" inputMode="numeric" autoComplete="one-time-code" required />
           </label>
+          <button type="submit">核验短信</button>
+          <a className="back" href="/authorize/buyer">
+            换个手机号
+          </a>
+        </form>
+      ) : null}
+      {props.step === "password" ? (
+        <form action="/authorize/buyer/submit" method="post" className="stack">
+          <input
+            type="hidden"
+            name="intent"
+            value={props.mode === "register" ? "register" : "password"}
+          />
+          <input type="hidden" name="phone" value={props.phone} />
           <label>
             密码
-            <input name="password" type="password" autoComplete="current-password" required />
+            <input
+              name="password"
+              type="password"
+              autoComplete={props.mode === "register" ? "new-password" : "current-password"}
+              required
+            />
           </label>
-          <button type="submit">登录</button>
+          {props.mode === "register" ? (
+            <label>
+              邮箱（可选）
+              <input name="email" type="email" autoComplete="email" />
+            </label>
+          ) : null}
+          <button type="submit">{props.mode === "register" ? "设置密码并登录" : "登录"}</button>
+          <a className="back" href="/authorize/buyer">
+            换个手机号
+          </a>
         </form>
-      )}
-      <form action="/authorize/buyer/submit" method="post">
-        <input type="hidden" name="intent" value="approve" />
-        <button type="submit">批准</button>
-      </form>
+      ) : null}
     </main>
   );
+}
+
+function buyerHeading(step: BuyerAuthorizeStep, mode: "login" | "register"): string {
+  if (step === "approve") {
+    return "批准 Agent";
+  }
+  if (step === "code") {
+    return "填写验证码";
+  }
+  if (step === "password") {
+    return mode === "register" ? "设置登录密码" : "输入密码";
+  }
+  return "买家登录";
+}
+
+function buyerLede(
+  step: BuyerAuthorizeStep,
+  mode: "login" | "register",
+  phone: string,
+  pendingApproval: boolean,
+): string {
+  if (step === "approve") {
+    const who = `当前登录 ${phone}。`;
+    return pendingApproval
+      ? `${who}确认后，这个 Agent 可以代表你访问已授权的范围。`
+      : `${who}当前没有待批准的授权请求。请从 Agent 重新发起授权后再批准。`;
+  }
+  if (step === "code") {
+    return `验证码将核验 ${phone}。未注册过的手机号会在下一步创建账号。`;
+  }
+  if (step === "password" && mode === "register") {
+    return `首次登录会为 ${phone} 创建账号。邮箱不是登录标识。`;
+  }
+  if (step === "password") {
+    return `${phone} 已注册。输入密码后即可批准。`;
+  }
+  return "未注册过的手机号，首次登录即注册。邮箱不是登录标识。";
 }
 
 export function AccountKeyView(props: {

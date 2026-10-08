@@ -48,6 +48,11 @@ h1 {
   font-size: 0.92rem;
 }
 
+.back {
+  width: fit-content;
+  color: #1f6c9f;
+}
+
 .stack {
   display: flex;
   flex-direction: column;

@@ -14,12 +14,14 @@ export async function dispatchOidc(provider: Provider, request: Request): Promis
       ? Buffer.alloc(0)
       : Buffer.from(await request.arrayBuffer());
   const socket = new Socket();
+  Object.assign(socket, { encrypted: url.protocol === "https:" });
   const req = new IncomingMessage(socket);
   req.method = request.method;
   req.url = `${pathname}${url.search}`;
   req.headers = Object.fromEntries(request.headers.entries());
   req.headers.host = url.host;
-  Object.assign(req, { originalUrl, socket: { encrypted: url.protocol === "https:" } });
+  req.headers["content-length"] = String(body.length);
+  Object.assign(req, { originalUrl, socket });
   if (body.length > 0) {
     req.push(body);
   }

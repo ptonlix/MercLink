@@ -75,15 +75,28 @@ export function formValue(form: FormData, name: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+export function appBaseUsesHttps(appBaseUrl: string | undefined): boolean {
+  if (appBaseUrl === undefined || appBaseUrl.trim() === "") {
+    return false;
+  }
+  try {
+    return new URL(appBaseUrl).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function redirectTo(
   path: string,
-  cookie?: { name: string; value: string; path: string },
+  cookie?: { name: string; value: string; path: string; clear?: boolean },
 ): Response {
   const headers = new Headers({ location: path });
   if (cookie !== undefined) {
+    const secure = appBaseUsesHttps(process.env.APP_BASE_URL) ? "; Secure" : "";
+    const maxAge = cookie.clear === true ? "; Max-Age=0" : "";
     headers.append(
       "set-cookie",
-      `${cookie.name}=${encodeURIComponent(cookie.value)}; Path=${cookie.path}; HttpOnly; SameSite=Lax`,
+      `${cookie.name}=${encodeURIComponent(cookie.value)}; Path=${cookie.path}; HttpOnly; SameSite=Lax${maxAge}${secure}`,
     );
   }
   return new Response(null, { status: 303, headers });

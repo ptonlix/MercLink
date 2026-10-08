@@ -21,6 +21,10 @@ declare module "oidc-provider" {
         consent: { grantId: string };
       },
     ): Promise<string>;
+    interactionDetails(
+      req: object,
+      res: object,
+    ): Promise<{ params?: { scope?: unknown } }>;
     Grant: {
       new (input: { accountId: string; clientId: string }): {
         addOIDCScope(scope: string): void;

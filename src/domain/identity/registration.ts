@@ -2,6 +2,7 @@ export const smsMinIntervalMs = 60_000;
 export const smsWindowMs = 24 * 60 * 60 * 1000;
 export const smsDailyCap = 10;
 export const smsMaxWrongChecks = 5;
+export const registrationChallengeTtlMs = 10 * 60 * 1000;
 export const smsSendPolicyNames = {
   interval: "sms-send:60s",
   daily: "sms-send:24h",
@@ -60,11 +61,21 @@ export function recordWrongSmsCheck(currentWrongChecks: number): {
   return { wrongChecks, invalidated: wrongChecks >= smsMaxWrongChecks };
 }
 
+export function registrationChallengeExpired(createdAt: Date, now: Date): boolean {
+  return now.getTime() - createdAt.getTime() >= registrationChallengeTtlMs;
+}
+
 export function canSetPassword(input: {
   smsVerified: boolean;
   invalidated: boolean;
+  createdAt: Date;
+  now: Date;
 }): RegistrationDecision {
-  if (input.invalidated || !input.smsVerified) {
+  if (
+    input.invalidated ||
+    !input.smsVerified ||
+    registrationChallengeExpired(input.createdAt, input.now)
+  ) {
     return { ok: false, error: "captcha_required", message: "请重新完成验证。" };
   }
   return { ok: true };

@@ -13,7 +13,7 @@ import {
   registerAuthenticator,
   type AuthenticateResult,
 } from "../../shared/seams/authenticate";
-import { buyerActor, merchantActor, scriptActor, type Actor } from "../../shared/actor";
+import { buyerActor, isScope, merchantActor, scriptActor, type Actor } from "../../shared/actor";
 import { findApiKeyBySecret } from "./keys";
 import { parseAccountId } from "./grants";
 
@@ -46,7 +46,7 @@ function createRequestAuthenticator(sql: Sql, provider: Provider) {
     if (!(await grantActive(sql, access.grantId, account.ownerType, account.ownerId))) {
       return { ok: false, response: apiError("unauthorized", "令牌已撤销。", 401) };
     }
-    const scopes = (access.scope ?? "").split(" ").filter((scope) => scope.length > 0);
+    const scopes = (access.scope ?? "").split(" ").filter((scope) => isScope(scope));
     const actor: Actor =
       account.ownerType === "merchant"
         ? merchantActor({ merchantId: account.ownerId, grantId: access.grantId, scopes })

@@ -29,6 +29,7 @@ export default async function MerchantAuthorizePage({
     <MerchantAuthorizeView
       notice={params.notice ?? null}
       mustChangePassword={merchant?.mustChangePassword ?? false}
+      account={merchant === null ? null : { name: merchant.name, phone: merchant.phone }}
     />
   );
 }

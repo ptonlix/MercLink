@@ -4,6 +4,7 @@ import {
   canSetPassword,
   captchaParamAccepted,
   recordWrongSmsCheck,
+  registrationChallengeExpired,
   smsSendLimited,
   smsSendPolicyNames,
 } from "../../domain/identity/registration";
@@ -26,6 +27,16 @@ export type BuyerRecord = {
 };
 
 const smsUnavailable = "短信服务暂不可用。";
+export const existingBuyerMustLogin = "该手机号已注册，请使用密码登录。";
+
+export function registrationAccountSession(
+  result: { ok: true; buyerId: string; created: boolean } | Failure,
+): string | null {
+  if (!result.ok || !result.created) {
+    return null;
+  }
+  return result.buyerId;
+}
 
 export type BuyerFlow = {
   sql: Sql;
@@ -83,8 +94,8 @@ export async function requestBuyerSms(
     return failure(503, "dependency_unavailable", sent.message);
   }
   await flow.sql`
-    INSERT INTO registration_challenges (id, phone, captcha_hash)
-    VALUES (${createPublicId("challenge")}, ${phone}, ${captchaHash})
+    INSERT INTO registration_challenges (id, phone, captcha_hash, created_at)
+    VALUES (${createPublicId("challenge")}, ${phone}, ${captchaHash}, ${flow.clock.now()})
   `;
   const existing = await findActiveBuyerByPhone(flow.sql, phone);
   return { ok: true, mode: beginBuyerPhone(existing !== null) };
@@ -96,7 +107,11 @@ export async function checkBuyerSms(
 ): Promise<{ ok: true; mode: "login" | "register" } | Failure> {
   const phone = normalizePhone(input.phone);
   const challenge = await latestChallenge(flow.sql, phone);
-  if (challenge === null || challenge.invalidatedAt !== null) {
+  if (
+    challenge === null ||
+    challenge.invalidatedAt !== null ||
+    registrationChallengeExpired(challenge.createdAt, flow.clock.now())
+  ) {
     return failure(400, "captcha_required", "请重新完成验证。");
   }
   const checked = await flow.sms.checkCode({ phone, code: input.code });
@@ -134,17 +149,19 @@ export async function completeBuyerRegistration(
   const ready = canSetPassword({
     smsVerified: challenge.smsVerifiedAt !== null,
     invalidated: challenge.invalidatedAt !== null,
+    createdAt: challenge.createdAt,
+    now: flow.clock.now(),
   });
   if (!ready.ok) {
     return failure(400, ready.error, ready.message);
   }
+  const existing = await findActiveBuyerByPhone(flow.sql, phone);
+  if (existing !== null) {
+    return failure(409, "conflict", existingBuyerMustLogin);
+  }
   const passwordDecision = nextPasswordAccepted(input.password);
   if (!passwordDecision.ok) {
     return failure(400, passwordDecision.error, passwordDecision.message);
-  }
-  const existing = await findActiveBuyerByPhone(flow.sql, phone);
-  if (existing !== null) {
-    return { ok: true, buyerId: existing.id, created: false, mode: "login" };
   }
   const passwordHash = await hashPassword(input.password);
   if (!passwordIsHashed(passwordHash, input.password)) {
@@ -152,19 +169,24 @@ export async function completeBuyerRegistration(
   }
   const email = input.email?.trim() ?? "";
   const buyerId = createPublicId("buyer");
+  const now = flow.clock.now();
   try {
-    await flow.sql`
-      INSERT INTO buyers (id, phone, email, password_hash, phone_verified_at)
-      VALUES (
-        ${buyerId}, ${phone}, ${email.length > 0 ? email : null}, ${passwordHash}, ${flow.clock.now()}
-      )
-    `;
+    await flow.sql.begin(async (tx) => {
+      await tx`
+        INSERT INTO buyers (id, phone, email, password_hash, phone_verified_at)
+        VALUES (
+          ${buyerId}, ${phone}, ${email.length > 0 ? email : null}, ${passwordHash}, ${now}
+        )
+      `;
+      await tx`
+        UPDATE registration_challenges
+        SET invalidated_at = ${now}
+        WHERE phone = ${phone} AND invalidated_at IS NULL
+      `;
+    });
   } catch (error: unknown) {
     if (isUniqueViolation(error)) {
-      const raced = await findActiveBuyerByPhone(flow.sql, phone);
-      if (raced !== null) {
-        return { ok: true, buyerId: raced.id, created: false, mode: "login" };
-      }
+      return failure(409, "conflict", existingBuyerMustLogin);
     }
     throw error;
   }
@@ -195,11 +217,38 @@ export async function loginBuyerWithPassword(
   if (!matches) {
     return failure(401, "unauthorized", "手机号或密码不正确。");
   }
+  await consumeChallenges(flow.sql, buyer.phone, flow.clock.now());
   return { ok: true, buyer };
 }
 
 export function findBuyerByEmail(): Promise<null> {
   return Promise.resolve(null);
+}
+
+export function safeBuyerPhone(value: string | undefined): string {
+  if (value === undefined) {
+    return "";
+  }
+  const phone = normalizePhone(value);
+  return isLoginPhone(phone) ? phone : "";
+}
+
+export async function findBuyerById(sql: Sql, buyerId: string): Promise<BuyerRecord | null> {
+  const rows = await sql<BuyerRecord[]>`
+    SELECT id, phone, email, password_hash AS "passwordHash"
+    FROM buyers
+    WHERE id = ${buyerId} AND deleted_at IS NULL
+    LIMIT 1
+  `;
+  return rows[0] ?? null;
+}
+
+async function consumeChallenges(sql: Sql, phone: string, now: Date): Promise<void> {
+  await sql`
+    UPDATE registration_challenges
+    SET invalidated_at = ${now}
+    WHERE phone = ${normalizePhone(phone)} AND invalidated_at IS NULL
+  `;
 }
 
 async function findActiveBuyerByPhone(sql: Sql, phone: string): Promise<BuyerRecord | null> {
@@ -217,12 +266,13 @@ type ChallengeRow = {
   wrongChecks: number;
   smsVerifiedAt: Date | null;
   invalidatedAt: Date | null;
+  createdAt: Date;
 };
 
 async function latestChallenge(sql: Sql, phone: string): Promise<ChallengeRow | null> {
   const rows = await sql<ChallengeRow[]>`
     SELECT id, wrong_checks AS "wrongChecks", sms_verified_at AS "smsVerifiedAt",
-           invalidated_at AS "invalidatedAt"
+           invalidated_at AS "invalidatedAt", created_at AS "createdAt"
     FROM registration_challenges
     WHERE phone = ${phone}
     ORDER BY created_at DESC

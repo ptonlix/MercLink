@@ -58,7 +58,7 @@ Agent 不直连数据库、Redis、对象存储，也不直连支付宝或阿里
 | 领域代码 | `src/domain` 纯 TypeScript                                  | 不依赖 Next.js。规则可以用单元测试直接跑                                                                                        |
 | 数据库   | PostgreSQL 18，当前小版本 18.6                              | 18 是现在最新的正式大版本。19 仍是 Beta，不用于生产。小版本跟到当前 18.x                                                        |
 | 数据访问 | Drizzle                                                     | 部分唯一索引、JSON 和显式事务比 ORM 魔法更清楚                                                                                  |
-| 授权服务 | `node-oidc-provider`                                        | OAuth 2.1、PKCE、设备码、刷新令牌轮换已经实现。不自己写授权协议                                                                 |
+| 授权服务 | `node-oidc-provider`                                        | Agent 默认走设备码。授权码回调只留在测试里。刷新令牌轮换已经实现。不自己写授权协议                                             |
 | 密码     | Argon2id                                                    | 超级管理员、商家、买家密码都只存哈希                                                                                            |
 | 校验     | Zod                                                         | 接口入参和字段值共用同一套解析                                                                                                  |
 | 类型检查 | TypeScript `strict`，并用 `tsc --noEmit`                    | 类型错误不能只靠编辑器发现                                                                                                      |

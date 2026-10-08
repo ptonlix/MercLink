@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -15,12 +15,9 @@ import { POST as placeOrderRoute } from "../../src/app/api/v1/orders/route";
 import { GET as publicProductsRoute } from "../../src/app/api/v1/products/route";
 import { MerchantAuthorizeView } from "../../src/app/authorize/views";
 import { registerSlices } from "../../src/composition/register-all";
-import { approveAgent, revokeGrant } from "../../src/app-services/access/grants";
-import {
-  agentClientId,
-  agentRedirectUri,
-  startAuthorizationServer,
-} from "../../src/app-services/access/provider";
+import { revokeGrant } from "../../src/app-services/access/grants";
+import { issueDeviceTokens } from "../support/device-tokens";
+import { agentClientId, startAuthorizationServer } from "../../src/app-services/access/provider";
 import { bindCatalogSql } from "../../src/app-services/catalog/http";
 import { registerCatalog } from "../../src/app-services/catalog/register";
 import { createCatalog, listCatalogs } from "../../src/app-services/catalog/catalogs";
@@ -575,56 +572,22 @@ async function withAcceptance<T>(
   }
 }
 
-async function issueTokens(
+function issueTokens(
   started: Awaited<ReturnType<typeof startAuthorizationServer>>,
   sql: postgres.Sql,
   ownerId: string,
   ownerType: "merchant" | "buyer",
 ): Promise<{ access_token: string; refresh_token: string; grantId: string }> {
-  const verifier = randomBytes(32).toString("base64url");
-  const challenge = createHash("sha256").update(verifier).digest("base64url");
   const scope =
     ownerType === "merchant" ? "product:write product:read order:read" : "order:write order:read";
-  const redirect = encodeURIComponent(agentRedirectUri);
-  const auth = await fetch(
-    `${started.origin}/oauth/auth?client_id=${agentClientId}&response_type=code&redirect_uri=${redirect}&scope=${encodeURIComponent(scope)}&code_challenge=${challenge}&code_challenge_method=S256&state=xyz`,
-    { redirect: "manual" },
-  );
-  const cookieHeader = auth.headers
-    .getSetCookie()
-    .map((cookie) => cookie.split(";")[0] ?? "")
-    .join("; ");
-  const approved = await approveAgent({
+  return issueDeviceTokens({
+    origin: started.origin,
     provider: started.provider,
     sql,
-    cookieHeader,
-    page: ownerType,
-    ownerType,
     ownerId,
+    ownerType,
+    scope,
   });
-  const resumed = await fetch(approved.returnTo, {
-    redirect: "manual",
-    headers: { cookie: cookieHeader },
-  });
-  const code = new URL(resumed.headers.get("location") ?? agentRedirectUri).searchParams.get(
-    "code",
-  );
-  const tokenResponse = await fetch(`${started.origin}/oauth/token`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: agentClientId,
-      code: code ?? "",
-      redirect_uri: agentRedirectUri,
-      code_verifier: verifier,
-    }),
-  });
-  const tokens = (await tokenResponse.json()) as {
-    access_token: string;
-    refresh_token: string;
-  };
-  return { ...tokens, grantId: approved.grantId };
 }
 
 async function refresh(

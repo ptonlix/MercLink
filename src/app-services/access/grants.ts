@@ -2,10 +2,22 @@ import Provider from "oidc-provider";
 import type { Sql } from "../../db/client";
 import { fixedApprovalScopes, type AuthorizationPage } from "../../domain/access/scopes";
 import { tokenHash } from "../../domain/access/tokens";
-import { agentClientId, finishInteraction } from "./provider";
+import { agentClientId, finishInteraction, requestedInteractionScopes } from "./provider";
+
+const protocolScopes = new Set(["openid", "offline_access"]);
 
 function accountIdFor(ownerType: "merchant" | "buyer", ownerId: string): string {
   return `${ownerType}:${ownerId}`;
+}
+
+function approvalScopes(page: AuthorizationPage, requested: readonly string[]): string[] {
+  const granted = new Set<string>(fixedApprovalScopes(page));
+  for (const scope of requested) {
+    if (protocolScopes.has(scope)) {
+      granted.add(scope);
+    }
+  }
+  return [...granted];
 }
 
 export function parseAccountId(
@@ -32,7 +44,11 @@ export async function approveAgent(input: {
   ownerId: string;
   clientName?: string;
 }): Promise<{ grantId: string; returnTo: string; scopes: readonly string[] }> {
-  const scopes = fixedApprovalScopes(input.page);
+  const requested = await requestedInteractionScopes({
+    provider: input.provider,
+    cookieHeader: input.cookieHeader,
+  });
+  const scopes = approvalScopes(input.page, requested);
   const accountId = accountIdFor(input.ownerType, input.ownerId);
   const grant = new input.provider.Grant({ accountId, clientId: agentClientId });
   grant.addOIDCScope(scopes.join(" "));

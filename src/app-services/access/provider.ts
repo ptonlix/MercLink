@@ -11,7 +11,6 @@ import {
 import { createOidcAdapter } from "./adapter";
 
 export const agentClientId = "merclink-agent";
-export const agentRedirectUri = "https://agent.example/callback";
 
 const providerScopes = [
   "openid",
@@ -40,13 +39,9 @@ export async function createAccessProvider(input: {
       {
         client_id: agentClientId,
         token_endpoint_auth_method: "none",
-        grant_types: [
-          "authorization_code",
-          "refresh_token",
-          "urn:ietf:params:oauth:grant-type:device_code",
-        ],
-        response_types: ["code"],
-        redirect_uris: [agentRedirectUri],
+        grant_types: ["refresh_token", "urn:ietf:params:oauth:grant-type:device_code"],
+        response_types: [],
+        redirect_uris: [],
         scope: providerScopes.join(" "),
       },
     ],
@@ -71,6 +66,33 @@ export async function createAccessProvider(input: {
         enabled: true,
         charset: "base-20",
         mask: "****-****",
+        successSource(ctx: { body?: string }) {
+          ctx.body = deviceApprovalSuccessPage();
+          return Promise.resolve();
+        },
+        userCodeInputSource(
+          ctx: { body?: string },
+          form: string,
+          _out: unknown,
+          err?: { userCode?: string; name?: string },
+        ) {
+          ctx.body = devicePromptPage("输入设备码", deviceCodeMessage(err), form);
+          return Promise.resolve();
+        },
+        userCodeConfirmSource(
+          ctx: { body?: string },
+          form: string,
+          _client: unknown,
+          _info: unknown,
+          userCode: string,
+        ) {
+          ctx.body = devicePromptPage(
+            "确认设备码",
+            `请确认短码 ${userCode}。确认后继续登录或注册，并批准这次授权。`,
+            form,
+          );
+          return Promise.resolve();
+        },
       },
     },
     ttl: {
@@ -172,18 +194,50 @@ function listenOrigin(server: Server): string {
   return `http://127.0.0.1:${address.port}`;
 }
 
+export async function requestedInteractionScopes(input: {
+  provider: Provider;
+  cookieHeader: string;
+}): Promise<readonly string[]> {
+  const details = await input.provider.interactionDetails(
+    interactionRequest(input.cookieHeader),
+    interactionResponse(),
+  );
+  const scope = details.params?.scope;
+  return typeof scope === "string" ? scope.split(" ").filter((item) => item.length > 0) : [];
+}
+
 export async function finishInteraction(input: {
   provider: Provider;
   cookieHeader: string;
   result: { login: { accountId: string }; consent: { grantId: string } };
 }): Promise<string> {
-  const req = {
-    headers: { cookie: input.cookieHeader },
+  return input.provider.interactionResult(
+    interactionRequest(input.cookieHeader),
+    interactionResponse(),
+    input.result,
+  );
+}
+
+function interactionRequest(cookieHeader: string): {
+  headers: { cookie: string };
+  method: "GET";
+  url: "/authorize/finish";
+  socket: { encrypted: false };
+} {
+  return {
+    headers: { cookie: cookieHeader },
     method: "GET",
     url: "/authorize/finish",
     socket: { encrypted: false },
   };
-  const res = {
+}
+
+function interactionResponse(): {
+  setHeader: () => undefined;
+  getHeader: () => undefined;
+  end: () => undefined;
+} {
+  return {
     setHeader() {
       return undefined;
     },
@@ -194,21 +248,77 @@ export async function finishInteraction(input: {
       return undefined;
     },
   };
-  return input.provider.interactionResult(req, res, input.result);
 }
 
-async function loadSigningJwk(sql: Sql): Promise<Record<string, unknown>> {
-  const rows = await sql<{ jwk: Record<string, unknown> }[]>`
-    SELECT jwk FROM oauth_signing_keys ORDER BY created_at LIMIT 1
-  `;
-  const existing = rows[0]?.jwk;
+function deviceCodeMessage(err: { userCode?: string; name?: string } | undefined): string {
+  if (err === undefined) {
+    return "输入 Agent 显示的短码。短码几分钟后失效。";
+  }
+  if (err.name === "AbortedError") {
+    return "这次授权已取消。";
+  }
+  if (err.userCode !== undefined || err.name === "NoCodeError") {
+    return "短码不正确、已过期，或已经提交过。请向 Agent 重新要一个短码，不要重复提交。";
+  }
+  return "处理失败，请向 Agent 重新要一个短码。";
+}
+
+export function devicePromptPage(title: string, message: string, form: string): string {
+  const safeTitle = escapeHtml(title);
+  const safeMessage = escapeHtml(message);
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${safeTitle}</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f7f6f3;color:#2f3437;font-family:"Avenir Next","PingFang SC","Noto Sans SC",sans-serif}.sheet{width:min(28rem,calc(100% - 2rem))}h1{margin:.2rem 0 .8rem;font-size:2rem;font-weight:500}form,button{margin-top:1rem}</style></head><body><main class="sheet"><p>MercLink</p><h1>${safeTitle}</h1><p>${safeMessage}</p>${form}</main></body></html>`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function deviceApprovalSuccessPage(): string {
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>批准成功</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:rgba(47,52,55,.45);color:#2f3437;font-family:"Avenir Next","PingFang SC","Noto Sans SC",sans-serif}.dialog{width:min(28rem,calc(100% - 2rem));background:#f7f6f3;border-radius:8px;padding:2rem 1.5rem}h1{margin:.2rem 0 .8rem;font-size:2rem;font-weight:500}p{margin:.4rem 0;line-height:1.6}</style></head><body><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="approved-title"><p>MercLink</p><h1 id="approved-title">批准成功</h1><p>Agent 可以继续获取访问令牌。你可以关闭这个页面。</p></div></body></html>`;
+}
+
+export function missingInteraction(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "SessionNotFound"
+  );
+}
+
+export async function loadSigningJwk(sql: Sql): Promise<Record<string, unknown>> {
+  const existing = await readSigningJwk(sql);
   if (existing !== undefined) {
     return existing;
   }
-  const jwk = createSigningJwk();
-  const kid = typeof jwk.kid === "string" ? jwk.kid : randomBytes(8).toString("hex");
-  await sql`INSERT INTO oauth_signing_keys (kid, jwk) VALUES (${kid}, ${sql.json(JSON.parse(JSON.stringify(jwk)) as Record<string, string>)})`;
-  return jwk;
+  const generated = createSigningJwk();
+  const kid = typeof generated.kid === "string" ? generated.kid : randomBytes(8).toString("hex");
+  const payload = JSON.parse(JSON.stringify(generated)) as Record<string, string>;
+  await sql.begin(async (tx) => {
+    await tx`LOCK TABLE oauth_signing_keys IN SHARE ROW EXCLUSIVE MODE`;
+    await tx`
+      INSERT INTO oauth_signing_keys (kid, jwk)
+      SELECT ${kid}, ${tx.json(payload)}
+      WHERE NOT EXISTS (SELECT 1 FROM oauth_signing_keys)
+    `;
+  });
+  const stored = await readSigningJwk(sql);
+  if (stored === undefined) {
+    throw new Error("oauth signing key was not stored");
+  }
+  return stored;
+}
+
+async function readSigningJwk(sql: Sql): Promise<Record<string, unknown> | undefined> {
+  const rows = await sql<{ jwk: Record<string, unknown> }[]>`
+    SELECT jwk FROM oauth_signing_keys ORDER BY created_at, kid LIMIT 1
+  `;
+  return rows[0]?.jwk;
 }
 
 function createSigningJwk(): Record<string, unknown> {

@@ -1,4 +1,3 @@
-import { createHash, randomBytes } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { withIdentityDatabase } from "../identity/database";
 import { changeAdminPassword, ensureSuperAdmin } from "../identity/admin";
@@ -17,7 +16,8 @@ import {
 } from "./grants";
 import { createApiKey, revokeApiKey } from "./keys";
 import { protectedResourceMetadata } from "./metadata";
-import { agentClientId, agentRedirectUri, startAuthorizationServer } from "./provider";
+import { issueDeviceTokens } from "../../../tests/support/device-tokens";
+import { agentClientId, startAuthorizationServer } from "./provider";
 import { tokenHash } from "../../domain/access/tokens";
 import { dispatchOidc } from "./dispatch";
 
@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 describe("oauth 2.1", () => {
-  it("rejects authorization code without PKCE and does not offer the password grant", async () => {
+  it("does not offer authorization-code, password, or implicit grants", async () => {
     await withIdentityDatabase(async (sql) => {
       const started = await startAuthorizationServer({
         sql,
@@ -35,33 +35,41 @@ describe("oauth 2.1", () => {
         accounts: { isActive: () => Promise.resolve(true) },
       });
       try {
-        const redirect = encodeURIComponent(agentRedirectUri);
-        const missing = await fetch(
-          `${started.origin}/oauth/auth?client_id=${agentClientId}&response_type=code&redirect_uri=${redirect}&scope=order:write`,
-          { redirect: "manual" },
-        );
-        const missingLocation = missing.headers.get("location") ?? "";
-        expect(missingLocation).toContain("error=invalid_request");
-        expect(decodeURIComponent(missingLocation)).toContain("PKCE");
+        const code = await tokenGrant(started.origin, {
+          grant_type: "authorization_code",
+          client_id: agentClientId,
+          code: "not-a-code",
+          redirect_uri: "https://callback.invalid/token",
+        });
+        expect(code.status).toBe(400);
+        await expect(code.json()).resolves.toMatchObject({ error: "invalid_request" });
 
-        const password = await fetch(`${started.origin}/oauth/token`, {
-          method: "POST",
-          headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            grant_type: "password",
-            client_id: agentClientId,
-            username: "13800138000",
-            password: "secret-password",
-          }),
+        const password = await tokenGrant(started.origin, {
+          grant_type: "password",
+          client_id: agentClientId,
+          username: "13800138000",
+          password: "secret-password",
         });
         expect(password.status).toBe(400);
         await expect(password.json()).resolves.toMatchObject({ error: "unsupported_grant_type" });
 
-        const implicit = await fetch(
-          `${started.origin}/oauth/auth?client_id=${agentClientId}&response_type=token&redirect_uri=${redirect}&scope=order:write&code_challenge=abc&code_challenge_method=S256`,
-          { redirect: "manual" },
-        );
-        expect(implicit.headers.get("location") ?? "").toContain("unsupported_response_type");
+        for (const responseType of ["token", "id_token", "code token"]) {
+          const rejected = await fetch(
+            `${started.origin}/oauth/auth?${new URLSearchParams({
+              client_id: agentClientId,
+              response_type: responseType,
+              scope: "openid",
+            })}`,
+            { redirect: "manual" },
+          );
+          const location = rejected.headers.get("location") ?? "";
+          const body = await rejected.text();
+          const rendered = `${String(rejected.status)} ${location} ${body}`;
+          expect(rendered).not.toContain("access_token=");
+          expect(rendered).not.toContain("id_token=");
+          expect(rejected.ok).toBe(false);
+          expect(rendered).toMatch(/unsupported_response_type|invalid_request|invalid_client/);
+        }
       } finally {
         await started.close();
       }
@@ -251,62 +259,29 @@ describe("oauth 2.1", () => {
 
 type Started = Awaited<ReturnType<typeof startAuthorizationServer>>;
 
-async function issueBuyerTokens(
+function issueBuyerTokens(
   started: Started,
   sql: Parameters<typeof approveAgent>[0]["sql"],
   ownerId: string,
   scope: string,
   ownerType: "merchant" | "buyer" = "buyer",
 ): Promise<{ access_token: string; refresh_token: string; expires_in: number; grantId: string }> {
-  const verifier = randomBytes(32).toString("base64url");
-  const challenge = createHash("sha256").update(verifier).digest("base64url");
-  const redirect = encodeURIComponent(agentRedirectUri);
-  const auth = await fetch(
-    `${started.origin}/oauth/auth?client_id=${agentClientId}&response_type=code&redirect_uri=${redirect}&scope=${encodeURIComponent(scope)}&code_challenge=${challenge}&code_challenge_method=S256&state=xyz`,
-    { redirect: "manual" },
-  );
-  expect(auth.status).toBe(303);
-  const location = auth.headers.get("location") ?? "";
-  expect(location).toContain(ownerType === "merchant" ? "/authorize/merchant" : "/authorize/buyer");
-  const cookieHeader = auth.headers
-    .getSetCookie()
-    .map((cookie) => cookie.split(";")[0] ?? "")
-    .join("; ");
-  const approved = await approveAgent({
+  return issueDeviceTokens({
+    origin: started.origin,
     provider: started.provider,
     sql,
-    cookieHeader,
-    page: ownerType,
-    ownerType,
     ownerId,
+    ownerType,
+    scope,
   });
-  const resumed = await fetch(approved.returnTo, {
-    redirect: "manual",
-    headers: { cookie: cookieHeader },
-  });
-  const code = new URL(
-    resumed.headers.get("location") ?? "https://agent.example/callback",
-  ).searchParams.get("code");
-  expect(code).toEqual(expect.any(String));
-  const tokenResponse = await fetch(`${started.origin}/oauth/token`, {
+}
+
+function tokenGrant(origin: string, fields: Record<string, string>): Promise<Response> {
+  return fetch(`${origin}/oauth/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: agentClientId,
-      code: code ?? "",
-      redirect_uri: agentRedirectUri,
-      code_verifier: verifier,
-    }),
+    body: new URLSearchParams(fields),
   });
-  const tokens = (await tokenResponse.json()) as {
-    access_token: string;
-    refresh_token: string;
-    expires_in: number;
-    error?: string;
-  };
-  expect(tokenResponse.status).toBe(200);
-  return { ...tokens, grantId: approved.grantId };
 }
 
 async function refresh(

@@ -1,35 +1,29 @@
-import { logRequest } from "./shared/log";
+// Starts migrations and logging only. Do not statically import business slices
+// or Node-only modules. Next compiles this file for the Edge runtime as well.
 
-// Starts migrations and logging only. Do not statically import business slices.
-// The integration change attaches the composition root here later.
 export async function register(): Promise<void> {
-  if (process.env.NEXT_RUNTIME === "edge") {
+  if (process.env.NEXT_RUNTIME !== "nodejs") {
     return;
   }
   if (process.env.NEXT_PHASE === "phase-production-build") {
     return;
   }
-  const { boot } = await import("./shared/startup");
-  await boot();
-  try {
-    const composition = await import("./composition/register-all");
-    await composition.registerAll();
-    composition.scheduleExpiryScan();
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "registration failed";
-    process.stderr.write(`${message}\n`);
-    process.exit(1);
-  }
+  const node = await import("./instrumentation.node");
+  await node.registerNode();
 }
 
-export function onRequestError(
+export async function onRequestError(
   error: unknown,
   request: {
     path: string;
     method: string;
     headers: { [key: string]: string | string[] };
   },
-): void {
+): Promise<void> {
+  if (process.env.NEXT_RUNTIME !== "nodejs") {
+    return;
+  }
+  const { logRequest } = await import("./shared/log");
   const headers = new Headers();
   for (const [key, value] of Object.entries(request.headers)) {
     headers.set(key, Array.isArray(value) ? value.join(", ") : value);

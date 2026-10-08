@@ -8,7 +8,7 @@
 
 - 商家可以有多本目录。字段、商品和规格属于目录，不属于商家账号。
 - 商家 Agent 通过 HTTP API 定义字段、创建商品和可售规格，并上架或下架。
-- 买家 Agent 可以查询已上架商品。下单前，买家在授权页用手机号注册或登录。
+- 买家 Agent 可以查询已上架商品。下单前，Agent 用设备码让买家在浏览器里注册或登录并批准。
 - 支付走支付宝。本服务不保存银行卡或支付宝账号密码。
 - 公开页面、`/skill.md`、`/merchant/skill.md` 和 `/llms.txt` 给人和 Agent 同一套事实。
 - 超级管理员开通和停用商家。商家不能自助注册。
@@ -23,7 +23,7 @@ v1 不接其他电商平台，不做购物车、营销页、优惠券、运费�
 | 数据   | PostgreSQL 18、Drizzle                  |
 | 限流   | Redis 8                                 |
 | 图片   | S3 兼容存储。本地用 MinIO，不写应用磁盘 |
-| 授权   | OAuth 2.1，`node-oidc-provider`         |
+| 授权   | OAuth 2.1 设备码，`node-oidc-provider`  |
 | 包管理 | pnpm 12.9.1                             |
 
 实现约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
@@ -86,6 +86,7 @@ docker compose -p merclink down
 | `/skill.md`           | 买家 Agent 说明          |
 | `/merchant/skill.md`  | 商家 Agent 说明          |
 | `/llms.txt`           | Agent 发现文件           |
+| `/oauth/device/auth`  | Agent 申请设备码         |
 | `/authorize/buyer`    | 买家注册、登录和批准     |
 | `/authorize/merchant` | 商家登录和批准           |
 | `/admin`              | 超级管理员开通或停用商家 |
