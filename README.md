@@ -1,32 +1,48 @@
 # MercLink
 
-给 AI Agent 用的商品与下单服务。商家 Agent 管理目录和商品，买家 Agent 查询已上架商品并完成支付宝支付。
+在 AI 时代，让天下没有难做的生意
 
-人批准授权，Agent 只拿到短期令牌。长期密钥留在服务端，不放进对话。
+帮中小商家做自己的店，并让各种 Agent 直接找到商品、完成购买。
 
-## 功能
+## 这是什么
 
-- 商家可以有多本目录。字段、商品和规格属于目录，不属于商家账号。
-- 商家 Agent 通过 HTTP API 定义字段、创建商品和可售规格，并上架或下架。
-- 买家 Agent 可以查询已上架商品。下单前，Agent 用设备码让买家在浏览器里注册或登录并批准。
-- 支付走支付宝。本服务不保存银行卡或支付宝账号密码。
-- 公开页面、`/skill.md`、`/merchant/skill.md` 和 `/llms.txt` 给人和 Agent 同一套事实。
-- 超级管理员开通和停用商家。商家不能自助注册。
+一家店，一套 HTTP API。商家用自己的 Agent 维护商品，买家用自己的 Agent 查询并下单。人在浏览器里批准授权，Agent 不保管密码。
+
+公开页面、两份 Skill 和 API 说的是同一套事实。Agent 不直连数据库、Redis、对象存储或支付宝。
+
+## 谁做什么
+
+| 角色 | 做什么 | 不做什么 |
+| --- | --- | --- |
+| 商家 Agent | 建目录、定义字段、创建商品和规格、上架或下架 | 不能自己开通商家，不能把订单标成已支付 |
+| 买家 Agent | 查已上架商品，按规格下一行订单，查支付结果 | 不能改商品，不能自己传价格 |
+| 付款人 | 在支付宝完成支付 | 不把支付宝密码交给 Agent |
+| 超级管理员 | 开通、停用商家，重置商家密码 | 不在这里管理商品 |
+
+字段、商品和规格属于目录，不属于商家账号。一家商家可以有多本目录。
 
 v1 不接其他电商平台，不做购物车、营销页、优惠券、运费或推荐。完整边界见 [docs/PRD.md](docs/PRD.md)。
 
+## 授权和支付
+
+Agent 用设备码让用户在自己的浏览器里登录并批准，然后只拿到短期访问令牌和可轮换的刷新令牌。不要向用户索要密码、短信验证码或 API Key，也不要把令牌贴进对话。
+
+API Key 不是 Agent 的登录方式。它只给没有浏览器的服务器脚本使用，登录后在账号页创建。授权页不会发放。
+
+支付走支付宝。电脑上打开收银台扫码；手机上的 Agent 第一次下单要传 `payment_channel: "mobile"`。打开支付链接不等于成功，只有订单状态 `paid` 才算付完。本服务不保存银行卡或支付宝账号密码。
+
 ## 技术栈
 
-| 部分   | 选择                                    |
-| ------ | --------------------------------------- |
-| 应用   | Next.js 16、TypeScript、一个进程        |
-| 数据   | PostgreSQL 18、Drizzle                  |
-| 限流   | Redis 8                                 |
-| 图片   | S3 兼容存储。本地用 MinIO，不写应用磁盘 |
-| 授权   | OAuth 2.1 设备码，`node-oidc-provider`  |
-| 包管理 | pnpm 12.9.1                             |
+| 部分 | 选择 |
+| --- | --- |
+| 应用 | Next.js 16、TypeScript、一个进程 |
+| 数据 | PostgreSQL 18、Drizzle |
+| 限流 | Redis 8。只记次数，不做缓存 |
+| 图片 | S3 兼容存储。本地用 MinIO，不写应用磁盘 |
+| 授权 | OAuth 2.1 设备码，`node-oidc-provider` |
+| 包管理 | pnpm 12.9.1 |
 
-实现约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+实现约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。人和 AI Coding 助手改代码前先读 [AGENTS.md](AGENTS.md)。
 
 ## 要求
 
@@ -34,7 +50,7 @@ v1 不接其他电商平台，不做购物车、营销页、优惠券、运费�
 - pnpm 12.9.1，通过 Corepack 启用
 - Docker 与 Docker Compose v2
 
-## 快速开始
+## 本地运行
 
 ```bash
 corepack enable
@@ -43,7 +59,7 @@ pnpm install --frozen-lockfile
 cp .env.example .env
 ```
 
-编辑 `.env`。本地依赖的连接信息是：
+本地依赖使用这些地址。只用于本机，不要拿去当生产配置：
 
 ```bash
 DATABASE_URL=postgres://merclink:merclink@127.0.0.1:5432/merclink
@@ -56,13 +72,13 @@ OBJECT_STORAGE_SECRET_ACCESS_KEY=merclinkminio
 APP_BASE_URL=http://127.0.0.1:3000
 ```
 
-这些值只用于本机。`ADMIN_PHONE`、`ADMIN_PASSWORD` 和 `OAUTH_SIGNING_SECRET` 自己填写。签名密钥可以用：
+`ADMIN_PHONE`、`ADMIN_PASSWORD` 和 `OAUTH_SIGNING_SECRET` 自己填写。签名密钥可以这样生成：
 
 ```bash
 openssl rand -base64 32
 ```
 
-本地开发在 `.env` 增加 `MERCLINK_DEV_STUBS=1`。`pnpm dev` 会把 `NODE_ENV` 设为 `development`，这时阿里云和支付宝变量可以留空：注册不发送短信，验证码固定为 `123456`；下单返回的 `payment.action` 是本机确认页，点确认后订单才变为已支付。`NODE_ENV=production` 时这个开关会让应用拒绝启动。
+在 `.env` 加上 `MERCLINK_DEV_STUBS=1` 后再启动。`pnpm dev` 会把 `NODE_ENV` 设为 `development`，这时阿里云和支付宝变量可以留空：注册不发短信，验证码固定为 `123456`；支付链接指向本机确认页，点确认后订单才变为已支付。`NODE_ENV=production` 时这个开关会让应用拒绝启动。
 
 ```bash
 docker compose -f compose.dev.yaml up -d
@@ -79,21 +95,21 @@ docker compose -p merclink down
 
 ## 常用入口
 
-| 路径                  | 用途                     |
-| --------------------- | ------------------------ |
-| `/`                   | 总落地页                 |
-| `/products`           | 已上架商品               |
-| `/skill.md`           | 买家 Agent 说明          |
-| `/merchant/skill.md`  | 商家 Agent 说明          |
-| `/llms.txt`           | Agent 发现文件           |
-| `/oauth/device/auth`  | Agent 申请设备码         |
-| `/authorize/buyer`    | 买家注册、登录和批准     |
-| `/authorize/merchant` | 商家登录和批准           |
-| `/admin`              | 超级管理员开通或停用商家 |
-| `/api/v1`             | HTTP API                 |
-| `/api/health`         | 健康检查                 |
+| 路径 | 谁用 | 用途 |
+| --- | --- | --- |
+| `/` | 访客 | 这一家店的落地页 |
+| `/products` | 访客、Agent | 已上架商品 |
+| `/skill.md` | 买家 Agent | 怎么查商品、下单、查支付 |
+| `/merchant/skill.md` | 商家 Agent | 怎么管目录和商品 |
+| `/llms.txt` | Agent | 发现上述入口 |
+| `/oauth/device/auth` | Agent | 申请设备码 |
+| `/authorize/buyer` | 买家 | 注册、登录、批准 |
+| `/authorize/merchant` | 商家 | 登录、批准。没有注册 |
+| `/admin` | 超级管理员 | 开通或停用商家 |
+| `/api/v1` | Agent、脚本 | HTTP API |
+| `/api/health` | 部署检查 | 健康检查 |
 
-已上架商品可以不登录查询。下单和管理接口使用 `Authorization: Bearer <访问令牌>`。错误体是 `{ "error": "<code>", "message": "<可读说明>" }`。接口清单以 [docs/PRD.md](docs/PRD.md) 第 10 节和两份 Skill 为准。
+查已上架商品不需要登录。下单和管理接口使用 `Authorization: Bearer <访问令牌>`。错误体是 `{ "error": "<code>", "message": "<可读说明>" }`。路径以 `src/shared/api-routes.ts` 为准，说明以两份 Skill 为准。
 
 ## 配置
 
@@ -139,7 +155,7 @@ docker compose up -d --build
 
 ```text
 src/app            页面和路由
-src/domain         账号、目录、商品、订单
+src/domain         账号、目录、商品、订单规则
 src/app-services   用例
 src/adapters       支付宝、阿里云、S3、Redis
 src/db             表和迁移
@@ -152,6 +168,7 @@ compose.yaml       正式环境应用和依赖
 
 - [产品需求](docs/PRD.md)
 - [技术架构](docs/ARCHITECTURE.md)
+- [AI 开发规范](AGENTS.md)
 
 ## 安全
 
