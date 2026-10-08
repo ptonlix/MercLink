@@ -183,4 +183,4 @@ compose.yaml       正式环境应用和依赖
 
 ## 许可证
 
-仓库尚未添加 `LICENSE`。在选择并加入许可证之前，保留所有权利。
+[Apache License 2.0](LICENSE)。
