@@ -250,8 +250,8 @@ describe("PRD section 12", () => {
         const otherTokens = await issueTokens(started, sql, otherBuyer, "buyer");
 
         const visible = await publicProductsRoute(new Request("http://localhost/api/v1/products"));
-        const visibleBody = (await visible.json()) as { items: { id: string }[] };
-        expect(visibleBody.items.map((item) => item.id)).toContain(product.value.id);
+        const visibleBody = (await visible.json()) as { data: { items: { id: string }[] } };
+        expect(visibleBody.data.items.map((item) => item.id)).toContain(product.value.id);
 
         const priced = await placeOrderRoute(
           new Request("http://localhost/api/v1/orders", {

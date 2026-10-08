@@ -402,8 +402,29 @@ Skill 与真实 API 不一致时，以 API 为准，并在同一天改 Skill。�
 ## 10. API
 
 基础路径：`/api/v1`  
-需要登录的接口：`Authorization: Bearer <访问令牌>`。没有令牌时返回 401，并带 `WWW-Authenticate` 和资源元数据地址。  
-错误体：`{ "error": "<code>", "message": "<可读说明>" }`
+需要登录的接口：`Authorization: Bearer <访问令牌>`。没有令牌时返回 401，并带 `WWW-Authenticate` 和资源元数据地址。body 的 `code` 是 `40100`。  
+JSON 响应外壳：`{ "code", "message", "data", "timestamp", "request_id" }`。成功时 `code` 是 `200`，`message` 是 `成功`，资源在 `data`。创建资源时 HTTP 状态仍是 201，body 的 `code` 仍是 `200`。失败时 HTTP 状态不是 200，`data` 是 `null`，`code` 是下表里的数字，不是 HTTP 状态本身。比较数字 `code`，不要比较 `message`，也不要读顶层 `error`。列表的 `data` 仍是 `{ "items", "next_cursor" }`。`timestamp` 是 Unix 毫秒。`request_id` 使用 `req_` 前缀，并回写 `X-Request-Id`。支付通知仍是纯文本 `success` 或 `fail`，不是这层外壳。
+
+| 名称 | code | HTTP |
+| --- | --- | --- |
+| 成功 | 200 | 200 或 201 |
+| `validation_error` | 40000 | 400 |
+| `unknown_field` | 40001 | 400 |
+| `field_retired` | 40002 | 400 |
+| `too_many_items` | 40003 | 400 |
+| `variant_required` | 40004 | 400 |
+| `captcha_required` | 40005 | 400 |
+| `invalid_signature` | 40006 | 400 |
+| `sms_rate_limited` | 40007 | 400 |
+| `unauthorized` | 40100 | 401 |
+| `forbidden` | 40300 | 403 |
+| `password_change_required` | 40301 | 403 |
+| `not_found` | 40400 | 404 |
+| `conflict` | 40900 | 409 |
+| `insufficient_stock` | 40901 | 409 |
+| `rate_limited` | 42900 | 429 |
+| `payment_retryable` | 50300 | 503 |
+| `dependency_unavailable` | 50301 | 503 |
 
 ### 购买侧
 
@@ -432,29 +453,35 @@ GET /api/v1/products?field.weight_g.lte=500
 }
 ```
 
-返回：
+返回 HTTP 201，body 的 `code` 仍是 `200`：
 
 ```json
 {
-  "id": "ord_123",
-  "status": "pending",
-  "amount": 159900,
-  "currency": "CNY",
-  "items": [
-    {
-      "id": "oli_1",
-      "variant_id": "var_42",
-      "qty": 1,
-      "amount": 159900
-    }
-  ],
-  "payment": {
-    "id": "pay_1",
-    "provider": "alipay",
-    "channel": "desktop",
+  "code": 200,
+  "message": "成功",
+  "data": {
+    "id": "ord_123",
     "status": "pending",
-    "action": "https://..."
-  }
+    "amount": 159900,
+    "currency": "CNY",
+    "items": [
+      {
+        "id": "oli_1",
+        "variant_id": "var_42",
+        "qty": 1,
+        "amount": 159900
+      }
+    ],
+    "payment": {
+      "id": "pay_1",
+      "provider": "alipay",
+      "channel": "desktop",
+      "status": "pending",
+      "action": "https://..."
+    }
+  },
+  "timestamp": 1710000000000,
+  "request_id": "req_example"
 }
 ```
 

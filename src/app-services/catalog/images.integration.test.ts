@@ -41,7 +41,10 @@ describe("product images", () => {
       path.join(process.cwd(), "src/db/migrations/010_schema.sql"),
       "utf8",
     );
-    const images = source.slice(source.indexOf("CREATE TABLE product_images"), source.indexOf("CREATE TABLE product_images") + 700);
+    const images = source.slice(
+      source.indexOf("CREATE TABLE product_images"),
+      source.indexOf("CREATE TABLE product_images") + 700,
+    );
     expect(images).toContain("REFERENCES catalogs (id)");
     expect(images.split(";")[0]).not.toContain("deleted_at");
     expect(images.split(";")[0]).not.toMatch(/references\s+merchants/i);
@@ -87,12 +90,11 @@ describe("product images", () => {
         },
       );
       expect(created.status).toBe(201);
-      const body = (await created.json()) as {
-        id: string;
-        url: string;
-        content_type: string;
-        byte_size: number;
-      };
+      const body = (
+        (await created.json()) as {
+          data: { id: string; url: string; content_type: string; byte_size: number };
+        }
+      ).data;
       expect(body.id.startsWith("img_")).toBe(true);
       expect(body.id).not.toContain("secret-name");
       expect(body.url).toBe(`${origin}/media/${body.id}`);
@@ -105,7 +107,7 @@ describe("product images", () => {
         params: Promise.resolve({ id: catalog.id }),
       });
       expect(forbidden.status).toBe(403);
-      await expect(forbidden.json()).resolves.toMatchObject({ error: "forbidden" });
+      await expect(forbidden.json()).resolves.toMatchObject({ code: 40300, data: null });
       expect(storage.puts).toEqual([body.id]);
       expect(limiter.consumes).toBe(1);
 
@@ -114,7 +116,7 @@ describe("product images", () => {
         params: Promise.resolve({ id: catalog.id }),
       });
       expect(other.status).toBe(404);
-      await expect(other.json()).resolves.toMatchObject({ error: "not_found" });
+      await expect(other.json()).resolves.toMatchObject({ code: 40400, data: null });
       expect(storage.puts).toEqual([body.id]);
     });
   });
@@ -133,13 +135,13 @@ describe("product images", () => {
           params: Promise.resolve({ id: catalog.id }),
         });
         expect(rejected.status).toBe(400);
-        await expect(rejected.json()).resolves.toMatchObject({ error: "validation_error" });
+        await expect(rejected.json()).resolves.toMatchObject({ code: 40000, data: null });
       }
       const limited = await uploadRoute(uploadRequest(catalog.id, png), {
         params: Promise.resolve({ id: catalog.id }),
       });
       expect(limited.status).toBe(429);
-      await expect(limited.json()).resolves.toMatchObject({ error: "rate_limited" });
+      await expect(limited.json()).resolves.toMatchObject({ code: 42900, data: null });
       expect(storage.puts).toEqual([]);
 
       now += imageUploadWindowMs + 1;
@@ -158,7 +160,7 @@ describe("product images", () => {
         params: Promise.resolve({ id: catalog.id }),
       });
       expect(unavailable.status).toBe(503);
-      await expect(unavailable.json()).resolves.toMatchObject({ error: "dependency_unavailable" });
+      await expect(unavailable.json()).resolves.toMatchObject({ code: 50301, data: null });
       expect(down.puts).toEqual([]);
     });
   });
@@ -173,7 +175,7 @@ describe("product images", () => {
       const created = await uploadRoute(uploadRequest(catalog.id, png), {
         params: Promise.resolve({ id: catalog.id }),
       });
-      const body = (await created.json()) as { id: string };
+      const body = ((await created.json()) as { data: { id: string } }).data;
       const consumesBeforeRead = limiter.consumes;
 
       resetAuthenticator();
@@ -207,7 +209,7 @@ describe("product images", () => {
       const uploaded = await uploadRoute(uploadRequest(catalog.id, png), {
         params: Promise.resolve({ id: catalog.id }),
       });
-      const image = (await uploaded.json()) as { id: string; url: string };
+      const image = ((await uploaded.json()) as { data: { id: string; url: string } }).data;
       const product = await createProduct(sql, "mch_a", catalog.id, {
         title: "短靴",
         price: 100,
@@ -225,14 +227,20 @@ describe("product images", () => {
         { params: Promise.resolve({ id: catalog.id, product_id: product.value.id }) },
       );
       expect(attached.status).toBe(200);
-      await expect(attached.json()).resolves.toMatchObject({ cover: image.url });
+      await expect(attached.json()).resolves.toMatchObject({
+        code: 200,
+        data: { cover: image.url },
+      });
 
       const external = await patchProductRoute(
         jsonRequest(catalog.id, product.value.id, { cover: "https://img.example/a.png" }),
         { params: Promise.resolve({ id: catalog.id, product_id: product.value.id }) },
       );
       expect(external.status).toBe(200);
-      await expect(external.json()).resolves.toMatchObject({ cover: "https://img.example/a.png" });
+      await expect(external.json()).resolves.toMatchObject({
+        code: 200,
+        data: { cover: "https://img.example/a.png" },
+      });
       expect(storage.deletes).toEqual([]);
       expect(storage.objects.has(image.id)).toBe(true);
 
@@ -242,7 +250,7 @@ describe("product images", () => {
         { params: Promise.resolve({ id: catalog.id, product_id: product.value.id }) },
       );
       expect(invalid.status).toBe(400);
-      await expect(invalid.json()).resolves.toMatchObject({ error: "validation_error" });
+      await expect(invalid.json()).resolves.toMatchObject({ code: 40000, data: null });
       const stored = await sql<{ cover: string }[]>`
         SELECT cover FROM products WHERE id = ${product.value.id}
       `;
@@ -252,14 +260,14 @@ describe("product images", () => {
       const otherUpload = await uploadRoute(uploadRequest(other.id, png), {
         params: Promise.resolve({ id: other.id }),
       });
-      const otherImage = (await otherUpload.json()) as { url: string };
+      const otherImage = ((await otherUpload.json()) as { data: { url: string } }).data;
       asMerchant("mch_a");
       const foreign = await patchProductRoute(
         jsonRequest(catalog.id, product.value.id, { cover: otherImage.url }),
         { params: Promise.resolve({ id: catalog.id, product_id: product.value.id }) },
       );
       expect(foreign.status).toBe(404);
-      await expect(foreign.json()).resolves.toMatchObject({ error: "not_found" });
+      await expect(foreign.json()).resolves.toMatchObject({ code: 40400, data: null });
       const unchanged = await sql<{ cover: string }[]>`
         SELECT cover FROM products WHERE id = ${product.value.id}
       `;
@@ -270,7 +278,9 @@ describe("product images", () => {
         { params: Promise.resolve({ id: catalog.id, variant_id: variantId ?? "" }) },
       );
       expect(variant.status).toBe(200);
-      const variantBody = (await variant.json()) as { variants: { cover: string | null }[] };
+      const variantBody = (
+        (await variant.json()) as { data: { variants: { cover: string | null }[] } }
+      ).data;
       expect(variantBody.variants[0]?.cover).toBe(image.url);
     });
   });

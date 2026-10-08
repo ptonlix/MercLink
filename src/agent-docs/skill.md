@@ -34,7 +34,7 @@ POST /api/v1/orders
 GET /api/v1/orders/{id}
 ```
 
-`GET /api/v1/products` 查询已上架商品，不需要登录。可用 `q`、`limit`、`cursor`、`catalog_id`，以及最低价、最高价。自定义字段过滤必须同时带 `catalog_id`，例如 `field.weight_g.lte=500`。没有目录 id 的字段过滤会被拒绝。字段不存在时错误码是 `unknown_field`。已停用字段的错误码是 `field_retired`，不是 `unknown_field`。
+`GET /api/v1/products` 查询已上架商品，不需要登录。可用 `q`、`limit`、`cursor`、`catalog_id`，以及最低价、最高价。自定义字段过滤必须同时带 `catalog_id`，例如 `field.weight_g.lte=500`。没有目录 id 的字段过滤会被拒绝。字段不存在时 `code` 是 `40001`（`unknown_field`）。已停用字段的 `code` 是 `40002`（`field_retired`），不是 `unknown_field`。
 
 `GET /api/v1/products/{id}` 返回该商品的公开字段和可售规格。
 
@@ -42,9 +42,9 @@ GET /api/v1/orders/{id}
 
 ## 下单
 
-下单必须用规格 ID，字段是 `variant_id`。只有该商品恰好有一条可售规格时，才可以只传商品 ID。有多条可售规格却只传商品 ID 时，错误码是 `variant_required`，不会创建订单。
+下单必须用规格 ID，字段是 `variant_id`。只有该商品恰好有一条可售规格时，才可以只传商品 ID。有多条可售规格却只传商品 ID 时，`code` 是 `40004`（`variant_required`），不会创建订单。
 
-不要自己传价格。服务端按规格单价乘数量计算行金额，调用方改不了价。`items` 只能有一项。多于一项时错误码是 `too_many_items`。
+不要自己传价格。服务端按规格单价乘数量计算行金额，调用方改不了价。`items` 只能有一项。多于一项时 `code` 是 `40003`（`too_many_items`）。
 
 `client_order_no` 是幂等业务单号。同一买家重复提交同一个 `client_order_no`，返回原订单，不会再次扣库存。
 
@@ -73,7 +73,7 @@ GET /api/v1/orders/{id}
 
 重复同一个 `client_order_no` 不会切换渠道。Repeating `client_order_no` does not switch channel. 不要只为了换渠道而新开一个 `client_order_no`，那会再扣库存。A new `client_order_no` must not be used only to switch channel.
 
-支付创建失败且可以重试时，错误码是 `payment_retryable`，订单保持 `pending`。
+支付创建失败且可以重试时，`code` 是 `50300`（`payment_retryable`），订单保持 `pending`。
 
 ## 查询订单状态
 
@@ -83,15 +83,27 @@ GET /api/v1/orders/{id}
 
 ## 限制
 
-不能查询已下架商品。不能修改商品。不能自己传价格。不能把未支付当成成功。商家令牌调用下单时，错误码是 `forbidden`。
+不能查询已下架商品。不能修改商品。不能自己传价格。不能把未支付当成成功。商家令牌调用下单时，`code` 是 `40300`（`forbidden`）。
+
+## 响应外壳
+
+`/api/v1` 的 JSON 响应一律是 `{ "code", "message", "data", "timestamp", "request_id" }`。资源字段只从 `data` 读，不要读顶层 `error`，也不要把 `id` 或 `items` 和 `code` 并列。列表的 `data` 仍是 `{ "items", "next_cursor" }`，没有 `pageNum`。
+
+比较数字 `code`，不要根据 `message` 分支。成功时 `code` 是 `200`，`message` 是 `成功`。创建资源时 HTTP 状态可以是 201，body 的 `code` 仍是 `200`。失败时 HTTP 状态不是 200，`data` 是 `null`。支付通知响应是纯文本 `success` 或 `fail`，不是这层 JSON 外壳。
 
 ## 错误
 
-错误体是 `{ "error": "<code>", "message": "<可读说明>" }`。
+常量名只是说明。线上比较的是数字 `code`。
 
-- 商品不存在：`not_found`
-- 已下架：`not_found`。已下架、已删除或没有可售规格的商品，公开查询不返回。
-- 库存不足：`insufficient_stock`
-- Key 无效：`unauthorized`。invalid key 指无效的 API Key 或被拒绝的凭证，不是字段 key。
-- 字段不存在：`unknown_field`
-- 权限不足：`forbidden`
+- 商品不存在：`not_found` `40400`
+- 已下架：`not_found` `40400`。已下架、已删除或没有可售规格的商品，公开查询不返回。
+- 库存不足：`insufficient_stock` `40901`
+- Key 无效：`unauthorized` `40100`。invalid key 指无效的 API Key 或被拒绝的凭证，不是字段 key。
+- 字段不存在：`unknown_field` `40001`
+- 已停用字段：`field_retired` `40002`
+- 必须指定规格：`variant_required` `40004`
+- 多于一项：`too_many_items` `40003`
+- 支付可重试：`payment_retryable` `50300`
+- 权限不足：`forbidden` `40300`
+- 请求无效：`validation_error` `40000`
+- 冲突：`conflict` `40900`

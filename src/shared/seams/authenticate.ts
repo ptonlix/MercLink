@@ -1,5 +1,5 @@
 import type { Actor } from "../actor";
-import { apiError } from "../errors";
+import { apiFailure } from "../errors";
 
 export const protectedResourcePath = "/.well-known/oauth-protected-resource";
 
@@ -26,8 +26,11 @@ function metadataUrl(request: Request): string {
 }
 
 function challenge(request: Request, message: string): Response {
-  return apiError("unauthorized", message, 401, {
-    "WWW-Authenticate": `Bearer realm="merclink", resource_metadata="${metadataUrl(request)}"`,
+  return apiFailure("unauthorized", message, {
+    request,
+    headers: {
+      "WWW-Authenticate": `Bearer realm="merclink", resource_metadata="${metadataUrl(request)}"`,
+    },
   });
 }
 

@@ -549,7 +549,7 @@ describe("catalog management", () => {
       { params: Promise.resolve({ id: "cat_1", product_id: "prd_1" }) },
     );
     expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toMatchObject({ error: "forbidden" });
+    await expect(response.json()).resolves.toMatchObject({ code: 40300, data: null });
   });
 });
 

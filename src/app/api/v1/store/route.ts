@@ -1,5 +1,5 @@
 import { getPublicStore } from "../../../../app-services/identity/profile-http";
 
-export function GET(): Promise<Response> {
-  return getPublicStore();
+export function GET(request?: Request): Promise<Response> {
+  return getPublicStore(request);
 }

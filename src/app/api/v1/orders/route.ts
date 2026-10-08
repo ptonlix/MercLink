@@ -1,6 +1,7 @@
 import { placeOrder } from "../../../../app-services/commerce/place-order";
 import { commerceRuntime } from "../../../../app-services/commerce/runtime";
 import { errorResponse, graphJson } from "../../../../app-services/commerce/view";
+import { apiSuccess } from "../../../../shared/errors";
 import { runOnce } from "../../../../jobs/close-expired-orders";
 import { authenticate } from "../../../../shared/seams/authenticate";
 
@@ -20,11 +21,11 @@ export async function POST(request: Request): Promise<Response> {
   try {
     body = await request.json();
   } catch {
-    return errorResponse("validation_error", "请求无效。");
+    return errorResponse("validation_error", "请求无效。", request);
   }
   const result = await placeOrder({ actor: auth.actor, body, runtime: commerceRuntime() });
   if (!result.ok) {
-    return errorResponse(result.error, result.message);
+    return errorResponse(result.error, result.message, request);
   }
-  return Response.json(graphJson(result.graph, result.action));
+  return apiSuccess(graphJson(result.graph, result.action), { status: 201, request });
 }

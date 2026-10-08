@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { buyerActor, grantedScopes, hasScope } from "./actor";
 import { apiRoutes, routesFor } from "./api-routes";
-import { apiError, errorCodes, minimumErrorCodes } from "./errors";
+import {
+  apiFailure,
+  apiSuccess,
+  businessCode,
+  errorCodes,
+  errorDefinitions,
+  httpStatusFor,
+  minimumErrorCodes,
+  successCode,
+  successMessage,
+} from "./errors";
+import { createRequestId, requestIdLength, requestIdPrefix } from "./request-id";
 import { createPublicId, hasIdPrefix, idPrefixes } from "./id";
 import { minorUnits } from "./money";
 import { authenticate, registerAuthenticator, resetAuthenticator } from "./seams/authenticate";
@@ -59,22 +70,72 @@ describe("api routes", () => {
 });
 
 describe("errors", () => {
-  it("uses one body and the minimum codes", async () => {
+  it("uses one numeric envelope and the shared status table", async () => {
     for (const code of minimumErrorCodes) {
       expect(errorCodes).toContain(code);
     }
     expect(errorCodes).toContain("password_change_required");
     expect(errorCodes).toContain("rate_limited");
     expect(errorCodes).toContain("sms_rate_limited");
+    expect(Object.keys(errorDefinitions).sort()).toEqual([...errorCodes].sort());
+    expect(successCode).toBe(200);
+    expect(businessCode("variant_required")).toBe(40004);
+    expect(httpStatusFor("variant_required")).toBe(400);
+    expect(httpStatusFor("sms_rate_limited")).toBe(400);
+    expect(httpStatusFor("conflict")).toBe(409);
+    expect(businessCode("conflict")).toBe(40900);
 
-    const response = apiError("validation_error", "Invalid JSON body\n    at secret line", 400);
+    const response = apiFailure("validation_error", "Invalid JSON body\n    at secret line");
     const text = await response.text();
-    const body: unknown = JSON.parse(text);
+    const body = JSON.parse(text) as {
+      code: number;
+      message: string;
+      data: unknown;
+      timestamp: number;
+      request_id: string;
+    };
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: "validation_error", message: "Invalid JSON body" });
+    expect(body.code).toBe(40000);
+    expect(body.message).toBe("Invalid JSON body");
+    expect(body.data).toBeNull();
+    expect(body.request_id.startsWith(requestIdPrefix)).toBe(true);
+    expect(body.request_id).toHaveLength(requestIdLength);
+    expect(response.headers.get("x-request-id")).toBe(body.request_id);
+    expect(body.timestamp).toEqual(expect.any(Number));
     expect(text).not.toContain("at secret");
     expect(text).not.toContain("stack");
+    expect(text).not.toContain('"error"');
+  });
+
+  it("keeps body code 200 when a resource is created", async () => {
+    const response = apiSuccess({ id: "prd_example" }, { status: 201 });
+    const body = (await response.json()) as { code: number; message: string; data: { id: string } };
+    expect(response.status).toBe(201);
+    expect(body.code).toBe(200);
+    expect(body.message).toBe(successMessage);
+    expect(body.data).toEqual({ id: "prd_example" });
+  });
+
+  it("reuses only a well-formed inbound request id", async () => {
+    const inbound = createRequestId();
+    const reused = apiFailure("not_found", "没有找到。", {
+      request: new Request("https://merclink.example/api/v1/products/prd_1", {
+        headers: { "x-request-id": inbound },
+      }),
+    });
+    expect(reused.headers.get("x-request-id")).toBe(inbound);
+    await expect(reused.json()).resolves.toMatchObject({ request_id: inbound, code: 40400 });
+
+    const malformed = apiFailure("not_found", "没有找到。", {
+      request: new Request("https://merclink.example/api/v1/products/prd_1", {
+        headers: { "x-request-id": "trace-not-a-request-id" },
+      }),
+    });
+    const generated = malformed.headers.get("x-request-id");
+    expect(generated?.startsWith(requestIdPrefix)).toBe(true);
+    expect(generated).not.toBe("trace-not-a-request-id");
+    expect(generated).toHaveLength(requestIdLength);
   });
 });
 

@@ -61,7 +61,10 @@ describe("buyer skill", () => {
     expect(body).toContain("字段不存在");
     expect(body).toContain("权限不足");
     expect(body).toContain("`not_found`");
-    expect(body).toContain("`insufficient_stock`");
+    expect(body).toContain("`insufficient_stock` `40901`");
+    expect(body).toContain("不要根据 `message` 分支");
+    expect(body).toContain("body 的 `code` 仍是 `200`");
+    expect(body).toContain("纯文本");
     expect(body).toContain("`unauthorized`");
     expect(body).toContain("`unknown_field`");
     expect(body).toContain("`forbidden`");
@@ -121,7 +124,9 @@ describe("merchant skill", () => {
       expect(body).toContain("也不能下单");
       expect(body).toContain("买家令牌不能调用商家写接口");
       expect(body).toContain("`paid`");
-      expect(body).toContain("`forbidden`");
+      expect(body).toContain("`forbidden` `40300`");
+      expect(body).toContain("从响应外壳读 `code` 和 `message`");
+      expect(body).toContain("body 的 `code` 仍是 `200`");
       expect(body).toContain("/api/v1/catalogs/{id}/images");
       expect(body).toContain("/api/v1/catalogs/{id}/products/{product_id}/axes");
       expect(body).toContain("option_values");

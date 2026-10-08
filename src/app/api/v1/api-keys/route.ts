@@ -1,25 +1,32 @@
 import { createApiKey, listApiKeys } from "../../../../app-services/access/keys";
 import { appRuntime, readCookie, redirectTo } from "../../../../app-services/identity/runtime";
 import { accountCookie, readSession } from "../../../../app-services/identity/session";
-import { apiError } from "../../../../shared/errors";
+import { apiFailure, apiSuccess } from "../../../../shared/errors";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
   const session = accountSession(request);
   if (session === null) {
-    return apiError("unauthorized", "请先登录。", 401);
+    return apiFailure("unauthorized", "请先登录。", { request });
   }
   const keys = await listApiKeys(appRuntime().sql, session.ownerId);
-  return Response.json({
-    items: keys.map((key) => ({ id: key.id, prefix: key.prefix, revoked: key.revokedAt !== null })),
-  });
+  return apiSuccess(
+    {
+      items: keys.map((key) => ({
+        id: key.id,
+        prefix: key.prefix,
+        revoked: key.revokedAt !== null,
+      })),
+    },
+    { request },
+  );
 }
 
 export async function POST(request: Request): Promise<Response> {
   const session = accountSession(request);
   if (session === null) {
-    return apiError("unauthorized", "请先登录。", 401);
+    return apiFailure("unauthorized", "请先登录。", { request });
   }
   const created = await createApiKey(appRuntime().sql, {
     ownerType: session.ownerType,
@@ -28,13 +35,16 @@ export async function POST(request: Request): Promise<Response> {
     authorizationPage: false,
   });
   if (!created.ok) {
-    return apiError(created.error, created.message, created.status);
+    return apiFailure(created.error, created.message, { request });
   }
   const accepts = request.headers.get("accept") ?? "";
   if (accepts.includes("text/html") || request.headers.get("content-type")?.includes("form")) {
     return redirectTo(`/authorize/account?secret=${encodeURIComponent(created.secret)}`);
   }
-  return Response.json({ id: created.id, secret: created.secret, prefix: created.prefix });
+  return apiSuccess(
+    { id: created.id, secret: created.secret, prefix: created.prefix },
+    { status: 201, request },
+  );
 }
 
 function accountSession(

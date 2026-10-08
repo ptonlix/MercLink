@@ -163,13 +163,17 @@ describe("order placement", () => {
         }),
       }),
     );
-    expect(omitted.status).toBe(200);
+    expect(omitted.status).toBe(201);
     const omittedId = harness.graphs()[0]?.payment.id;
     const omittedBody: unknown = await omitted.json();
     expect(omittedBody).toMatchObject({
-      payment: {
-        channel: "desktop",
-        action: `https://pay.example/${omittedId ?? ""}`,
+      code: 200,
+      message: "成功",
+      data: {
+        payment: {
+          channel: "desktop",
+          action: `https://pay.example/${omittedId ?? ""}`,
+        },
       },
     });
     expect(harness.stock("var_1")).toBe(4);
@@ -200,7 +204,7 @@ describe("order placement", () => {
       }),
     );
     expect(invalid.status).toBe(400);
-    await expect(invalid.json()).resolves.toMatchObject({ error: "validation_error" });
+    await expect(invalid.json()).resolves.toMatchObject({ code: 40000, data: null });
     expect(harness.stock("var_1")).toBe(4);
     expect(harness.locks()).toBe(1);
     expect(harness.graphs().some((graph) => graph.order.clientOrderNo === "bad-channel")).toBe(
@@ -256,8 +260,11 @@ describe("order placement", () => {
     );
     expect(read.status).toBe(200);
     await expect(read.json()).resolves.toMatchObject({
-      id: mobile.graph.order.id,
-      payment: { channel: "mobile", action: null },
+      code: 200,
+      data: {
+        id: mobile.graph.order.id,
+        payment: { channel: "mobile", action: null },
+      },
     });
   });
 
@@ -367,7 +374,7 @@ describe("order placement", () => {
       }),
     );
     expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toMatchObject({ error: "forbidden" });
+    await expect(response.json()).resolves.toMatchObject({ code: 40300, data: null });
     expect(harness.locks()).toBe(0);
 
     const files = await walk("src/app/api/v1");
@@ -567,12 +574,13 @@ describe("slice boundaries", () => {
     const body: unknown = await response.json();
     expect(response.status).toBe(200);
     expect(body).toMatchObject({
-      items: [{ items: [{ variant_id: "var_1" }] }],
+      code: 200,
+      data: { items: [{ items: [{ variant_id: "var_1" }] }] },
     });
     if (!isList(body)) {
       return;
     }
-    expect(body.items).toHaveLength(1);
+    expect(body.data.items).toHaveLength(1);
     expect(JSON.stringify(body)).not.toContain("var_2");
 
     registerAuthenticator(() => ({
@@ -818,10 +826,12 @@ function resolveVariant(
   return { ok: true, line };
 }
 
-function isList(value: unknown): value is { items: unknown[] } {
-  return (
-    typeof value === "object" && value !== null && "items" in value && Array.isArray(value.items)
-  );
+function isList(value: unknown): value is { data: { items: unknown[] } } {
+  if (typeof value !== "object" || value === null || !("data" in value)) {
+    return false;
+  }
+  const data = value.data;
+  return typeof data === "object" && data !== null && "items" in data && Array.isArray(data.items);
 }
 
 async function walk(directory: string): Promise<string[]> {

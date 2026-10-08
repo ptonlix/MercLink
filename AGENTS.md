@@ -98,3 +98,13 @@ pnpm run check
 - 不要新增第二份路由表、第二份商品读取逻辑或第二套限流存储。
 - 不要实现 PRD 明确不做的能力：购物车、优惠券、运费、推荐、退款、商家自助注册、其他电商平台。
 - 不要在 Agent 内置页里收集支付宝密码，也不要把支付成功建立在同步回跳上。
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

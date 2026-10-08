@@ -69,8 +69,11 @@ describe.skipIf(!hasDatabase)("merchant profile sql", () => {
       const shownBody = await responseJson(shown);
       expect(shown.status).toBe(200);
       expect(shownBody).toMatchObject({
-        display_name: "南风商店",
-        summary: "数据库里的已发布简介",
+        code: 200,
+        data: {
+          display_name: "南风商店",
+          summary: "数据库里的已发布简介",
+        },
       });
       expect(JSON.stringify(shownBody)).not.toContain("13800000009");
       expect(JSON.stringify(shownBody)).not.toContain("secret@example.com");
@@ -82,7 +85,7 @@ describe.skipIf(!hasDatabase)("merchant profile sql", () => {
       const hidden = await publicStoreRoute();
       expect(hidden.status).toBe(404);
       const hiddenBody = await responseJson(hidden);
-      expect(hiddenBody).toMatchObject({ error: "not_found" });
+      expect(hiddenBody).toMatchObject({ code: 40400, data: null });
       expect(JSON.stringify(hiddenBody)).not.toContain("数据库里的已发布简介");
     });
   });

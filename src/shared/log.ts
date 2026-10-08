@@ -35,6 +35,7 @@ export type RequestLogInput = {
   path: string;
   headers: Headers;
   bodyText?: string;
+  requestId?: string;
 };
 
 function bearerToken(headers: Headers): string | undefined {
@@ -64,6 +65,7 @@ export function formatRequestLog(input: RequestLogInput): string {
     headerRecord[key] = value;
   });
   const payload = {
+    ...(input.requestId === undefined ? {} : { request_id: input.requestId }),
     method: input.method,
     path: input.path,
     headers: headerRecord,

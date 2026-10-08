@@ -43,7 +43,7 @@ DELETE /api/v1/catalogs/{id}/variants/{variant_id}
 GET /api/v1/manage/orders
 ```
 
-目录接口都要带目录 ID。令牌只能访问自己的目录和自己的店铺介绍。另一个商家的目录返回 not found 或 `forbidden`，并且不返回字段或商品数据。
+目录接口都要带目录 ID。令牌只能访问自己的目录和自己的店铺介绍。另一个商家的目录返回 `not_found` `40400` 或 `forbidden` `40300`，并且不返回字段或商品数据。
 
 ## 店铺介绍
 
@@ -145,7 +145,7 @@ GET /api/v1/manage/orders
 
 `PATCH /api/v1/catalogs/{id}/products/{product_id}` 编辑商品。`PATCH /api/v1/catalogs/{id}/variants/{variant_id}` 编辑规格。`DELETE /api/v1/catalogs/{id}/variants/{variant_id}` 软删除规格。恢复规格后它仍然不可售。
 
-未知字段 key 写入时，错误码是 `unknown_field`。
+未知字段 key 写入时，`code` 是 `40001`（`unknown_field`）。
 
 ## 上架、下架、软删除、字段停用
 
@@ -153,9 +153,9 @@ GET /api/v1/manage/orders
 
 - 下架 unpublish：`POST /api/v1/catalogs/{id}/products/{product_id}/unpublish`。商品留在商家正常列表，状态为 off。公开查询不再返回，规格不可购买。
 - 软删除 soft delete：`DELETE /api/v1/catalogs/{id}/products/{product_id}`。正常列表看不到。公开页、购买查询和下单都视为不存在。有订单也可以软删除，订单快照还在。恢复 `POST /api/v1/catalogs/{id}/products/{product_id}/restore` 只清掉删除标记，商品仍是下架，规格不自动可售。没有物理删除。
-- 字段停用 field retirement：停用的是字段，不是商品。停用后的 key 不能复用，当前商品属性去掉该 key，历史订单快照不变。购买过滤用这个 key 时错误码是 `field_retired`。
+- 字段停用 field retirement：停用的是字段，不是商品。停用后的 key 不能复用，当前商品属性去掉该 key，历史订单快照不变。购买过滤用这个 key 时 `code` 是 `40002`（`field_retired`）。
 
-上架：`POST /api/v1/catalogs/{id}/products/{product_id}/publish`。缺少当前必填字段，或没有可售规格时，上架失败，商品保持下架。读错误体里的 `error` 和 `message`。破坏性变更确认后导致下架时，同样读这个错误体，再补齐字段后重新上架。
+上架：`POST /api/v1/catalogs/{id}/products/{product_id}/publish`。缺少当前必填字段，或没有可售规格时，上架失败，商品保持下架。上架失败时从响应外壳读 `code` 和 `message`，资源不在顶层。破坏性变更确认后导致下架时，同样读这个外壳，再补齐字段后重新上架。
 
 `GET /api/v1/catalogs/{id}/products` 可按 `status=on` 或 `status=off` 过滤。默认不返回已软删除的商品。
 
@@ -163,6 +163,22 @@ GET /api/v1/manage/orders
 
 `GET /api/v1/manage/orders` 只读，可按 `catalog_id` 过滤。只能看订单行属于自己目录的订单。
 
-没有把订单标成已支付的接口。商家令牌不能把订单标成已支付，也不能下单。买家令牌不能调用商家写接口，错误码是 `forbidden`。商家令牌调用 `POST /api/v1/orders` 同样是 `forbidden`。
+没有把订单标成已支付的接口。商家令牌不能把订单标成已支付，也不能下单。买家令牌不能调用商家写接口，`code` 是 `40300`（`forbidden`）。商家令牌调用 `POST /api/v1/orders` 同样是 `40300`。
 
 只有状态 `paid` 才算支付成功。打开支付链接不等于成功。
+
+## 响应外壳
+
+`/api/v1` 的 JSON 响应一律是 `{ "code", "message", "data", "timestamp", "request_id" }`。目录、商品、规格、订单和店铺字段都在 `data` 里。比较数字 `code`，不要根据 `message` 分支，也不要读顶层 `error`。成功时 `code` 是 `200`，`message` 是 `成功`。创建资源时 HTTP 状态可以是 201，body 的 `code` 仍是 `200`。失败时 `data` 是 `null`，HTTP 状态不是 200。列表的 `data` 仍是 `{ "items", "next_cursor" }`。支付通知响应是纯文本 `success` 或 `fail`，不是这层 JSON 外壳。
+
+常量名只是说明：
+
+- `validation_error` `40000`
+- `unknown_field` `40001`
+- `field_retired` `40002`
+- `variant_required` `40004`
+- `unauthorized` `40100`
+- `forbidden` `40300`
+- `not_found` `40400`
+- `conflict` `40900`
+- `insufficient_stock` `40901`

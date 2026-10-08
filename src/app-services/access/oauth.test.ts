@@ -198,7 +198,7 @@ describe("oauth 2.1", () => {
         expect(placed).toBeInstanceOf(Response);
         if (placed instanceof Response) {
           expect(placed.status).toBe(403);
-          await expect(placed.json()).resolves.toMatchObject({ error: "forbidden" });
+          await expect(placed.json()).resolves.toMatchObject({ code: 40300, data: null });
         }
         const anonymous = await guardApiRequest(
           new Request("https://merclink.example/api/v1/orders", { method: "POST" }),

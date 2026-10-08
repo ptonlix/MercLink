@@ -21,8 +21,12 @@ describe("fail-closed seams", () => {
     if (!isErrorBody(body)) {
       return;
     }
-    expect(body.error).toBe("unauthorized");
+    expect(body.code).toBe(40100);
+    expect(body.data).toBeNull();
     expect(body.message.length).toBeGreaterThan(0);
+    expect(body.request_id.startsWith("req_")).toBe(true);
+    expect(result.response.headers.get("x-request-id")).toBe(body.request_id);
+    expect("error" in body).toBe(false);
     expect(result.response.headers.get("WWW-Authenticate")).toContain(
       "/.well-known/oauth-protected-resource",
     );
@@ -41,7 +45,8 @@ describe("fail-closed seams", () => {
     }
     const body: unknown = JSON.parse(await result.response.text());
     expect(result.response.status).toBe(401);
-    expect(body).toMatchObject({ error: "unauthorized" });
+    expect(body).toMatchObject({ code: 40100, data: null });
+    expect(body).not.toHaveProperty("error");
   });
 
   it("does not invent a sellable row when lock is unregistered", async () => {
@@ -136,14 +141,29 @@ describe("skill rewrites", () => {
   });
 });
 
-function isErrorBody(value: unknown): value is { error: string; message: string } {
+function isErrorBody(value: unknown): value is {
+  code: number;
+  message: string;
+  data: null;
+  request_id: string;
+} {
   if (typeof value !== "object" || value === null) {
     return false;
   }
-  if (!("error" in value) || !("message" in value)) {
+  if (
+    !("code" in value) ||
+    !("message" in value) ||
+    !("data" in value) ||
+    !("request_id" in value)
+  ) {
     return false;
   }
-  return typeof value.error === "string" && typeof value.message === "string";
+  return (
+    typeof value.code === "number" &&
+    typeof value.message === "string" &&
+    value.data === null &&
+    typeof value.request_id === "string"
+  );
 }
 
 function trackingTransaction(): { calls: number } {

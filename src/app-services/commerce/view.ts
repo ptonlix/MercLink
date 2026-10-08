@@ -1,27 +1,13 @@
 import type { ErrorCode } from "../../shared/errors";
-import { apiError } from "../../shared/errors";
+import { apiFailure, httpStatusFor } from "../../shared/errors";
 import type { StoredGraph, StoredItem, StoredOrder, StoredPayment } from "./repository";
 
-const statusByError: Partial<Record<ErrorCode, number>> = {
-  unauthorized: 401,
-  forbidden: 403,
-  not_found: 404,
-  validation_error: 400,
-  too_many_items: 400,
-  variant_required: 400,
-  insufficient_stock: 409,
-  conflict: 409,
-  payment_retryable: 503,
-  invalid_signature: 400,
-  dependency_unavailable: 503,
-};
-
 export function httpStatus(error: ErrorCode): number {
-  return statusByError[error] ?? 400;
+  return httpStatusFor(error);
 }
 
-export function errorResponse(error: ErrorCode, message: string): Response {
-  return apiError(error, message, httpStatus(error));
+export function errorResponse(error: ErrorCode, message: string, request?: Request): Response {
+  return apiFailure(error, message, { request });
 }
 
 export function orderJson(

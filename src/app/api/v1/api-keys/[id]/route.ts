@@ -1,7 +1,7 @@
 import { revokeApiKey } from "../../../../../app-services/access/keys";
 import { appRuntime, readCookie, redirectTo } from "../../../../../app-services/identity/runtime";
 import { accountCookie, readSession } from "../../../../../app-services/identity/session";
-import { apiError } from "../../../../../shared/errors";
+import { apiFailure } from "../../../../../shared/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -31,12 +31,12 @@ async function revoke(
       ? null
       : readSession(token, runtime.env.OAUTH_SIGNING_SECRET, runtime.clock.now());
   if (session === null || session.kind !== "account") {
-    return apiError("unauthorized", "请先登录。", 401);
+    return apiFailure("unauthorized", "请先登录。", { request });
   }
   const params = await context.params;
   const result = await revokeApiKey(runtime.sql, { keyId: params.id, ownerId: session.ownerId });
   if (!result.ok) {
-    return apiError(result.error, result.message, result.status);
+    return apiFailure(result.error, result.message, { request });
   }
   if (form) {
     return redirectTo("/authorize/account");

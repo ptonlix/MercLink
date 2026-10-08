@@ -24,6 +24,7 @@ export async function onRequestError(
     return;
   }
   const { logRequest } = await import("./shared/log");
+  const { createRequestId, inboundRequestId } = await import("./shared/request-id");
   const headers = new Headers();
   for (const [key, value] of Object.entries(request.headers)) {
     headers.set(key, Array.isArray(value) ? value.join(", ") : value);
@@ -34,5 +35,6 @@ export async function onRequestError(
     path: request.path,
     headers,
     bodyText: message,
+    requestId: inboundRequestId(headers.get("x-request-id")) ?? createRequestId(),
   });
 }

@@ -7,7 +7,7 @@ import {
   anonymousProductSearch,
 } from "../../domain/access/guard";
 import { accountCanAuthenticate } from "../identity/can-authenticate";
-import { apiError } from "../../shared/errors";
+import { apiFailure } from "../../shared/errors";
 import {
   authenticate,
   registerAuthenticator,
@@ -21,12 +21,12 @@ function createRequestAuthenticator(sql: Sql, provider: Provider) {
   return async function requestAuthenticator(request: Request): Promise<AuthenticateResult> {
     const token = bearer(request);
     if (token === undefined) {
-      return { ok: false, response: apiError("unauthorized", "需要登录。", 401) };
+      return { ok: false, response: apiFailure("unauthorized", "需要登录。", { request }) };
     }
     if (isApiKeyToken(token)) {
       const key = await findApiKeyBySecret(sql, token);
       if (key === null || !(await ownerActive(sql, key.ownerType, key.ownerId))) {
-        return { ok: false, response: apiError("unauthorized", "密钥无效。", 401) };
+        return { ok: false, response: apiFailure("unauthorized", "密钥无效。", { request }) };
       }
       return {
         ok: true,
@@ -41,10 +41,10 @@ function createRequestAuthenticator(sql: Sql, provider: Provider) {
     const access = await provider.AccessToken.find(token);
     const account = access?.accountId === undefined ? null : parseAccountId(access.accountId);
     if (access === undefined || account === null || access.grantId === undefined) {
-      return { ok: false, response: apiError("unauthorized", "令牌无效。", 401) };
+      return { ok: false, response: apiFailure("unauthorized", "令牌无效。", { request }) };
     }
     if (!(await grantActive(sql, access.grantId, account.ownerType, account.ownerId))) {
-      return { ok: false, response: apiError("unauthorized", "令牌已撤销。", 401) };
+      return { ok: false, response: apiFailure("unauthorized", "令牌已撤销。", { request }) };
     }
     const scopes = (access.scope ?? "").split(" ").filter((scope) => isScope(scope));
     const actor: Actor =
@@ -72,7 +72,7 @@ export async function guardApiRequest(
   }
   const decision = roleDecision(result.actor, request.method, url.pathname);
   if (!decision.ok) {
-    return apiError(decision.error, decision.message, decision.status);
+    return apiFailure(decision.error, decision.message, { request });
   }
   return result;
 }

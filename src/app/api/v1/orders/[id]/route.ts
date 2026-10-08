@@ -1,6 +1,7 @@
 import { readBuyerOrder } from "../../../../../app-services/commerce/read-order";
 import { commerceRuntime } from "../../../../../app-services/commerce/runtime";
 import { errorResponse, graphJson } from "../../../../../app-services/commerce/view";
+import { apiSuccess } from "../../../../../shared/errors";
 import { authenticate } from "../../../../../shared/seams/authenticate";
 
 export async function GET(
@@ -18,7 +19,7 @@ export async function GET(
     runtime: commerceRuntime(),
   });
   if (!result.ok) {
-    return errorResponse(result.error, result.message);
+    return errorResponse(result.error, result.message, request);
   }
-  return Response.json(graphJson(result.graph, null));
+  return apiSuccess(graphJson(result.graph, null), { request });
 }

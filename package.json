@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:acceptance": "vitest run tests/acceptance",
+    "test:smoke": "vitest run --config vitest.smoke.config.ts",
     "boundaries": "depcruise --config .dependency-cruiser.cjs src",
     "knip": "knip",
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run boundaries && pnpm run knip"

@@ -17,6 +17,7 @@ import type { RateLimitPort } from "../../ports/rate-limit";
 import type { SmsPort } from "../../ports/sms";
 import { createPublicId } from "../../shared/id";
 import { hashPassword, verifyPassword } from "./passwords";
+import { httpStatusFor } from "../../shared/errors";
 import { failure, isUniqueViolation, type Failure } from "./result";
 
 export type BuyerRecord = {
@@ -196,11 +197,11 @@ export async function completeBuyerRegistration(
 function smsLimited(policy: string): Failure {
   if (policy === smsSendPolicyNames.interval) {
     const decision = smsSendLimited("interval");
-    return failure(429, decision.error, decision.message);
+    return failure(httpStatusFor(decision.error), decision.error, decision.message);
   }
   if (policy === smsSendPolicyNames.daily) {
     const decision = smsSendLimited("daily");
-    return failure(429, decision.error, decision.message);
+    return failure(httpStatusFor(decision.error), decision.error, decision.message);
   }
   return failure(503, "dependency_unavailable", smsUnavailable);
 }
@@ -270,7 +271,15 @@ type ChallengeRow = {
 };
 
 async function latestChallenge(sql: Sql, phone: string): Promise<ChallengeRow | null> {
-  const rows = await sql<ChallengeRow[]>`
+  const rows = await sql<
+    {
+      id: string;
+      wrongChecks: number;
+      smsVerifiedAt: Date | string | null;
+      invalidatedAt: Date | string | null;
+      createdAt: Date | string;
+    }[]
+  >`
     SELECT id, wrong_checks AS "wrongChecks", sms_verified_at AS "smsVerifiedAt",
            invalidated_at AS "invalidatedAt", created_at AS "createdAt"
     FROM registration_challenges
@@ -278,5 +287,25 @@ async function latestChallenge(sql: Sql, phone: string): Promise<ChallengeRow | 
     ORDER BY created_at DESC
     LIMIT 1
   `;
-  return rows[0] ?? null;
+  const row = rows[0];
+  if (row === undefined) {
+    return null;
+  }
+  // postgres.js returns timestamps as strings after the driver serializer override.
+  return {
+    id: row.id,
+    wrongChecks: row.wrongChecks,
+    smsVerifiedAt: asDate(row.smsVerifiedAt),
+    invalidatedAt: asDate(row.invalidatedAt),
+    createdAt: asDate(row.createdAt),
+  };
+}
+
+function asDate(value: Date | string): Date;
+function asDate(value: Date | string | null): Date | null;
+function asDate(value: Date | string | null): Date | null {
+  if (value === null) {
+    return null;
+  }
+  return value instanceof Date ? value : new Date(value);
 }

@@ -1,6 +1,7 @@
 import { listMerchantOrders } from "../../../../../app-services/commerce/read-order";
 import { commerceRuntime } from "../../../../../app-services/commerce/runtime";
 import { errorResponse, graphJson } from "../../../../../app-services/commerce/view";
+import { apiSuccess } from "../../../../../shared/errors";
 import { authenticate } from "../../../../../shared/seams/authenticate";
 
 export async function GET(request: Request): Promise<Response> {
@@ -15,9 +16,12 @@ export async function GET(request: Request): Promise<Response> {
     runtime: commerceRuntime(),
   });
   if (!result.ok) {
-    return errorResponse(result.error, result.message);
+    return errorResponse(result.error, result.message, request);
   }
-  return Response.json({
-    items: result.graphs.map((graph) => graphJson(graph, null)),
-  });
+  return apiSuccess(
+    {
+      items: result.graphs.map((graph) => graphJson(graph, null)),
+    },
+    { request },
+  );
 }

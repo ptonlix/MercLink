@@ -39,7 +39,7 @@ describe("merchant profile http", () => {
     const body: unknown = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toEqual(emptyDraft());
+    expect(body).toMatchObject({ code: 200, message: "成功", data: emptyDraft() });
     expect(JSON.stringify(body)).not.toContain("13800138000");
     expect(JSON.stringify(body)).not.toContain("mch_a");
     expect(JSON.stringify(body)).not.toContain("超管填写的账号名");
@@ -71,7 +71,7 @@ describe("merchant profile http", () => {
     expect(read).toEqual(body);
     expect(html).not.toContain("草稿简介");
     expect(publicResponse.status).toBe(404);
-    await expect(publicResponse.json()).resolves.toMatchObject({ error: "not_found" });
+    await expect(publicResponse.json()).resolves.toMatchObject({ code: 40400, data: null });
     expect(JSON.stringify(await publicStoreRoute().then((item) => item.json()))).not.toContain(
       "草稿简介",
     );
@@ -93,7 +93,7 @@ describe("merchant profile http", () => {
     });
     const first = await putProfileRoute(authed("PUT", firstBody));
     const second = await putProfileRoute(authed("PUT", firstBody));
-    expect(await first.json()).toEqual(await second.json());
+    expect(dataOf(await first.json())).toEqual(dataOf(await second.json()));
     expect(memory.writes).toBe(1);
     const replaced = await putProfileRoute(
       authed(
@@ -108,11 +108,14 @@ describe("merchant profile http", () => {
     );
 
     await expect(replaced.json()).resolves.toMatchObject({
-      summary: "换成新简介",
-      website_url: null,
-      logo_url: null,
-      area_served: null,
-      address: null,
+      code: 200,
+      data: {
+        summary: "换成新简介",
+        website_url: null,
+        logo_url: null,
+        area_served: null,
+        address: null,
+      },
     });
     expect(memory.writes).toBe(2);
   });
@@ -134,34 +137,37 @@ describe("merchant profile http", () => {
     asBuyer();
     const buyer = await putProfileRoute(authed("PUT", draftBody({ summary: "买家改写" })));
     expect(buyer.status).toBe(403);
-    await expect(buyer.json()).resolves.toMatchObject({ error: "forbidden" });
+    await expect(buyer.json()).resolves.toMatchObject({ code: 40300, data: null });
 
     asMerchant("mch_a", ["product:read"]);
     const missingScope = await putProfileRoute(authed("PUT", draftBody({ summary: "无权改写" })));
     expect(missingScope.status).toBe(403);
-    await expect(missingScope.json()).resolves.toMatchObject({ error: "forbidden" });
+    await expect(missingScope.json()).resolves.toMatchObject({ code: 40300, data: null });
     const readable = await merchantProfileRoute(authed("GET"));
     expect(readable.status).toBe(200);
-    await expect(readable.json()).resolves.toMatchObject({ summary: "已发布简介" });
+    await expect(readable.json()).resolves.toMatchObject({
+      code: 200,
+      data: { summary: "已发布简介" },
+    });
 
     asMerchant("mch_a", ["product:write"]);
     const unknown = await putProfileRoute(
       authed("PUT", { ...draftBody({ summary: "带手机号字段" }), phone: "13800138000" }),
     );
     expect(unknown.status).toBe(400);
-    await expect(unknown.json()).resolves.toMatchObject({ error: "validation_error" });
+    await expect(unknown.json()).resolves.toMatchObject({ code: 40000, data: null });
 
     const emptySummary = await putProfileRoute(
       authed("PUT", draftBody({ display_name: "新店名", summary: "", published: true })),
     );
     expect(emptySummary.status).toBe(400);
-    await expect(emptySummary.json()).resolves.toMatchObject({ error: "validation_error" });
+    await expect(emptySummary.json()).resolves.toMatchObject({ code: 40000, data: null });
 
     const phoneWebsite = await putProfileRoute(
       authed("PUT", draftBody({ website_url: "13800138000", published: true })),
     );
     expect(phoneWebsite.status).toBe(400);
-    await expect(phoneWebsite.json()).resolves.toMatchObject({ error: "validation_error" });
+    await expect(phoneWebsite.json()).resolves.toMatchObject({ code: 40000, data: null });
 
     const notJson = await putProfileRoute(
       new Request("https://merclink.example/api/v1/merchant/profile", {
@@ -171,7 +177,7 @@ describe("merchant profile http", () => {
       }),
     );
     expect(notJson.status).toBe(400);
-    await expect(notJson.json()).resolves.toMatchObject({ error: "validation_error" });
+    await expect(notJson.json()).resolves.toMatchObject({ code: 40000, data: null });
 
     expect(memory.writes).toBe(writesAfterPublish);
     const stored = await merchantProfileRoute(authed("GET"));
@@ -188,7 +194,10 @@ describe("merchant profile http", () => {
     expect(JSON.stringify(storedBody)).not.toContain("mch_a");
     const visible = await publicStoreRoute();
     const visibleText = await visible.text();
-    expect(JSON.parse(visibleText)).toMatchObject({ summary: "已发布简介" });
+    expect(JSON.parse(visibleText)).toMatchObject({
+      code: 200,
+      data: { summary: "已发布简介" },
+    });
     expect(visibleText).not.toContain("13800138000");
   });
 
@@ -197,7 +206,7 @@ describe("merchant profile http", () => {
       new Request("https://merclink.example/api/v1/merchant/profile"),
     );
     expect(missing.status).toBe(401);
-    await expect(missing.json()).resolves.toMatchObject({ error: "unauthorized" });
+    await expect(missing.json()).resolves.toMatchObject({ code: 40100, data: null });
 
     const memory = memoryStore();
     memory.merchants.set("mch_a", merchant({ phone: "13800138000" }));
@@ -212,13 +221,16 @@ describe("merchant profile http", () => {
     expect(saved.status).toBe(200);
     const shown = await publicStoreRoute();
     expect(shown.status).toBe(200);
-    await expect(shown.json()).resolves.toEqual({
-      display_name: "南风商店",
-      summary: "停用前简介",
-      website_url: null,
-      logo_url: null,
-      area_served: null,
-      address: null,
+    await expect(shown.json()).resolves.toMatchObject({
+      code: 200,
+      data: {
+        display_name: "南风商店",
+        summary: "停用前简介",
+        website_url: null,
+        logo_url: null,
+        area_served: null,
+        address: null,
+      },
     });
 
     const row = memory.merchants.get("mch_a");
@@ -228,8 +240,8 @@ describe("merchant profile http", () => {
     row.status = "disabled";
     const hidden = await publicStoreRoute();
     expect(hidden.status).toBe(404);
-    const hiddenBody = await responseJson(hidden);
-    expect(hiddenBody).toMatchObject({ error: "not_found" });
+    const hiddenBody: unknown = await hidden.json();
+    expect(hiddenBody).toMatchObject({ code: 40400, data: null });
     expect(isRecord(hiddenBody) && typeof hiddenBody.message === "string").toBe(true);
     expect(JSON.stringify(hiddenBody)).not.toContain("停用前简介");
     expect(JSON.stringify(hiddenBody)).not.toContain("display_name");
@@ -248,7 +260,7 @@ describe("merchant profile http", () => {
 
     asMerchant("mch_b", ["product:write"]);
     const other = await merchantProfileRoute(authed("GET"));
-    await expect(other.json()).resolves.toEqual(emptyDraft());
+    await expect(other.json()).resolves.toMatchObject({ code: 200, data: emptyDraft() });
     await putProfileRoute(authed("PUT", draftBody({ summary: "乙的草稿" })));
     asMerchant("mch_a", ["product:read"]);
     await expect(merchantProfileRoute(authed("GET")).then(responseJson)).resolves.toMatchObject({
@@ -263,7 +275,14 @@ describe("merchant profile http", () => {
 });
 
 async function responseJson(response: Response): Promise<unknown> {
-  return JSON.parse(await response.text()) as unknown;
+  return dataOf(JSON.parse(await response.text()));
+}
+
+function dataOf(value: unknown): unknown {
+  if (typeof value === "object" && value !== null && "data" in value) {
+    return value.data;
+  }
+  return value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

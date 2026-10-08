@@ -5,7 +5,7 @@ import {
   parseProfileBody,
   type ProfileDraft,
 } from "../../domain/identity/profile";
-import { apiError } from "../../shared/errors";
+import { apiFailure, apiSuccess } from "../../shared/errors";
 import { authenticate } from "../../shared/seams/authenticate";
 import {
   publicStore,
@@ -45,15 +45,15 @@ export async function getMerchantProfile(request: Request): Promise<Response> {
   }
   const merchantId = merchantOwnerId(auth.actor);
   if (merchantId === undefined) {
-    return apiError("forbidden", "需要商家权限。", 403);
+    return apiFailure("forbidden", "需要商家权限。", { request });
   }
   const store = ensureStore();
   const secrets = await store.secrets(merchantId);
   if (secrets === null) {
-    return apiError("forbidden", "需要商家权限。", 403);
+    return apiFailure("forbidden", "需要商家权限。", { request });
   }
   const row = await store.readOwn(merchantId);
-  return Response.json(merchantProfileJson(row));
+  return apiSuccess(merchantProfileJson(row), { request });
 }
 
 export async function putMerchantProfile(request: Request): Promise<Response> {
@@ -63,42 +63,42 @@ export async function putMerchantProfile(request: Request): Promise<Response> {
   }
   const merchantId = merchantOwnerId(auth.actor);
   if (merchantId === undefined) {
-    return apiError("forbidden", "需要商家权限。", 403);
+    return apiFailure("forbidden", "需要商家权限。", { request });
   }
   if (!canWriteProfile(auth.actor)) {
-    return apiError("forbidden", "缺少所需权限。", 403);
+    return apiFailure("forbidden", "缺少所需权限。", { request });
   }
   if (!isJsonContentType(request)) {
-    return apiError("validation_error", "请求体必须是 application/json。", 400);
+    return apiFailure("validation_error", "请求体必须是 application/json。", { request });
   }
   const parsedBody = await readJson(request);
   if (!parsedBody.ok) {
-    return apiError("validation_error", parsedBody.message, 400);
+    return apiFailure("validation_error", parsedBody.message, { request });
   }
   const store = ensureStore();
   const secrets = await store.secrets(merchantId);
   if (secrets === null) {
-    return apiError("forbidden", "需要商家权限。", 403);
+    return apiFailure("forbidden", "需要商家权限。", { request });
   }
   const parsed = parseProfileBody(parsedBody.value, secrets);
   if (!parsed.ok) {
-    return apiError(parsed.error, parsed.message, 400);
+    return apiFailure(parsed.error, parsed.message, { request });
   }
   const current = await store.readOwn(merchantId);
   const saved =
     current !== null && sameProfile(current, parsed.value)
       ? current
       : await store.replace(merchantId, parsed.value);
-  return Response.json(merchantProfileJson(saved));
+  return apiSuccess(merchantProfileJson(saved), { request });
 }
 
-export async function getPublicStore(): Promise<Response> {
+export async function getPublicStore(request?: Request): Promise<Response> {
   ensureStore();
   const store = await publicStore.get();
   if (store === null) {
-    return apiError("not_found", "没有已发布的店铺介绍。", 404);
+    return apiFailure("not_found", "没有已发布的店铺介绍。", { request });
   }
-  return Response.json(publicStoreJson(store));
+  return apiSuccess(publicStoreJson(store), { request });
 }
 
 function ensureStore(): MerchantProfileStore {

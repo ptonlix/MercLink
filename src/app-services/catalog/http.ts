@@ -1,11 +1,11 @@
 import { getDatabase } from "../../db/client";
 import { requireMerchantScope } from "../../domain/catalog/access";
-import type { CatalogErrorCode, CatalogFailure, CatalogResult } from "../../domain/catalog/result";
+import type { CatalogFailure, CatalogResult } from "../../domain/catalog/result";
 import { catalogFail, catalogOk } from "../../domain/catalog/result";
 import type { FieldFilterInput } from "../../domain/catalog/query";
 import { systemFieldKeys } from "../../domain/catalog/fields";
 import { authenticate } from "../../shared/seams/authenticate";
-import { apiError } from "../../shared/errors";
+import { apiFailure, apiSuccess } from "../../shared/errors";
 import type { Scope } from "../../shared/actor";
 import { addField, changeFields, listFields, readSchema } from "./fields";
 import { createCatalog, listCatalogs } from "./catalogs";
@@ -21,7 +21,13 @@ import {
   softDeleteVariant,
   unpublishProduct,
 } from "./products";
-import { imageResponse, publicImageResponse, readPublicImage, uploadCatalogImage } from "./images";
+import {
+  imageResponse,
+  mediaFailure,
+  publicImageResponse,
+  readPublicImage,
+  uploadCatalogImage,
+} from "./images";
 import { mediaRuntime } from "./media-runtime";
 import { getPublicProduct, listMerchantProducts, listPublicProducts } from "./query";
 import { registerCatalog } from "./register";
@@ -62,7 +68,7 @@ async function merchantGate(
   }
   const decision = requireMerchantScope(auth.actor, scope);
   if (!decision.ok) {
-    return { ok: false, response: failureResponse(decision) };
+    return { ok: false, response: failureResponse(decision, request) };
   }
   return { ok: true, merchantId: decision.value.merchantId };
 }
@@ -96,19 +102,20 @@ function fieldFiltersFrom(url: URL): CatalogResult<FieldFilterInput[]> {
   return catalogOk(filters);
 }
 
-function failureResponse(failure: CatalogFailure): Response {
-  return apiError(failure.error, failure.message, statusFor(failure.error));
+function failureResponse(failure: CatalogFailure, request?: Request): Response {
+  return apiFailure(failure.error, failure.message, { request });
 }
 
 function jsonResult<T>(
   result: CatalogResult<T>,
   map: (value: T) => unknown,
-  status = 200,
+  status: 200 | 201 = 200,
+  request?: Request,
 ): Response {
   if (!result.ok) {
-    return failureResponse(result);
+    return failureResponse(result, request);
   }
-  return Response.json(map(result.value), { status });
+  return apiSuccess(map(result.value), { status, request });
 }
 
 export async function getProducts(request: Request): Promise<Response> {
@@ -116,7 +123,7 @@ export async function getProducts(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const filters = fieldFiltersFrom(url);
   if (!filters.ok) {
-    return failureResponse(filters);
+    return failureResponse(filters, request);
   }
   const page = await listPublicProducts(sql, {
     ...(url.searchParams.get("q") !== null ? { q: url.searchParams.get("q") ?? undefined } : {}),
@@ -137,16 +144,21 @@ export async function getProducts(request: Request): Promise<Response> {
       : {}),
     fieldFilters: filters.value,
   });
-  return jsonResult(page, (value) => ({
-    items: value.items.map(publicProductJson),
-    next_cursor: value.nextCursor,
-  }));
+  return jsonResult(
+    page,
+    (value) => ({
+      items: value.items.map(publicProductJson),
+      next_cursor: value.nextCursor,
+    }),
+    200,
+    request,
+  );
 }
 
-export async function getProduct(id: string): Promise<Response> {
+export async function getProduct(id: string, request?: Request): Promise<Response> {
   const sql = ensureCatalogRegistered();
   const product = await getPublicProduct(sql, id);
-  return jsonResult(product, publicProductJson);
+  return jsonResult(product, publicProductJson, 200, request);
 }
 
 export async function getCatalogs(request: Request): Promise<Response> {
@@ -156,7 +168,7 @@ export async function getCatalogs(request: Request): Promise<Response> {
   }
   const sql = ensureCatalogRegistered();
   const items = await listCatalogs(sql, gate.merchantId);
-  return Response.json({ items: items.map(catalogJson) });
+  return apiSuccess({ items: items.map(catalogJson) }, { request });
 }
 
 export async function postCatalog(request: Request): Promise<Response> {
@@ -166,11 +178,11 @@ export async function postCatalog(request: Request): Promise<Response> {
   }
   const body = await readJson(request);
   if (!body.ok) {
-    return failureResponse(body);
+    return failureResponse(body, request);
   }
   const sql = ensureCatalogRegistered();
   const created = await createCatalog(sql, gate.merchantId, body.value);
-  return jsonResult(created, catalogJson, 201);
+  return jsonResult(created, catalogJson, 201, request);
 }
 
 export async function getSchema(request: Request, catalogId: string): Promise<Response> {
@@ -181,13 +193,18 @@ export async function getSchema(request: Request, catalogId: string): Promise<Re
   }
   const sql = ensureCatalogRegistered();
   const schema = await readSchema(sql, catalogId, actor?.ok === true ? actor.actor : undefined);
-  return jsonResult(schema, (value) => ({
-    catalog_id: value.catalogId,
-    currency: value.currency,
-    schema_revision: value.schemaRevision,
-    system_fields: systemFieldKeys,
-    fields: value.fields.map(fieldJson),
-  }));
+  return jsonResult(
+    schema,
+    (value) => ({
+      catalog_id: value.catalogId,
+      currency: value.currency,
+      schema_revision: value.schemaRevision,
+      system_fields: systemFieldKeys,
+      fields: value.fields.map(fieldJson),
+    }),
+    200,
+    request,
+  );
 }
 
 export async function getFields(request: Request, catalogId: string): Promise<Response> {
@@ -197,7 +214,7 @@ export async function getFields(request: Request, catalogId: string): Promise<Re
   }
   const sql = ensureCatalogRegistered();
   const fields = await listFields(sql, gate.merchantId, catalogId);
-  return jsonResult(fields, (value) => ({ items: value.map(fieldJson) }));
+  return jsonResult(fields, (value) => ({ items: value.map(fieldJson) }), 200, request);
 }
 
 export async function postField(request: Request, catalogId: string): Promise<Response> {
@@ -215,30 +232,34 @@ export async function postFieldChange(
   }
   const body = await readJson(request);
   if (!body.ok) {
-    return failureResponse(body);
+    return failureResponse(body, request);
   }
   const sql = ensureCatalogRegistered();
   const result =
     kind === "create"
       ? await addField(sql, gate.merchantId, catalogId, body.value)
       : await changeFields(sql, gate.merchantId, catalogId, body.value);
-  return jsonResult(result, (value) =>
-    value.applied
-      ? {
-          applied: true,
-          revision: value.revision,
-          affected_count: value.affectedCount,
-          field: value.field === null ? null : fieldJson({ id: "", ...value.field }),
-        }
-      : {
-          applied: false,
-          breaking: true,
-          affected_count: value.affectedCount,
-          affected: value.affected.map((item) => ({
-            product_id: item.productId,
-            reason: item.reason,
-          })),
-        },
+  return jsonResult(
+    result,
+    (value) =>
+      value.applied
+        ? {
+            applied: true,
+            revision: value.revision,
+            affected_count: value.affectedCount,
+            field: value.field === null ? null : fieldJson({ id: "", ...value.field }),
+          }
+        : {
+            applied: false,
+            breaking: true,
+            affected_count: value.affectedCount,
+            affected: value.affected.map((item) => ({
+              product_id: item.productId,
+              reason: item.reason,
+            })),
+          },
+    kind === "create" ? 201 : 200,
+    request,
   );
 }
 
@@ -263,10 +284,15 @@ export async function getMerchantProducts(request: Request, catalogId: string): 
       ? { cursor: url.searchParams.get("cursor") ?? undefined }
       : {}),
   });
-  return jsonResult(page, (value) => ({
-    items: value.items.map(productJson),
-    next_cursor: value.nextCursor,
-  }));
+  return jsonResult(
+    page,
+    (value) => ({
+      items: value.items.map(productJson),
+      next_cursor: value.nextCursor,
+    }),
+    200,
+    request,
+  );
 }
 
 export async function postCatalogImage(request: Request, catalogId: string): Promise<Response> {
@@ -285,13 +311,14 @@ export async function postCatalogImage(request: Request, catalogId: string): Pro
       byte_size: image.byteSize,
     }),
     201,
+    request,
   );
 }
 
 export async function getMedia(id: string): Promise<Response> {
   const runtime = mediaRuntime();
   if (runtime === undefined) {
-    return apiError("dependency_unavailable", "图片暂时无法读取。", 503);
+    return mediaFailure("dependency_unavailable", "图片暂时无法读取。");
   }
   const sql = ensureCatalogRegistered();
   return publicImageResponse(await readPublicImage(sql, runtime.objectStorage, id));
@@ -304,11 +331,11 @@ export async function postProduct(request: Request, catalogId: string): Promise<
   }
   const body = await readJson(request);
   if (!body.ok) {
-    return failureResponse(body);
+    return failureResponse(body, request);
   }
   const sql = ensureCatalogRegistered();
   const created = await createProduct(sql, gate.merchantId, catalogId, body.value);
-  return jsonResult(created, productJson, 201);
+  return jsonResult(created, productJson, 201, request);
 }
 
 export async function patchProductRoute(
@@ -386,11 +413,11 @@ export async function patchVariantRoute(
   }
   const body = await readJson(request);
   if (!body.ok) {
-    return failureResponse(body);
+    return failureResponse(body, request);
   }
   const sql = ensureCatalogRegistered();
   const updated = await patchVariant(sql, gate.merchantId, catalogId, variantId, body.value);
-  return jsonResult(updated, productJson);
+  return jsonResult(updated, productJson, 200, request);
 }
 
 export async function deleteVariantRoute(
@@ -404,22 +431,7 @@ export async function deleteVariantRoute(
   }
   const sql = ensureCatalogRegistered();
   const deleted = await softDeleteVariant(sql, gate.merchantId, catalogId, variantId);
-  return jsonResult(deleted, productJson);
-}
-
-function statusFor(error: CatalogErrorCode): number {
-  switch (error) {
-    case "forbidden":
-      return 403;
-    case "not_found":
-      return 404;
-    case "conflict":
-    case "insufficient_stock":
-    case "variant_required":
-      return 409;
-    default:
-      return 400;
-  }
+  return jsonResult(deleted, productJson, 200, request);
 }
 
 async function mutateProduct(
@@ -440,7 +452,7 @@ async function mutateProduct(
   }
   const sql = ensureCatalogRegistered();
   const updated = await run(sql, gate.merchantId, catalogId, productId, {});
-  return jsonResult(updated, productJson);
+  return jsonResult(updated, productJson, 200, request);
 }
 
 async function mutateWithBody(
@@ -454,7 +466,7 @@ async function mutateWithBody(
     productId: string,
     body: unknown,
   ) => Promise<CatalogResult<ProductRecord>>,
-  status = 201,
+  status: 200 | 201 = 201,
 ): Promise<Response> {
   const gate = await merchantGate(request, "product:write");
   if (!gate.ok) {
@@ -462,11 +474,11 @@ async function mutateWithBody(
   }
   const body = await readJson(request);
   if (!body.ok) {
-    return failureResponse(body);
+    return failureResponse(body, request);
   }
   const sql = ensureCatalogRegistered();
   const updated = await run(sql, gate.merchantId, catalogId, productId, body.value);
-  return jsonResult(updated, productJson, status);
+  return jsonResult(updated, productJson, status, request);
 }
 
 function catalogJson(catalog: CatalogRecord) {

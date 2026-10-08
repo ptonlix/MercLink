@@ -28,11 +28,26 @@ const dateParameterOids = [1082, 1083, 1114, 1184];
 
 function preserveDriverParameters(sql: Sql): void {
   const serializers = sql.options.serializers;
+  const parsers = sql.options.parsers;
   serializers[114] = jsonbParameter;
   serializers[3802] = jsonbParameter;
+  parsers[114] = jsonbParser;
+  parsers[3802] = jsonbParser;
   for (const oid of dateParameterOids) {
     serializers[oid] = dateParameter;
   }
+  // Drizzle replaces timestamp parsers with an identity function. Domain code
+  // expects Date instances from timestamptz columns.
+  parsers[1114] = dateParser;
+  parsers[1184] = dateParser;
+}
+
+function jsonbParser(value: string): unknown {
+  return JSON.parse(value);
+}
+
+function dateParser(value: string): Date {
+  return new Date(value);
 }
 
 function jsonbParameter(value: unknown): string {

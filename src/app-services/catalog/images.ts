@@ -10,7 +10,7 @@ import {
 import { catalogFail, catalogOk, type CatalogResult } from "../../domain/catalog/result";
 import type { ObjectStoragePort } from "../../ports/object-storage";
 import type { RateLimitPort } from "../../ports/rate-limit";
-import { apiError } from "../../shared/errors";
+import { apiFailure, apiSuccess, httpStatusFor } from "../../shared/errors";
 import { lockCatalog, ownedCatalog, type Db, type Sql } from "./db";
 import { mediaRuntime } from "./media-runtime";
 
@@ -27,28 +27,21 @@ export type ImageError =
 export type ImageResult<T> =
   { ok: true; value: T } | { ok: false; error: ImageError; message: string };
 
-function imageHttpStatus(error: ImageError): number {
-  switch (error) {
-    case "not_found":
-      return 404;
-    case "rate_limited":
-      return 429;
-    case "dependency_unavailable":
-      return 503;
-    default:
-      return 400;
-  }
+export function mediaFailure(error: ImageError, message: string): Response {
+  const readable = message.split("\n")[0] ?? "Request failed";
+  return Response.json({ error, message: readable }, { status: httpStatusFor(error) });
 }
 
 export function imageResponse<T>(
   result: ImageResult<T>,
   map: (value: T) => unknown,
-  status = 200,
+  status: 200 | 201 = 200,
+  request?: Request,
 ): Response {
   if (!result.ok) {
-    return apiError(result.error, result.message, imageHttpStatus(result.error));
+    return apiFailure(result.error, result.message, { request });
   }
-  return Response.json(map(result.value), { status });
+  return apiSuccess(map(result.value), { status, request });
 }
 
 export async function ownedMediaCover(
@@ -168,7 +161,7 @@ export function publicImageResponse(
   result: ImageResult<{ bytes: Uint8Array; contentType: string }>,
 ): Response {
   if (!result.ok) {
-    return apiError(result.error, result.message, imageHttpStatus(result.error));
+    return mediaFailure(result.error, result.message);
   }
   return new Response(binaryBody(result.value.bytes), {
     status: 200,
