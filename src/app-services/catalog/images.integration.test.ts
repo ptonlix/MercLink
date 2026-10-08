@@ -14,7 +14,7 @@ import { createClockRateLimit } from "../../adapters/redis/clock-rate-limit";
 import { systemClock, type Clock } from "../../ports/clock";
 import type { ObjectStoragePort } from "../../ports/object-storage";
 import type { RateLimitPort } from "../../ports/rate-limit";
-import { imageUploadLimit, imageUploadWindowMs, maxImageBytes } from "../../domain/catalog/images";
+import { imageUploadLimit, imageUploadWindowMs } from "../../domain/catalog/images";
 import { createCatalog } from "./catalogs";
 import { bindCatalogSql } from "./http";
 import { createProduct } from "./products";

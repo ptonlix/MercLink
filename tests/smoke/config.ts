@@ -19,7 +19,7 @@ export function readSmokeConfig(
   return { baseUrl, databaseName };
 }
 
-export function databaseNameFrom(databaseUrl: string | undefined): string | null {
+function databaseNameFrom(databaseUrl: string | undefined): string | null {
   if (databaseUrl === undefined || databaseUrl.trim() === "") {
     return null;
   }

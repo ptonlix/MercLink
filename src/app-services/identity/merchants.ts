@@ -103,9 +103,7 @@ export async function disableMerchant(
     await tx`
       UPDATE merchants SET status = ${effects.status}, updated_at = now() WHERE id = ${merchantId}
     `;
-    if (effects.revokeGrants || effects.revokeApiKeys) {
-      await revokeMerchantAccess(tx, merchantId);
-    }
+    await revokeMerchantAccess(tx, merchantId);
   });
   return { ok: true };
 }

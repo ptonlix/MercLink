@@ -8,10 +8,7 @@ const secrets = { phone: "13800138000", email: "secret@example.com" };
 describe("merchant profile validation", () => {
   it("accepts a draft with empty text and null optional fields", () => {
     expect(
-      parseProfileBody(
-        draftBody({ display_name: "", summary: "", published: false }),
-        secrets,
-      ),
+      parseProfileBody(draftBody({ display_name: "", summary: "", published: false }), secrets),
     ).toEqual({
       ok: true,
       value: {

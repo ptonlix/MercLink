@@ -1,6 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreDependencies": ["argon2", "oidc-provider"],
   "ignoreIssues": {
     "src/db/client.ts": ["exports", "types"],
     "src/ports/**": ["exports", "types"],

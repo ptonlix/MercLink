@@ -12,12 +12,12 @@
 
 ## 谁做什么
 
-| 角色 | 做什么 | 不做什么 |
-| --- | --- | --- |
+| 角色       | 做什么                                       | 不做什么                               |
+| ---------- | -------------------------------------------- | -------------------------------------- |
 | 商家 Agent | 建目录、定义字段、创建商品和规格、上架或下架 | 不能自己开通商家，不能把订单标成已支付 |
-| 买家 Agent | 查已上架商品，按规格下一行订单，查支付结果 | 不能改商品，不能自己传价格 |
-| 付款人 | 在支付宝完成支付 | 不把支付宝密码交给 Agent |
-| 超级管理员 | 开通、停用商家，重置商家密码 | 不在这里管理商品 |
+| 买家 Agent | 查已上架商品，按规格下一行订单，查支付结果   | 不能改商品，不能自己传价格             |
+| 付款人     | 在支付宝完成支付                             | 不把支付宝密码交给 Agent               |
+| 超级管理员 | 开通、停用商家，重置商家密码                 | 不在这里管理商品                       |
 
 字段、商品和规格属于目录，不属于商家账号。一家商家可以有多本目录。
 
@@ -33,14 +33,14 @@ API Key 不是 Agent 的登录方式。它只给没有浏览器的服务器脚�
 
 ## 技术栈
 
-| 部分 | 选择 |
-| --- | --- |
-| 应用 | Next.js 16、TypeScript、一个进程 |
-| 数据 | PostgreSQL 18、Drizzle |
-| 限流 | Redis 8。只记次数，不做缓存 |
-| 图片 | S3 兼容存储。本地用 MinIO，不写应用磁盘 |
-| 授权 | OAuth 2.1 设备码，`node-oidc-provider` |
-| 包管理 | pnpm 12.9.1 |
+| 部分   | 选择                                    |
+| ------ | --------------------------------------- |
+| 应用   | Next.js 16、TypeScript、一个进程        |
+| 数据   | PostgreSQL 18、Drizzle                  |
+| 限流   | Redis 8。只记次数，不做缓存             |
+| 图片   | S3 兼容存储。本地用 MinIO，不写应用磁盘 |
+| 授权   | OAuth 2.1 设备码，`node-oidc-provider`  |
+| 包管理 | pnpm 12.9.1                             |
 
 实现约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。人和 AI Coding 助手改代码前先读 [AGENTS.md](AGENTS.md)。
 
@@ -95,19 +95,19 @@ docker compose -p merclink down
 
 ## 常用入口
 
-| 路径 | 谁用 | 用途 |
-| --- | --- | --- |
-| `/` | 访客 | 这一家店的落地页 |
-| `/products` | 访客、Agent | 已上架商品 |
-| `/skill.md` | 买家 Agent | 怎么查商品、下单、查支付 |
-| `/merchant/skill.md` | 商家 Agent | 怎么管目录和商品 |
-| `/llms.txt` | Agent | 发现上述入口 |
-| `/oauth/device/auth` | Agent | 申请设备码 |
-| `/authorize/buyer` | 买家 | 注册、登录、批准 |
-| `/authorize/merchant` | 商家 | 登录、批准。没有注册 |
-| `/admin` | 超级管理员 | 开通或停用商家 |
-| `/api/v1` | Agent、脚本 | HTTP API |
-| `/api/health` | 部署检查 | 健康检查 |
+| 路径                  | 谁用        | 用途                     |
+| --------------------- | ----------- | ------------------------ |
+| `/`                   | 访客        | 这一家店的落地页         |
+| `/products`           | 访客、Agent | 已上架商品               |
+| `/skill.md`           | 买家 Agent  | 怎么查商品、下单、查支付 |
+| `/merchant/skill.md`  | 商家 Agent  | 怎么管目录和商品         |
+| `/llms.txt`           | Agent       | 发现上述入口             |
+| `/oauth/device/auth`  | Agent       | 申请设备码               |
+| `/authorize/buyer`    | 买家        | 注册、登录、批准         |
+| `/authorize/merchant` | 商家        | 登录、批准。没有注册     |
+| `/admin`              | 超级管理员  | 开通或停用商家           |
+| `/api/v1`             | Agent、脚本 | HTTP API                 |
+| `/api/health`         | 部署检查    | 健康检查                 |
 
 查已上架商品不需要登录。下单和管理接口使用 `Authorization: Bearer <访问令牌>`。错误体是 `{ "error": "<code>", "message": "<可读说明>" }`。路径以 `src/shared/api-routes.ts` 为准，说明以两份 Skill 为准。
 

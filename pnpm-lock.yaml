@@ -162,6 +162,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  urllib: '>=4.9.1'
+
 importers:
 
   .:
@@ -3726,8 +3729,8 @@ packages:
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
 
-  urllib@4.9.0:
-    resolution: {integrity: sha512-Rp3DBvVqy9arSTMH6oN5N7OAN01U3dQ2xc19AadP86MzC4j67MDeqOup5shpWnjkDVGWfLfWPOd8CyqOtd6u3w==}
+  urllib@4.9.1:
+    resolution: {integrity: sha512-Pi9NgRXZYpcLJIZQZiX7F7Bc41JeYxHygITWug5omCfI9+cgcRU0rSxpqHfLtfy3eaRrhi1q89Xh8IF0GVGItw==}
     engines: {node: '>= 18.19.0'}
 
   utility@2.5.0:
@@ -5348,7 +5351,7 @@ snapshots:
       formstream: 1.5.2
       snakecase-keys: 8.1.0
       sse-decoder: 1.0.0
-      urllib: 4.9.0
+      urllib: 4.9.1
       utility: 2.5.0
 
   ansi-styles@4.3.0:
@@ -7456,7 +7459,7 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  urllib@4.9.0:
+  urllib@4.9.1:
     dependencies:
       form-data: 4.0.6
       formstream: 1.5.2

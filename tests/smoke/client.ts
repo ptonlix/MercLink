@@ -107,12 +107,6 @@ export function assertSuccess(body: Envelope, status: number): void {
   }
 }
 
-export function assertFailure(body: Envelope, status: number, code: number): void {
-  if (status === 200 || body.code !== code || body.data !== null) {
-    throw new Error(`expected HTTP ${String(status)} code ${String(code)}, got ${JSON.stringify(body)}`);
-  }
-}
-
 export function assertDevStubs(): void {
   if (process.env.SMOKE_DEV_STUBS !== "1") {
     throw new Error("SMOKE_DEV_STUBS=1 is required before payment, SMS, or captcha flows");

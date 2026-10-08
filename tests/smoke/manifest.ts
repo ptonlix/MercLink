@@ -1,10 +1,10 @@
 export const smokeMethods = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 
-export type SmokeMethod = (typeof smokeMethods)[number];
+type SmokeMethod = (typeof smokeMethods)[number];
 
-export type SmokeAudience = "public" | "bearer" | "cookie" | "form";
+type SmokeAudience = "public" | "bearer" | "cookie" | "form";
 
-export type SmokeBodyKind = "envelope" | "text" | "json" | "html" | "bytes" | "redirect" | "empty" | "oauth";
+type SmokeBodyKind = "envelope" | "text" | "json" | "html" | "bytes" | "redirect" | "empty" | "oauth";
 
 export type SmokeRoute = {
   method: SmokeMethod;

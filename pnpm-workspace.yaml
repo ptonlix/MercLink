@@ -1,3 +1,6 @@
+overrides:
+  urllib: ">=4.9.1"
+
 allowBuilds:
   "@alicloud/openapi-core": true
   argon2: true

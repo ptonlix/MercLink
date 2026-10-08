@@ -13,9 +13,7 @@ export function imageUploadPolicies(): {
   };
 }
 
-const imageContentTypes = ["image/jpeg", "image/png", "image/webp"] as const;
-
-export type ImageContentType = (typeof imageContentTypes)[number];
+export type ImageContentType = "image/jpeg" | "image/png" | "image/webp";
 
 const jpegSignature = [0xff, 0xd8, 0xff] as const;
 const pngSignature = [0x89, 0x50, 0x4e, 0x47] as const;

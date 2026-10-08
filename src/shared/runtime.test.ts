@@ -21,8 +21,7 @@ describe("startup refusal", () => {
       "OBJECT_STORAGE_ACCESS_KEY_ID",
       "OBJECT_STORAGE_SECRET_ACCESS_KEY",
     ] as const) {
-      const missing = { ...source };
-      delete missing[key];
+      const missing = Object.fromEntries(Object.entries(source).filter(([name]) => name !== key));
       const loaded = loadEnv(missing);
       expect(loaded.ok).toBe(false);
       if (!loaded.ok) {
