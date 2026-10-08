@@ -2,20 +2,14 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  activePhoneAvailable,
-  disableMerchantEffects,
   merchantCanApproveAgent,
   merchantCanAuthenticate,
   provisionedMerchant,
+  shouldCreateStoreMerchant,
   shouldCreateSuperAdmin,
   unknownMerchantMessage,
 } from "./accounts";
-import {
-  isArgon2idHash,
-  nextPasswordAccepted,
-  passwordIsHashed,
-  provisionAllowed,
-} from "./password";
+import { isArgon2idHash, nextPasswordAccepted, passwordIsHashed } from "./password";
 import { isLoginPhone, normalizePhone } from "./phone";
 import { deviceCodeTtlSeconds } from "../access/tokens";
 import {
@@ -50,13 +44,7 @@ describe("phones and passwords", () => {
     expect(passwordIsHashed("plain-secret", "plain-secret")).toBe(false);
   });
 
-  it("blocks merchant provisioning until the initial password changes", () => {
-    expect(provisionAllowed(true)).toEqual({
-      ok: false,
-      error: "password_change_required",
-      message: "请先修改初始密码。",
-    });
-    expect(provisionAllowed(false)).toEqual({ ok: true });
+  it("rejects a short next password", () => {
     expect(nextPasswordAccepted("short")).toMatchObject({ ok: false, error: "validation_error" });
     expect(nextPasswordAccepted("long-enough")).toEqual({ ok: true });
   });
@@ -66,18 +54,10 @@ describe("admin and merchant accounts", () => {
   it("creates one super-admin and one active merchant", () => {
     expect(shouldCreateSuperAdmin(0)).toBe(true);
     expect(shouldCreateSuperAdmin(1)).toBe(false);
-    expect(activePhoneAvailable(true).ok).toBe(false);
-    expect(activePhoneAvailable(false)).toEqual({ ok: true });
     expect(provisionedMerchant()).toEqual({ status: "active", mustChangePassword: true });
   });
 
   it("disables login and approval without deleting the account", () => {
-    expect(disableMerchantEffects()).toEqual({
-      status: "disabled",
-      revokeGrants: true,
-      revokeApiKeys: true,
-      keepAccount: true,
-    });
     expect(merchantCanAuthenticate({ status: "disabled", deletedAt: null })).toBe(false);
     expect(merchantCanAuthenticate({ status: "active", deletedAt: new Date() })).toBe(false);
     expect(merchantCanAuthenticate({ status: "active", deletedAt: null })).toBe(true);
@@ -87,13 +67,17 @@ describe("admin and merchant accounts", () => {
     expect(
       merchantCanApproveAgent({ status: "active", deletedAt: null, mustChangePassword: false }),
     ).toBe(true);
-    expect(unknownMerchantMessage).toBe("请联系管理员开通");
+    expect(unknownMerchantMessage).toBe("请使用店主手机号登录。");
+    expect(shouldCreateStoreMerchant(0)).toBe(true);
+    expect(shouldCreateStoreMerchant(1)).toBe(false);
   });
 
-  it("disables a merchant through the access seam instead of writing grant tables", async () => {
+  it("does not keep a second-store provision, disable, or password-copy path", async () => {
     const source = await readFile("src/app-services/identity/merchants.ts", "utf8");
-    expect(source).toContain("disableMerchantEffects");
-    expect(source).toContain("revokeMerchantAccess");
+    expect(source).not.toContain("disableMerchant");
+    expect(source).not.toContain("resetMerchantPassword");
+    expect(source).not.toContain("alignStoreMerchant");
+    expect(source).not.toContain("revokeMerchantAccess");
     expect(source).not.toContain("oauth_grants");
     expect(source).not.toContain("api_keys");
     expect(source).not.toContain("oidc_records");

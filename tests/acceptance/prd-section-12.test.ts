@@ -45,7 +45,7 @@ import { createMemoryRateLimit } from "../../src/adapters/redis/memory";
 import { smsRateLimitPolicies } from "../../src/domain/identity/registration";
 import { requestBuyerSms } from "../../src/app-services/identity/buyers";
 import { fakeCaptcha, fakeSms } from "../../src/app-services/identity/fakes";
-import { provisionMerchant } from "../../src/app-services/identity/merchants";
+import { ensureStoreMerchant } from "../../src/app-services/identity/merchants";
 import { runOnce } from "../../src/jobs/close-expired-orders";
 import { runMigrations } from "../../src/db/migrate";
 import { loadLanding, loadProduct } from "../../src/public-discovery/model";
@@ -124,22 +124,16 @@ describe("PRD section 12", () => {
           nextPassword: "changed-admin-password",
         }),
       ).toMatchObject({ ok: true });
-      const first = await provisionMerchant(sql, {
-        adminId: admin.admin.id,
-        name: "跑鞋店",
-        phone: "13800000001",
-        password: "merchant-password",
-      });
-      const second = await provisionMerchant(sql, {
-        adminId: admin.admin.id,
-        name: "净化器店",
-        phone: "13800000002",
-        password: "merchant-password",
-      });
-      expect(first.ok && second.ok).toBe(true);
-      if (!first.ok || !second.ok) {
-        return;
-      }
+      const first = await ensureStoreMerchant(sql, admin.admin);
+      const secondMerchantId = "mch_foreign_store";
+      await sql`
+        INSERT INTO merchants (
+          id, name, phone, password_hash, status, created_by, must_change_password
+        ) VALUES (
+          ${secondMerchantId}, '隔离用商家', '13800000002', 'hash', 'active', ${admin.admin.id}, false
+        )
+      `;
+      const second = { merchantId: secondMerchantId };
       expect(first.default_catalog).toBe("created");
       const shoes = (await listCatalogs(sql, first.merchantId))[0];
       expect(shoes).toBeDefined();
@@ -424,7 +418,8 @@ describe("PRD section 12", () => {
         const page = renderToStaticMarkup(
           createElement(MerchantAuthorizeView, { notice: null, mustChangePassword: false }),
         );
-        expect(page).toContain("请联系管理员开通");
+        expect(page).toContain("店主账号");
+        expect(page).not.toContain("请联系管理员开通");
         expect(page).not.toContain("注册");
 
         const captcha = fakeCaptcha(() => false);

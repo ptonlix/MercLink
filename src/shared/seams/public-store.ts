@@ -11,17 +11,26 @@ export type PublicStoreImpl = {
   get: () => Promise<PublicStoreProfile | null>;
 };
 
-let implementation: PublicStoreImpl | undefined;
+const slotKey = Symbol.for("merclink.publicStore");
+
+type StoreSlot = { impl?: PublicStoreImpl };
+
+function slot(): StoreSlot {
+  const globalSlot = globalThis as typeof globalThis & { [slotKey]?: StoreSlot };
+  globalSlot[slotKey] ??= {};
+  return globalSlot[slotKey];
+}
 
 export function registerPublicStore(impl: PublicStoreImpl): void {
-  implementation = impl;
+  slot().impl = impl;
 }
 
 export function resetPublicStore(): void {
-  implementation = undefined;
+  slot().impl = undefined;
 }
 
 async function get(): Promise<PublicStoreProfile | null> {
+  const implementation = slot().impl;
   if (implementation === undefined) {
     return null;
   }

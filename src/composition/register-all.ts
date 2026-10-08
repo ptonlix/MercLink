@@ -8,6 +8,7 @@ import { registerCatalogOwnership } from "../app-services/commerce/runtime";
 import { registerMerchantProfile } from "../app-services/identity/profile-http";
 import { getDatabase, type Sql } from "../db/client";
 import { ensureSuperAdmin } from "../app-services/identity/admin";
+import { ensureStoreMerchant } from "../app-services/identity/merchants";
 import { accountCanAuthenticate } from "../app-services/identity/can-authenticate";
 import { appRuntime } from "../app-services/identity/runtime";
 import { getRedisClient } from "../adapters/redis/client";
@@ -42,7 +43,7 @@ export async function registerAll(source: NodeJS.ProcessEnv = process.env): Prom
   }
   await bindObjectStorage(loaded.env);
   const runtime = appRuntime();
-  await ensureSuperAdmin(runtime.sql, {
+  const admin = await ensureSuperAdmin(runtime.sql, {
     phone: loaded.env.ADMIN_PHONE,
     password: loaded.env.ADMIN_PASSWORD,
   });
@@ -55,6 +56,7 @@ export async function registerAll(source: NodeJS.ProcessEnv = process.env): Prom
     },
   });
   registerSlices({ sql: getDatabase(loaded.env.DATABASE_URL).sql, provider });
+  await ensureStoreMerchant(runtime.sql, admin.admin);
   ready = true;
 }
 

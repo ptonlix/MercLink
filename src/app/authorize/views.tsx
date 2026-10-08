@@ -10,8 +10,10 @@ export function MerchantAuthorizeView(props: {
   return (
     <main className="sheet">
       <p className="kicker">MercLink</p>
-      <h1>{account === null ? "商家登录" : "批准 Agent"}</h1>
-      <p className="lede">已开通的商家在这里登录并批准 Agent。没有账号时，请联系管理员开通。</p>
+      <h1>{account === null ? "店主登录" : "批准 Agent"}</h1>
+      <p className="lede">
+        用启动时的店主账号登录并批准 Agent。手机号和密码与管理页相同。这里不能新建账号。
+      </p>
       {props.notice === null ? null : <p className="notice">{props.notice}</p>}
       {account === null ? (
         <form action="/authorize/merchant/submit" method="post" className="stack">
@@ -225,14 +227,15 @@ export function AccountKeyView(props: {
   );
 }
 
-export function AdminView(props: {
-  notice: string | null;
-  mustChangePassword: boolean;
-}): ReactNode {
+export function AdminView(props: { notice: string | null }): ReactNode {
   return (
     <main className="sheet">
       <p className="kicker">管理</p>
-      <h1>超级管理员</h1>
+      <h1>店主</h1>
+      <p className="lede">
+        这一套部署只有一家店。这个账号就是店主，用同一手机号和密码到商家授权页批准
+        Agent。默认目录已经建好。
+      </p>
       {props.notice === null ? null : <p className="notice">{props.notice}</p>}
       <form action="/admin/submit" method="post" className="stack">
         <input type="hidden" name="intent" value="password" />
@@ -246,46 +249,6 @@ export function AdminView(props: {
         </label>
         <button type="submit">修改密码</button>
       </form>
-      {props.mustChangePassword ? null : (
-        <>
-          <form action="/admin/submit" method="post" className="stack">
-            <input type="hidden" name="intent" value="provision" />
-            <label>
-              商家名称
-              <input name="name" required />
-            </label>
-            <label>
-              手机号
-              <input name="phone" inputMode="numeric" required />
-            </label>
-            <label>
-              初始密码
-              <input name="password" type="password" required />
-            </label>
-            <button type="submit">开通商家</button>
-          </form>
-          <form action="/admin/submit" method="post" className="stack">
-            <input type="hidden" name="intent" value="disable" />
-            <label>
-              商家编号
-              <input name="merchantId" required />
-            </label>
-            <button type="submit">停用商家</button>
-          </form>
-          <form action="/admin/submit" method="post" className="stack">
-            <input type="hidden" name="intent" value="reset" />
-            <label>
-              商家编号
-              <input name="merchantId" required />
-            </label>
-            <label>
-              新密码
-              <input name="password" type="password" required />
-            </label>
-            <button type="submit">重置密码</button>
-          </form>
-        </>
-      )}
     </main>
   );
 }

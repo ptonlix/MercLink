@@ -4,11 +4,6 @@ import {
   ensureSuperAdmin,
 } from "../../../app-services/identity/admin";
 import {
-  disableMerchant,
-  provisionMerchant,
-  resetMerchantPassword,
-} from "../../../app-services/identity/merchants";
-import {
   appRuntime,
   formValue,
   readCookie,
@@ -68,33 +63,6 @@ export async function POST(request: Request): Promise<Response> {
     });
     return redirectTo(
       `/admin?notice=${encodeURIComponent(result.ok ? "密码已修改。" : result.message)}`,
-    );
-  }
-  if (intent === "provision") {
-    const result = await provisionMerchant(runtime.sql, {
-      adminId: session.adminId,
-      name: formValue(form, "name"),
-      phone: formValue(form, "phone"),
-      password: formValue(form, "password"),
-    });
-    const message = result.ok
-      ? `已开通 ${result.merchantId}，目录 ${result.default_catalog}`
-      : result.message;
-    return redirectTo(`/admin?notice=${encodeURIComponent(message)}`);
-  }
-  if (intent === "disable") {
-    const result = await disableMerchant(runtime.sql, formValue(form, "merchantId"));
-    return redirectTo(
-      `/admin?notice=${encodeURIComponent(result.ok ? "商家已停用。" : result.message)}`,
-    );
-  }
-  if (intent === "reset") {
-    const result = await resetMerchantPassword(runtime.sql, {
-      merchantId: formValue(form, "merchantId"),
-      password: formValue(form, "password"),
-    });
-    return redirectTo(
-      `/admin?notice=${encodeURIComponent(result.ok ? "密码已重置。" : result.message)}`,
     );
   }
   return redirectTo("/admin");

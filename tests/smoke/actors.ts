@@ -16,40 +16,30 @@ export async function merchantAccessToken(client: SmokeClient): Promise<Merchant
   if (adminPhone === undefined || adminPassword === undefined) {
     throw new Error("ADMIN_PHONE and ADMIN_PASSWORD are required to provision a smoke merchant");
   }
+  let password = adminPassword;
   const signedIn = await loginAdmin(client, adminPhone, adminPassword);
-  if (!signedIn) {
+  if (signedIn) {
+    const changed = await changeAdminPassword(client, adminPassword, smokeAdminPassword);
+    if (!noticeFrom(changed).includes("密码已修改")) {
+      throw new Error(`store owner password change failed: ${noticeFrom(changed)}`);
+    }
+    password = smokeAdminPassword;
+  } else {
     const retired = await loginAdmin(client, adminPhone, smokeAdminPassword);
     if (!retired) {
-      throw new Error("admin login failed");
+      throw new Error("store owner login failed");
     }
-  }
-  const phone = uniquePhone();
-  const initialPassword = "merchant-init-1";
-  let notice = await provision(client, phone, initialPassword);
-  if (notice.includes("修改")) {
-    await changeAdminPassword(client, adminPassword, smokeAdminPassword);
-    client.clearCookies();
-    const again = await loginAdmin(client, adminPhone, smokeAdminPassword);
-    if (!again) {
-      throw new Error("admin login failed after password change");
-    }
-    notice = await provision(client, phone, initialPassword);
-  }
-  const merchantId = /mch_[A-Za-z0-9_-]+/.exec(notice)?.[0];
-  if (merchantId === undefined) {
-    throw new Error(`merchant was not provisioned: ${notice}`);
+    password = smokeAdminPassword;
   }
   client.clearCookies();
-  await submitForm(client, "/authorize/merchant/submit", {
+  const loggedIn = await submitForm(client, "/authorize/merchant/submit", {
     intent: "login",
-    phone,
-    password: initialPassword,
+    phone: adminPhone,
+    password,
   });
-  await submitForm(client, "/authorize/merchant/submit", {
-    intent: "change-password",
-    currentPassword: initialPassword,
-    nextPassword: "merchant-next-1",
-  });
+  if (noticeFrom(loggedIn).includes("不正确") || noticeFrom(loggedIn).includes("店主手机号")) {
+    throw new Error(`store owner authorization login failed: ${noticeFrom(loggedIn)}`);
+  }
   const token = await issueDeviceAccessToken(client, merchantScope);
   return { token };
 }
@@ -235,22 +225,12 @@ async function changeAdminPassword(
   client: SmokeClient,
   currentPassword: string,
   nextPassword: string,
-): Promise<void> {
-  await submitForm(client, "/admin/submit", {
+): Promise<Response> {
+  return submitForm(client, "/admin/submit", {
     intent: "password",
     currentPassword,
     nextPassword,
   });
-}
-
-async function provision(client: SmokeClient, phone: string, password: string): Promise<string> {
-  const response = await submitForm(client, "/admin/submit", {
-    intent: "provision",
-    name: "冒烟商店",
-    phone,
-    password,
-  });
-  return noticeFrom(response);
 }
 
 async function submitForm(

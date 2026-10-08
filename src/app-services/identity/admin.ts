@@ -1,11 +1,7 @@
 import type { Sql } from "../../db/client";
 import { shouldCreateSuperAdmin } from "../../domain/identity/accounts";
-import {
-  passwordIsHashed,
-  nextPasswordAccepted,
-  provisionAllowed,
-} from "../../domain/identity/password";
-import { isLoginPhone, normalizePhone } from "../../domain/identity/phone";
+import { passwordIsHashed, nextPasswordAccepted } from "../../domain/identity/password";
+import { normalizePhone } from "../../domain/identity/phone";
 import { createPublicId } from "../../shared/id";
 import { hashPassword, verifyPassword } from "./passwords";
 import { failure, type Failure } from "./result";
@@ -86,21 +82,17 @@ export async function changeAdminPassword(
     return failure(401, "unauthorized", "当前密码不正确。");
   }
   const passwordHash = await hashPassword(input.nextPassword);
-  await sql`
-    UPDATE admins
-    SET password_hash = ${passwordHash}, must_change_password = false, updated_at = now()
-    WHERE id = ${admin.id}
-  `;
-  return { ok: true };
-}
-
-export function assertAdminCanProvision(admin: AdminRecord): { ok: true } | Failure {
-  const decision = provisionAllowed(admin.mustChangePassword);
-  if (!decision.ok) {
-    return failure(403, decision.error, decision.message);
-  }
-  if (!isLoginPhone(admin.phone)) {
-    return failure(400, "validation_error", "管理员手机号不正确。");
-  }
+  await sql.begin(async (tx) => {
+    await tx`
+      UPDATE admins
+      SET password_hash = ${passwordHash}, must_change_password = false, updated_at = now()
+      WHERE id = ${admin.id}
+    `;
+    await tx`
+      UPDATE merchants
+      SET password_hash = ${passwordHash}, must_change_password = false, updated_at = now()
+      WHERE phone = ${admin.phone} AND deleted_at IS NULL
+    `;
+  });
   return { ok: true };
 }

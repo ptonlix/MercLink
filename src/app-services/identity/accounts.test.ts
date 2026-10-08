@@ -6,12 +6,7 @@ import { unknownMerchantMessage } from "../../domain/identity/accounts";
 import { defaultCatalog, resetDefaultCatalog } from "../../shared/seams/default-catalog";
 import { changeAdminPassword, ensureSuperAdmin } from "./admin";
 import { withIdentityDatabase } from "./database";
-import {
-  disableMerchant,
-  loginMerchant,
-  provisionMerchant,
-  resetMerchantPassword,
-} from "./merchants";
+import { ensureStoreMerchant, loginMerchant } from "./merchants";
 
 const phone = "13800138000";
 const password = "initial-admin-password";
@@ -55,7 +50,7 @@ describe("identity schema", () => {
 });
 
 describe("super-admin and merchants", () => {
-  it("hashes the initial password and rejects provisioning before it changes", async () => {
+  it("hashes the initial password and creates the store before the password changes", async () => {
     await withIdentityDatabase(async (sql) => {
       const first = await ensureSuperAdmin(sql, { phone, password });
       const second = await ensureSuperAdmin(sql, {
@@ -66,17 +61,20 @@ describe("super-admin and merchants", () => {
       expect(second.created).toBe(false);
       expect(second.admin.id).toBe(first.admin.id);
       expect(passwordIsHashed(first.admin.passwordHash, password)).toBe(true);
-      const blocked = await provisionMerchant(sql, {
-        adminId: first.admin.id,
-        name: "南风铺",
-        phone: "13700137000",
-        password: "merchant-password",
-      });
-      expect(blocked).toMatchObject({ ok: false, status: 403, error: "password_change_required" });
+      const store = await ensureStoreMerchant(sql, first.admin);
+      expect(store).toMatchObject({ ok: true, created: true, default_catalog: "pending" });
+      const again = await ensureStoreMerchant(sql, first.admin);
+      expect(again).toMatchObject({ ok: true, created: false, merchantId: store.merchantId });
+      await sql`UPDATE merchants SET password_hash = 'kept-hash' WHERE id = ${store.merchantId}`;
+      await ensureStoreMerchant(sql, first.admin);
+      const rows = await sql<{ password_hash: string }[]>`
+        SELECT password_hash FROM merchants WHERE id = ${store.merchantId}
+      `;
+      expect(rows[0]?.password_hash).toBe("kept-hash");
     });
   });
 
-  it("provisions one merchant, requests the default catalog, and rejects a duplicate phone", async () => {
+  it("creates one store with the admin phone and requests the default catalog", async () => {
     await withIdentityDatabase(async (sql) => {
       const admin = await changedAdmin(sql);
       const calls: { merchantId: string; tx: object }[] = [];
@@ -84,39 +82,24 @@ describe("super-admin and merchants", () => {
         calls.push(input);
         return Promise.resolve({ status: "created", catalogId: "cat_test" });
       });
-      const created = await provisionMerchant(sql, {
-        adminId: admin.id,
-        name: "南风铺",
-        phone: "13700137000",
-        password: "merchant-password",
-      });
-      expect(created).toMatchObject({ ok: true, default_catalog: "created" });
+      const created = await ensureStoreMerchant(sql, admin);
+      expect(created).toMatchObject({ ok: true, created: true, default_catalog: "created" });
       expect(calls).toHaveLength(1);
-      if (created.ok) {
-        expect(calls[0]?.merchantId).toBe(created.merchantId);
-      }
-      const duplicate = await provisionMerchant(sql, {
-        adminId: admin.id,
-        name: "另一家",
-        phone: "13700137000",
-        password: "merchant-password",
-      });
-      expect(duplicate).toMatchObject({ ok: false, error: "conflict" });
-      const count = await sql<{ count: string }[]>`SELECT count(*) FROM merchants`;
-      expect(count[0]?.count).toBe("1");
+      expect(calls[0]?.merchantId).toBe(created.merchantId);
+      const rows = await sql<{ phone: string; name: string }[]>`
+        SELECT phone, name FROM merchants
+      `;
+      expect(rows).toEqual([{ phone, name: "本店" }]);
+      const login = await loginMerchant(sql, { phone, password: next });
+      expect(login.ok).toBe(true);
     });
   });
 
-  it("still provisions when the default catalog seam is unregistered", async () => {
+  it("still creates the store when the default catalog seam is unregistered", async () => {
     await withIdentityDatabase(async (sql) => {
       resetDefaultCatalog();
-      const admin = await changedAdmin(sql);
-      const created = await provisionMerchant(sql, {
-        adminId: admin.id,
-        name: "北窗",
-        phone: "13600136000",
-        password: "merchant-password",
-      });
+      const createdAdmin = await ensureSuperAdmin(sql, { phone, password });
+      const created = await ensureStoreMerchant(sql, createdAdmin.admin);
       expect(created).toMatchObject({ ok: true, default_catalog: "pending" });
       const rows = await sql<{ status: string; must_change_password: boolean }[]>`
         SELECT status, must_change_password FROM merchants
@@ -125,42 +108,7 @@ describe("super-admin and merchants", () => {
     });
   });
 
-  it("disables the merchant, revokes grants and keys, and rejects login", async () => {
-    await withIdentityDatabase(async (sql) => {
-      const admin = await changedAdmin(sql);
-      const created = await provisionMerchant(sql, {
-        adminId: admin.id,
-        name: "南风铺",
-        phone: "13700137000",
-        password: "merchant-password",
-      });
-      if (!created.ok) {
-        throw new Error("provision failed");
-      }
-      await sql`
-        INSERT INTO oauth_grants (id, owner_type, owner_id, client_name, scopes, refresh_hash)
-        VALUES ('grn_test', 'merchant', ${created.merchantId}, 'agent', ARRAY['product:read'], 'hash')
-      `;
-      await sql`
-        INSERT INTO api_keys (id, owner_type, owner_id, prefix, hash, scopes)
-        VALUES ('key_test', 'merchant', ${created.merchantId}, 'key_test', 'hash', ARRAY['product:read'])
-      `;
-      expect(await disableMerchant(sql, created.merchantId)).toEqual({ ok: true });
-      const grants = await sql<{ revoked_at: Date | null }[]>`SELECT revoked_at FROM oauth_grants`;
-      const keys = await sql<{ revoked_at: Date | null }[]>`SELECT revoked_at FROM api_keys`;
-      expect(grants[0]?.revoked_at).toBeInstanceOf(Date);
-      expect(keys[0]?.revoked_at).toBeInstanceOf(Date);
-      const login = await loginMerchant(sql, {
-        phone: "13700137000",
-        password: "merchant-password",
-      });
-      expect(login.ok).toBe(false);
-      const kept = await sql<{ id: string }[]>`SELECT id FROM merchants`;
-      expect(kept).toHaveLength(1);
-    });
-  });
-
-  it("tells an unknown phone to contact an administrator", async () => {
+  it("tells an unknown phone to use the store owner phone", async () => {
     await withIdentityDatabase(async (sql) => {
       const login = await loginMerchant(sql, {
         phone: "13700137000",
@@ -169,34 +117,6 @@ describe("super-admin and merchants", () => {
       expect(login).toMatchObject({ ok: false, message: unknownMerchantMessage });
       const count = await sql<{ count: string }[]>`SELECT count(*) FROM merchants`;
       expect(count[0]?.count).toBe("0");
-    });
-  });
-
-  it("resets a merchant password and requires another change", async () => {
-    await withIdentityDatabase(async (sql) => {
-      const admin = await changedAdmin(sql);
-      const created = await provisionMerchant(sql, {
-        adminId: admin.id,
-        name: "南风铺",
-        phone: "13700137000",
-        password: "merchant-password",
-      });
-      if (!created.ok) {
-        throw new Error("provision failed");
-      }
-      expect(
-        await resetMerchantPassword(sql, {
-          merchantId: created.merchantId,
-          password: "reset-password",
-        }),
-      ).toEqual({
-        ok: true,
-      });
-      const rows = await sql<{ must_change_password: boolean; password_hash: string }[]>`
-        SELECT must_change_password, password_hash FROM merchants WHERE id = ${created.merchantId}
-      `;
-      expect(rows[0]?.must_change_password).toBe(true);
-      expect(passwordIsHashed(rows[0]?.password_hash ?? "", "reset-password")).toBe(true);
     });
   });
 });

@@ -9,19 +9,7 @@ export function passwordIsHashed(stored: string, plaintext: string): boolean {
 }
 
 export type PasswordDecision =
-  | { ok: true }
-  | { ok: false; error: "password_change_required" | "validation_error"; message: string };
-
-export function provisionAllowed(mustChangePassword: boolean): PasswordDecision {
-  if (mustChangePassword) {
-    return {
-      ok: false,
-      error: "password_change_required",
-      message: "请先修改初始密码。",
-    };
-  }
-  return { ok: true };
-}
+  { ok: true } | { ok: false; error: "validation_error"; message: string };
 
 export function nextPasswordAccepted(password: string): PasswordDecision {
   if (password.trim().length < passwordMinLength) {

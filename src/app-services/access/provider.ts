@@ -88,8 +88,8 @@ export async function createAccessProvider(input: {
         ) {
           ctx.body = devicePromptPage(
             "确认设备码",
-            `请确认短码 ${userCode}。确认后继续登录或注册，并批准这次授权。`,
-            form,
+            `请确认短码 ${userCode}。确认后进入登录页。登录并修改初始密码后，才会出现批准。`,
+            visibleSubmit(form, "确认短码"),
           );
           return Promise.resolve();
         },
@@ -261,6 +261,18 @@ function deviceCodeMessage(err: { userCode?: string; name?: string } | undefined
     return "短码不正确、已过期，或已经提交过。请向 Agent 重新要一个短码，不要重复提交。";
   }
   return "处理失败，请向 Agent 重新要一个短码。";
+}
+
+export function visibleSubmit(form: string, label: string): string {
+  if (!form.includes("<form")) {
+    return form;
+  }
+  const visible = form.replace(/<noscript>[\s\S]*?<\/noscript>/gi, "");
+  if (visible.includes("<button")) {
+    return form;
+  }
+  const button = `<button type="submit">${escapeHtml(label)}</button>`;
+  return form.replace("</form>", `${button}</form>`);
 }
 
 export function devicePromptPage(title: string, message: string, form: string): string {

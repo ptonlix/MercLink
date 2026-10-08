@@ -110,6 +110,18 @@ describe("merchant skill", () => {
       expect(missingAssignedPaths(body, routesFor("merchant"))).toEqual([]);
       expect(body).toContain("不要引导用户自助注册");
       expect(body).toContain("Do not guide self-registration.");
+      expect(body).toContain("client_id=merclink-agent");
+      expect(body).toContain("application/x-www-form-urlencoded");
+      expect(body).toContain("scope=field:write product:write product:read order:read");
+      expect(body).toContain("verification_uri_complete");
+      expect(body).toContain("POST /oauth/token");
+      expect(body).toContain("authorization_pending");
+      expect(body).toContain("请先修改初始密码");
+      expect(body).toContain("店主账号");
+      expect(body).not.toContain("请联系管理员开通");
+      expect(body).toContain("默认目录");
+      expect(body).toContain("data.items[].id");
+      expect(body).toContain("data.applied");
       expect(body).toContain("不要向用户索要密码、短信验证码或 API Key");
       expect(body).toContain("字段预览");
       expect(body).toContain('"confirm": true');

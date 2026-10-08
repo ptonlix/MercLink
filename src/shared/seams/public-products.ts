@@ -51,17 +51,26 @@ export type PublicProductsImpl = {
   get: (id: string) => Promise<PublicGetResult>;
 };
 
-let implementation: PublicProductsImpl | undefined;
+const slotKey = Symbol.for("merclink.publicProducts");
+
+type ProductSlot = { impl?: PublicProductsImpl };
+
+function slot(): ProductSlot {
+  const globalSlot = globalThis as typeof globalThis & { [slotKey]?: ProductSlot };
+  globalSlot[slotKey] ??= {};
+  return globalSlot[slotKey];
+}
 
 export function registerPublicProducts(impl: PublicProductsImpl): void {
-  implementation = impl;
+  slot().impl = impl;
 }
 
 export function resetPublicProducts(): void {
-  implementation = undefined;
+  slot().impl = undefined;
 }
 
 async function list(query: PublicListQuery): Promise<PublicProductPage> {
+  const implementation = slot().impl;
   if (implementation === undefined) {
     return { items: [], nextCursor: null };
   }
@@ -69,6 +78,7 @@ async function list(query: PublicListQuery): Promise<PublicProductPage> {
 }
 
 async function get(id: string): Promise<PublicGetResult> {
+  const implementation = slot().impl;
   if (implementation === undefined) {
     return { ok: false, error: "not_found", message: "没有找到。" };
   }

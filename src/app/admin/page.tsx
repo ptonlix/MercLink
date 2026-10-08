@@ -28,7 +28,7 @@ export default async function AdminPage({
   if (admin === null || session === null || session.kind !== "admin") {
     return (
       <main className="sheet">
-        <h1>超级管理员</h1>
+        <h1>店主</h1>
         {params.notice === undefined ? null : <p className="notice">{params.notice}</p>}
         <form action="/admin/submit" method="post" className="stack">
           <input type="hidden" name="intent" value="login" />
@@ -45,7 +45,7 @@ export default async function AdminPage({
       </main>
     );
   }
-  return <AdminView notice={params.notice ?? null} mustChangePassword={admin.mustChangePassword} />;
+  return <AdminView notice={params.notice ?? null} />;
 }
 
 async function headerCookie(): Promise<string | undefined> {

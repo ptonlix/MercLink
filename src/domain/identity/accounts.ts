@@ -4,26 +4,8 @@ export function shouldCreateSuperAdmin(existingCount: number): boolean {
   return existingCount === 0;
 }
 
-export function activePhoneAvailable(
-  activeExists: boolean,
-): { ok: true } | { ok: false; message: string } {
-  if (activeExists) {
-    return { ok: false, message: "该手机号已开通。" };
-  }
-  return { ok: true };
-}
-
 export function provisionedMerchant(): { status: "active"; mustChangePassword: true } {
   return { status: "active", mustChangePassword: true };
-}
-
-export function disableMerchantEffects(): {
-  status: "disabled";
-  revokeGrants: true;
-  revokeApiKeys: true;
-  keepAccount: true;
-} {
-  return { status: "disabled", revokeGrants: true, revokeApiKeys: true, keepAccount: true };
 }
 
 export function merchantCanAuthenticate(input: {
@@ -41,4 +23,12 @@ export function merchantCanApproveAgent(input: {
   return merchantCanAuthenticate(input) && !input.mustChangePassword;
 }
 
-export const unknownMerchantMessage = "请联系管理员开通";
+export const storeMerchantName = "本店";
+
+export const singleStoreMessage = "这一套部署只有一家店。";
+
+export const unknownMerchantMessage = "请使用店主手机号登录。";
+
+export function shouldCreateStoreMerchant(existingCount: number): boolean {
+  return existingCount === 0;
+}

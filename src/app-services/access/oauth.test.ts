@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { withIdentityDatabase } from "../identity/database";
 import { changeAdminPassword, ensureSuperAdmin } from "../identity/admin";
-import { provisionMerchant } from "../identity/merchants";
+import { ensureStoreMerchant } from "../identity/merchants";
 import { hashPassword } from "../identity/passwords";
 import { resetAuthenticator } from "../../shared/seams/authenticate";
 import { resetDefaultCatalog } from "../../shared/seams/default-catalog";
@@ -165,15 +165,7 @@ describe("oauth 2.1", () => {
         currentPassword: "initial-admin-password",
         nextPassword: "changed-admin-password",
       });
-      const merchant = await provisionMerchant(sql, {
-        adminId: admin.admin.id,
-        name: "南风铺",
-        phone: "13700137000",
-        password: "merchant-password",
-      });
-      if (!merchant.ok) {
-        throw new Error("merchant was not provisioned");
-      }
+      const merchant = await ensureStoreMerchant(sql, admin.admin);
       await sql`UPDATE merchants SET must_change_password = false WHERE id = ${merchant.merchantId}`;
       const started = await startAuthorizationServer({
         sql,

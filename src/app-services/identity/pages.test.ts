@@ -10,7 +10,7 @@ import {
 import { unknownMerchantMessage } from "../../domain/identity/accounts";
 
 describe("authorization pages", () => {
-  it("has no registration control and tells an unknown phone to contact an administrator", () => {
+  it("has no registration control and tells an unknown phone to use the store owner phone", () => {
     const html = renderToStaticMarkup(
       createElement(MerchantAuthorizeView, {
         notice: unknownMerchantMessage,
