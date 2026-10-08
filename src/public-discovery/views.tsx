@@ -27,7 +27,7 @@ const shelfPageSize = 4;
 
 const startLinks = [
   { href: "/products", label: "商品列表" },
-  { href: buyerSkillPath, label: "购买 Skill" },
+  { href: buyerSkillPath, label: "买家 Skill" },
   { href: merchantSkillPath, label: "商家 Skill" },
   { href: apiRootPath, label: "API 根地址" },
 ] as const;

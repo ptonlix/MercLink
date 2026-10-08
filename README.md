@@ -95,19 +95,19 @@ docker compose -p merclink down
 
 ## 常用入口
 
-| 路径                  | 谁用        | 用途                     |
-| --------------------- | ----------- | ------------------------ |
-| `/`                   | 访客        | 这一家店的落地页         |
-| `/products`           | 访客、Agent | 已上架商品               |
-| `/skill.md`           | 买家 Agent  | 怎么查商品、下单、查支付 |
-| `/merchant/skill.md`  | 商家 Agent  | 怎么管目录和商品         |
-| `/llms.txt`           | Agent       | 发现上述入口             |
-| `/oauth/device/auth`  | Agent       | 申请设备码               |
-| `/authorize/buyer`    | 买家        | 注册、登录、批准         |
-| `/authorize/merchant` | 商家        | 登录、批准。没有注册     |
-| `/admin`              | 店主        | 修改店主密码             |
-| `/api/v1`             | Agent、脚本 | HTTP API                 |
-| `/api/health`         | 部署检查    | 健康检查                 |
+| 路径                  | 谁用        | 用途                           |
+| --------------------- | ----------- | ------------------------------ |
+| `/`                   | 访客        | 这一家店的落地页               |
+| `/products`           | 访客、Agent | 已上架商品                     |
+| `/skill.md`           | 买家 Agent  | 怎么查商品、下单、查自己的订单 |
+| `/merchant/skill.md`  | 商家 Agent  | 怎么管目录和商品               |
+| `/llms.txt`           | Agent       | 发现上述入口                   |
+| `/oauth/device/auth`  | Agent       | 申请设备码                     |
+| `/authorize/buyer`    | 买家        | 注册、登录、批准               |
+| `/authorize/merchant` | 商家        | 登录、批准。没有注册           |
+| `/admin`              | 店主        | 修改店主密码                   |
+| `/api/v1`             | Agent、脚本 | HTTP API                       |
+| `/api/health`         | 部署检查    | 健康检查                       |
 
 查已上架商品不需要登录。下单和管理接口使用 `Authorization: Bearer <访问令牌>`。错误体是 `{ "error": "<code>", "message": "<可读说明>" }`。路径以 `src/shared/api-routes.ts` 为准，说明以两份 Skill 为准。
 

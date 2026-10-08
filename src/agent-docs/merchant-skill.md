@@ -1,34 +1,42 @@
 # 商家 Skill
 
-这份文档公开，只讲调用方法。它不包含任何商家的商品数据，也不包含令牌。
+用这一份公开文档配置这一家店：取得商家令牌，维护目录、字段、商品、规格、封面、上下架和店铺介绍。它只讲调用方法，不包含任何商家的商品数据，也不包含令牌。
 
-按下面的顺序配置这一家店。不要先找开店接口，也不要调用 `/merchants`。启动时已经创建店主账号和一本名为「默认目录」的目录。店主就是管理页的同一个手机号和密码。
+Use this document to configure the one store: obtain a merchant token, then maintain catalogs, fields, products, variants, covers, shelf status, and the public profile. It teaches the HTTP API only. It contains no merchant data and no token.
 
-Do not guide self-registration. Do not ask for a password, SMS code, or API key. The store owner account already exists and is the account created at startup. Log in with that phone and password on the merchant authorization page. Do not ask the user to open another merchant account. Field changes that break compatibility need a field preview and confirmation. Unpublish, soft delete, and field retirement are different. A merchant token cannot mark an order paid or place an order. A buyer token cannot call merchant mutations. Only status `paid` means success.
+## 何时使用
 
-Use the origin of this document as the API origin. A `robots.txt` disallow for `/api` or `/oauth` applies to crawlers. It does not forbid an approved agent from calling those paths.
+用户要把商品放进这家店、改字段、上下架、查自己的订单，或发布店铺介绍时，使用本文档。
 
-## 先按这个顺序做
+不要用本文档给买家查商品、下单或查询订单。买家读 `/skill.md`。也不要调用 `/merchants`，没有开店接口。启动时已经创建店主账号和一本名为「默认目录」的目录。店主就是管理页的同一个手机号和密码。
+
+Do not guide self-registration. Do not ask for a password, SMS code, or API key. The store owner account already exists and is the account created at startup. Log in with that phone and password on the merchant authorization page. Do not ask the user to open another merchant account.
+
+API 源站就是本文档的源站。`robots.txt` 禁止 `/api` 或 `/oauth` 只约束爬虫，不禁止已批准的 Agent 调用这些地址。
+
+## 能做什么
+
+建目录，定义字段，做字段预览和确认，新建和编辑商品与规格，上架，下架，软删除，恢复，查看订单，以及读取、保存、发布或撤回这一家店的公开介绍。不能修改其他商家的数据。
+
+## 不要做
+
+- 不要引导用户自助注册。不要向用户索要密码、短信验证码或 API Key。不要让用户把访问令牌或刷新令牌复制进对话。
+- 不要把颜色、尺码等可售差异建成目录字段。目录字段描述整件商品，规格轴只描述可售差异。
+- 不要把价格换成元、小数或字符串。调用方传整数分。
+- 不要把字段预览当成失败。`data.applied` 为 `false` 时还没有写库。
+- 不要把下架、软删除和字段停用当成同一件事。
+- 商家令牌不能把订单标成已支付，也不能下单。买家令牌不能调用商家写接口。只有状态 `paid` 才算支付成功。
+
+## 主流程
 
 1. 用设备码取得商家访问令牌。人在浏览器登录并批准。Agent 不收集密码。
 2. `GET /api/v1/catalogs`。目录 ID 在 `data.items[].id`。商品属于同一类时用已有目录，通常就是「默认目录」。
-3. 需要新属性时，先加目录字段。可选字段会立即生效。必填或其它破坏性变更要先预览，再确认。
+3. 需要新属性时，先加目录字段。可选字段会立即生效。必填或其它破坏性变更要先做字段预览，再确认。
 4. 没有尺码、颜色等可售差异时，创建商品时写入整数分价格。系统会建一条默认可售规格。
 5. 有可售差异时，创建商品不要带 `price`。先声明全部规格轴，再只创建实际出售的组合。
 6. 需要封面时先上传图片，把返回的 `data.url` 写入 `cover`。
 7. 调用 publish。上架失败时商品仍是下架。
 8. 店铺介绍是可选的，而且是整店一份，不是每本目录一份。
-
-Follow this order:
-
-1. Obtain a merchant access token with the device authorization grant. The human logs in and approves in a browser. Do not collect the password.
-2. `GET /api/v1/catalogs`. Read the catalog id from `data.items[].id`. Reuse the existing catalog, usually `默认目录`, when the products are the same kind.
-3. Add catalog fields before writing product attributes. Optional additions apply immediately. Required and other breaking changes need a preview, then confirmation.
-4. Without sellable differences, send an integer minor-unit price when creating the product. The server creates one sellable variant.
-5. With sellable differences, create the product without `price`. Declare every axis before creating any variant, then create only the combinations actually sold.
-6. Upload an image before saving a cover. Write the returned `data.url` to `cover`.
-7. Call publish. A failed publish leaves the product off the shelf.
-8. The public store profile is optional and belongs to the whole store, not to one catalog.
 
 ## 认证
 
@@ -38,21 +46,17 @@ Follow this order:
 scope=field:write product:write product:read order:read
 ```
 
-自己保存返回的 `device_code`。只把 `user_code` 和 `verification_uri_complete` 给用户；没有完整地址时再用 `verification_uri`。不要把 `device_code` 给用户。用户在浏览器确认短码后，用启动时创建的店主账号登录并批准。这个账号就是管理页的同一个手机号和密码，不需要再开通商家。商家授权页没有注册。手机号不对时，页面写明请使用店主手机号登录。如果用户打开的是买家注册页，停止这次授权，用上面的商家 scope 重新申请。不要引导用户自助注册。
+自己保存返回的 `device_code`。只把 `user_code` 和 `verification_uri_complete` 给用户；没有完整地址时再用 `verification_uri`。不要把 `device_code` 给用户。用户在浏览器确认短码后，用启动时创建的店主账号登录并批准。商家授权页没有注册。手机号不对时，页面写明请使用店主手机号登录。如果用户打开的是买家注册页，停止这次授权，用上面的商家 scope 重新申请。
 
-不要引导用户自助注册。不要向用户索要密码、短信验证码或 API Key。密码只由用户自己在授权页输入，Agent 不读取、不转发、不保存。首次登录时，页面会要求先修改初始密码。看到「请先修改初始密码。」时，请用户在同一页面把密码改成至少 8 位，再点「批准」。改密完成前点批准不会结束授权。不要让用户把访问令牌或刷新令牌复制进对话。不要使用公网回调地址。Agent 在内网，没有独立的公网服务。不使用密码模式。
+密码只由用户自己在授权页输入，Agent 不读取、不转发、不保存。首次登录时，页面会要求先修改初始密码。看到「请先修改初始密码。」时，请用户在同一页面把密码改成至少 8 位，再点「批准」。改密完成前点批准不会结束授权。不要使用公网回调地址。Agent 在内网，没有独立的公网服务。不使用密码模式。
 
 用户操作期间，Agent 轮询 `POST /oauth/token`。同样使用 `application/x-www-form-urlencoded`。字段是 `grant_type=urn:ietf:params:oauth:grant-type:device_code`、`client_id=merclink-agent` 和保存的 `device_code`。返回 `authorization_pending` 时继续等。响应若有 `interval`，两次轮询至少间隔这么多秒。返回 `slow_down` 时再拉长间隔。短码 10 分钟后失效，失效后重新申请，不要重复提交已经确认过的短码。
 
-商家批准的权限是 `field:write`、`product:write`、`product:read`、`order:read`。批准结果固定是这四项，不能在重复授权里删掉其中一项。这里没有访问令牌、刷新令牌或 API Key 的示例值。
+商家批准的权限是 `field:write`、`product:write`、`product:read`、`order:read`。批准结果固定是这四项。这里没有访问令牌、刷新令牌或 API Key 的示例值。
 
 访问令牌约 15 分钟。过期后用 `POST /oauth/token` 换新的，`grant_type=refresh_token`，并带原来的 `client_id` 和刷新令牌。旧刷新令牌立即失效，保存新的刷新令牌。请求已登录接口时使用 `Authorization` 头，方案是 Bearer。不要把令牌写进本文档或对话。
 
 没有令牌时，接口返回 401，`code` 是 `40100`，并在 `WWW-Authenticate` 里指向 `/.well-known/oauth-protected-resource`。这时重新走设备码，不要向用户要令牌。
-
-## 能做什么
-
-建目录，定义字段，做字段预览和确认，新建和编辑商品与规格，上架，下架，软删除，恢复，查看订单，以及读取、保存、发布或撤回这一家店的公开介绍。不能修改其他商家的数据。没有商家目录，也不要调用 `/merchants`。
 
 ## 路由
 
@@ -255,6 +259,17 @@ key 以小写英文字母开头，后面只能是小写英文、数字和下划�
 没有把订单标成已支付的接口。商家令牌不能把订单标成已支付，也不能下单。买家令牌不能调用商家写接口，`code` 是 `40300`（`forbidden`）。商家令牌调用 `POST /api/v1/orders` 同样是 `40300`。
 
 只有状态 `paid` 才算支付成功。打开支付链接不等于成功。
+
+## 常见错误用法
+
+- 只申请 `order:read` 或 `order:write`，会打开买家注册页。停下来，用商家 scope 重新申请。
+- 把「请先修改初始密码。」理解成向用户索要密码。密码只在授权页由人自己输入。
+- 用商品名、目录名或自己编的 ID 调用后续接口。只使用响应 `data` 里的 ID。
+- 把 `1599.00` 或 `1599` 元传成价格。`159900` 才表示 1599.00 元。
+- 把颜色放进 `fields`，或把规格组合写成 `options`。可售差异用 `/axes` 和 `option_values`。
+- 看到 HTTP 200 或 201 就继续下一步。字段预览要先看 `data.applied`。
+- 恢复商品后立刻认为可以购买。恢复后仍是下架，规格也不可售，需要再打开规格并 publish。
+- 用商家令牌调用 `POST /api/v1/orders`，或把打开支付链接当成已支付。
 
 ## 错误
 

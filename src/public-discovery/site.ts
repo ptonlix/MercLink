@@ -85,7 +85,7 @@ export function llmsText(origin = publicBaseUrl(), store: StoreQuote | null = nu
   lines.push(
     `- [总落地页](${absoluteUrl("/", origin)}): 这一家店和已上架商品`,
     `- [商品列表](${absoluteUrl("/products", origin)}): 当前已上架商品`,
-    `- [购买 Skill](${absoluteUrl(buyerSkillPath, origin)}): 如何查询已上架商品并下单`,
+    `- [买家 Skill](${absoluteUrl(buyerSkillPath, origin)}): 如何查询商品、下单并查询自己的订单`,
     `- [商家 Skill](${absoluteUrl(merchantSkillPath, origin)}): 如何管理目录、字段、商品和规格`,
     `- [API](${absoluteUrl(apiRootPath, origin)}): HTTP API 根地址`,
     "",
