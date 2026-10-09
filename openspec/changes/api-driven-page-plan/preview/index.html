@@ -1556,20 +1556,50 @@
       }
       window.addEventListener("hashchange", showPage);
 
+      // The DOM snapshot selects fixed assets; it must never supply a URL.
+      function previewImageSource(source) {
+        switch (source) {
+          case "assets/tour-1.webp":
+            return "assets/tour-1.webp";
+          case "assets/tour-2.webp":
+            return "assets/tour-2.webp";
+          case "assets/tour-3.webp":
+            return "assets/tour-3.webp";
+          case "assets/sample-tea.png":
+            return "assets/sample-tea.png";
+          case "assets/sample-panda.png":
+            return "assets/sample-panda.png";
+          case "assets/sample-food.png":
+            return "assets/sample-food.png";
+          case "assets/sample-cooking.png":
+            return "assets/sample-cooking.png";
+          case "assets/sample-sunset.png":
+            return "assets/sample-sunset.png";
+          default:
+            return null;
+        }
+      }
+
       function renderDetail(product) {
         selectedProduct = product;
         document.getElementById("detail-title").textContent = product.title;
         const cover = document.querySelector(".cover");
-        cover.src = product.preview_cover;
+        const coverSource = previewImageSource(product.preview_cover);
+        cover.hidden = coverSource === null;
+        if (coverSource) cover.src = coverSource;
+        else cover.removeAttribute("src");
         cover.alt = product.title + "封面";
-        cover.width = product.photos.length ? 1920 : 1280;
-        cover.height = product.photos.length ? 1080 : 960;
+        cover.width = coverSource === "assets/tour-1.webp" ? 1920 : 1280;
+        cover.height = coverSource === "assets/tour-1.webp" ? 1080 : 960;
+        const photoSources = product.photos
+          .map(previewImageSource)
+          .filter((src) => src !== null);
         const photos = document.querySelector(".photos");
         photos.open = false;
-        photos.hidden = product.photos.length === 0;
+        photos.hidden = photoSources.length === 0;
         const extraPhotos = document.querySelector(".extra-photos");
         extraPhotos.replaceChildren();
-        product.photos.forEach((src, index) => {
+        photoSources.forEach((src, index) => {
           const image = document.createElement("img");
           image.src = src;
           image.alt = product.title + "附图 " + (index + 1);

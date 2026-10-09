@@ -119,9 +119,14 @@ Authorization presentation MUST retain existing form targets, fields, roles and 
 
 ### Requirement: Page layouts and planning preview remain accessible
 
-Public and help-dialog layouts MUST remain readable at 390 CSS pixels without horizontal document overflow. Primary controls MUST have visible labels, keyboard focus and usable touch targets. The standalone design preview MUST be clearly labeled as a demonstration, use isolated assets, and MUST NOT call business APIs, submit credentials, upload images, send SMS, create orders or initiate payment. It MUST omit the prior multi-page review toolbar and use the home, view-more, product and back links as its visible navigation. A sample store introduction MUST be labeled as a sample and MUST NOT be persisted to the backend.
+Public and help-dialog layouts MUST remain readable at 390 CSS pixels without horizontal document overflow. Primary controls MUST have visible labels, keyboard focus and usable touch targets. The standalone design preview MUST be clearly labeled as a demonstration, use isolated assets, and MUST NOT call business APIs, submit credentials, upload images, send SMS, create orders or initiate payment. Image references read from its DOM snapshot MUST select only explicitly approved local assets; URL attributes MUST receive fixed approved paths rather than raw snapshot text. Unknown image references MUST be omitted while the product text remains readable. It MUST omit the prior multi-page review toolbar and use the home, view-more, product and back links as its visible navigation. A sample store introduction MUST be labeled as a sample and MUST NOT be persisted to the backend.
 
 #### Scenario: Visitor opens the design preview
 
 - **WHEN** the attached HTML is opened and the visitor switches example pages
 - **THEN** the demonstration layouts can be inspected and no real identity or commerce operation occurs
+
+#### Scenario: Preview snapshot contains an unapproved image reference
+
+- **WHEN** the snapshot contains an external URL, executable URL scheme, HTML payload or unlisted local path for a cover or additional photo
+- **THEN** that reference is not assigned to any image URL attribute, approved local images still render, and the product text remains readable
