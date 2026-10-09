@@ -43,7 +43,7 @@ describe("public pages", () => {
     const metadata = await landingMetadata();
 
     expect(visible).toContain(product.title);
-    expect(visible).toContain("¥2599.00");
+    expect(visible).toContain("USD 2599.00");
     expect(visible).toContain("有货");
     expect(visible).toContain('href="/products"');
     expect(visible).toContain('href="/skill.md"');
@@ -101,7 +101,8 @@ describe("public pages", () => {
     expect(visibleProduct).toContain(String(product.offer.price));
     expect(visibleProduct).toContain(product.offer.currency);
     expect(visibleProduct).toContain(product.offer.availability);
-    expect(visibleProduct).not.toContain("2599.00");
+    expect(visibleProduct).toContain("USD 2599.00");
+    expect(visibleHtml(listHtml)).toContain("USD 2599.00");
     expect(offer).toEqual({
       "@type": "Offer",
       price: product.offer.price,
@@ -152,7 +153,7 @@ describe("public pages", () => {
       await ProductPage({ params: Promise.resolve({ id: product.id }) }),
     );
     const visible = visibleHtml(html);
-    expect(visible).toContain(`<img src="${product.cover}" alt="${product.title}"/>`);
+    expect(visible).toContain(`src="${product.cover}" alt="${product.title}"`);
     const block = jsonLdBlocks(html)[0];
     expect(isRecord(block) ? block.image : undefined).toBe(product.cover);
 
@@ -211,7 +212,7 @@ describe("public pages", () => {
     expect(visible.indexOf(store.displayName)).toBeLessThan(visible.indexOf(store.summary));
     expect(visible.indexOf(store.summary)).toBeLessThan(visible.indexOf(product.title));
     expect(visible.indexOf(product.title)).toBeLessThan(visible.indexOf(storeSlogan));
-    expect(visible).toContain('<h1 class="store-name">南风商店</h1>');
+    expect(visible).toMatch(/<h1[^>]*>南风商店<\/h1>/);
     expect(visible).toContain("https://cdn.example/logo.png");
     expect(visible).toContain("杭州市");
     expect(visible).toContain("西湖区某某路 88 号");
@@ -266,12 +267,22 @@ describe("public pages", () => {
 
   it("shows two product cards in yuan and keeps them without script", async () => {
     const boots = publishedProduct();
-    boots.offer = { ...boots.offer, price: minorUnits(159900), availability: "in_stock" };
+    boots.offer = {
+      ...boots.offer,
+      currency: "CNY",
+      price: minorUnits(159900),
+      availability: "in_stock",
+    };
     const cup = publishedProduct();
     cup.id = "prd_cup";
     cup.title = "哨兵杯子";
     cup.cover = null;
-    cup.offer = { ...cup.offer, price: minorUnits(800), availability: "out_of_stock" };
+    cup.offer = {
+      ...cup.offer,
+      currency: "CNY",
+      price: minorUnits(800),
+      availability: "out_of_stock",
+    };
     registerProducts([boots, cup]);
 
     const html = renderToStaticMarkup(await HomePage());
@@ -285,13 +296,7 @@ describe("public pages", () => {
     expect(visible).toContain(`href="/products/${cup.id}"`);
     expect(visible).toContain("placeholder");
     expect(visible).not.toContain(">无<");
-    expect(visible).not.toContain(viewAllProductsLabel);
-    expect(html).toContain("#f6f4ee");
-    expect(html).toContain("#1d1c19");
-    expect(html).toContain("#ffffff");
-    expect(html).toContain("#6e8b32");
-    expect(html).toContain("aspect-ratio: 1 / 1");
-    expect(html).toContain("overflow-x: auto");
+    expect(visible).toContain(viewAllProductsLabel);
     expect(html).not.toContain("linear-gradient");
     expect(html).not.toContain("autoplay");
     expect(visible.indexOf(boots.title)).toBeLessThan(visible.indexOf(storeSlogan));
@@ -325,6 +330,70 @@ describe("public pages", () => {
     expect(withdrawn).not.toContain("南风商店");
     expect(withdrawn).not.toContain("可以直接交给 Agent 购买");
     expect(landingGraph(html).find((node) => node["@type"] === "OnlineStore")).toBeUndefined();
+  });
+  it("keeps both ordered role guides and the more link in server HTML even without products", async () => {
+    const visible = visibleHtml(renderToStaticMarkup(await HomePage()));
+    expect(visible).toContain(viewAllProductsLabel);
+    expect(visible).toContain("如何使用 MercLink");
+    expect(visible).toContain("把买家 Skill 交给 Agent");
+    expect(visible).toContain("把商家 Skill 交给 Agent");
+    expect(visible).toContain("首次登录先修改初始密码");
+    expect(visible).toContain("打开付款链接不表示支付成功");
+    expect(visible.indexOf(viewAllProductsLabel)).toBeLessThan(
+      visible.indexOf("如何使用 MercLink"),
+    );
+    expect((visible.match(/<ol/g) ?? []).length).toBe(2);
+    expect((visible.match(/<li>/g) ?? []).length).toBe(8);
+    expect(visible).toContain(`${origin}/skill.md`);
+    expect(visible).toContain(`${origin}/merchant/skill.md`);
+    expect(visible).not.toContain("prd_demo");
+  });
+
+  it("shows all variant facts without script and does not submit a display price", async () => {
+    const product = publishedProduct();
+    product.fields = { enabled: true, optional: null };
+    const variant = product.variants[0];
+    if (variant === undefined) throw new Error("Fixture requires a variant");
+    product.variants = [
+      { ...variant, id: "var_unlimited", stock: null, sku: "SKU-1" },
+      { ...variant, id: "var_empty", stock: 0, availability: "out_of_stock" },
+    ];
+    registerProducts([product]);
+    const visible = visibleHtml(
+      renderToStaticMarkup(await ProductPage({ params: Promise.resolve({ id: product.id }) })),
+    );
+    expect(visible).toContain("var_unlimited");
+    expect(visible).toContain("var_empty");
+    expect(visible).toContain("不限库存");
+    expect(visible).toContain("缺货");
+    expect(visible).toContain("SKU-1");
+    expect(visible).toContain(">是<");
+    expect(visible).toContain("未填写");
+    expect(visible).not.toContain('action="/api/v1/orders"');
+    expect(visible).not.toContain('name="price"');
+  });
+
+  it("formats CNY minor units for people while preserving the structured offer", async () => {
+    const product = publishedProduct();
+    product.offer = { price: minorUnits(15900), currency: "CNY", availability: "in_stock" };
+    registerProducts([product]);
+    const list = visibleHtml(renderToStaticMarkup(await ProductsPage({})));
+    const detail = renderToStaticMarkup(
+      await ProductPage({ params: Promise.resolve({ id: product.id }) }),
+    );
+    expect(list).toContain("¥159.00");
+    expect(visibleHtml(detail)).toContain("¥159.00");
+    expect(productOffer(detail).price).toBe(15900);
+  });
+
+  it("uses the returned cursor for regular pagination", async () => {
+    publicProducts.register({
+      list: () => Promise.resolve({ items: [publishedProduct()], nextCursor: "cursor+/=" }),
+      get: () => Promise.resolve({ ok: false, error: "not_found", message: "没有找到。" }),
+    });
+    const visible = visibleHtml(renderToStaticMarkup(await ProductsPage({})));
+    expect(visible).toContain('href="/products?cursor=cursor%2B%2F%3D"');
+    expect(visible).toContain("下一页商品");
   });
 });
 

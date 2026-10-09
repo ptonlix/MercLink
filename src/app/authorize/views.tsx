@@ -8,13 +8,17 @@ export function MerchantAuthorizeView(props: {
 }): ReactNode {
   const account = props.account ?? null;
   return (
-    <main className="sheet">
+    <main className="ml-auth">
       <p className="kicker">MercLink</p>
-      <h1>{account === null ? "店主登录" : "批准 Agent"}</h1>
-      <p className="lede">
-        用启动时的店主账号登录并批准 Agent。手机号和密码与管理页相同。这里不能新建账号。
-      </p>
-      {props.notice === null ? null : <p className="notice">{props.notice}</p>}
+      <h1>
+        {account === null ? "店主登录" : props.mustChangePassword ? "修改初始密码" : "批准 Agent"}
+      </h1>
+      <p className="lede">用启动时的店主账号登录并批准 Agent。手机号和密码与管理页相同。</p>
+      {props.notice === null ? null : (
+        <p className="notice" role="alert" aria-live="polite">
+          {props.notice}
+        </p>
+      )}
       {account === null ? (
         <form action="/authorize/merchant/submit" method="post" className="stack">
           <label>
@@ -33,25 +37,48 @@ export function MerchantAuthorizeView(props: {
             当前登录 {account.name} {account.phone}
           </p>
           {props.mustChangePassword ? (
-            <form action="/authorize/merchant/submit" method="post" className="stack">
-              <input type="hidden" name="intent" value="change-password" />
-              <label>
-                当前密码
-                <input name="currentPassword" type="password" required />
-              </label>
-              <label>
-                新密码
-                <input name="nextPassword" type="password" required />
-              </label>
-              <button type="submit">修改密码</button>
-            </form>
-          ) : null}
-          <form action="/authorize/merchant/submit" method="post">
-            <input type="hidden" name="intent" value="approve" />
-            <button type="submit">批准</button>
-          </form>
+            <>
+              <p className="hint">先修改初始密码，完成后才能批准 Agent。</p>
+              <form action="/authorize/merchant/submit" method="post" className="stack">
+                <input type="hidden" name="intent" value="change-password" />
+                <label>
+                  当前密码
+                  <input
+                    name="currentPassword"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                  />
+                </label>
+                <label>
+                  新密码
+                  <input name="nextPassword" type="password" autoComplete="new-password" required />
+                </label>
+                <button type="submit">修改密码</button>
+              </form>
+            </>
+          ) : (
+            <>
+              <p className="hint">
+                商家 Agent 可以管理目录、商品与规格，并查看店铺订单。请核对自己的授权请求后继续。
+              </p>
+              <form action="/authorize/merchant/submit" method="post">
+                <input type="hidden" name="intent" value="approve" />
+                <button type="submit">批准</button>
+              </form>
+            </>
+          )}
         </>
       )}
+      <aside className="owner-guide">
+        <h2>如何上架商品</h2>
+        <p>
+          把<a href="/merchant/skill.md">商家 Skill</a>交给
+          Agent，在浏览器登录并批准后，向它提供商品名称、价格、库存、图片和规格。Agent
+          补齐必填资料并上架，商品才会出现在店铺首页。
+        </p>
+      </aside>
+      <p className="hint">请只在自己的浏览器输入密码，不要发送给 Agent。</p>
     </main>
   );
 }
@@ -71,13 +98,29 @@ export function BuyerAuthorizeView(props: {
 }): ReactNode {
   const devStubs = props.devStubs === true;
   return (
-    <main className="sheet">
+    <main className="ml-auth">
       <p className="kicker">MercLink</p>
       <h1>{buyerHeading(props.step, props.mode)}</h1>
       <p className="lede">
         {buyerLede(props.step, props.mode, props.phone, props.pendingApproval === true)}
       </p>
-      {props.notice === null ? null : <p className="notice">{props.notice}</p>}
+      {props.notice === null ? null : (
+        <p className="notice" role="alert" aria-live="polite">
+          {props.notice}
+        </p>
+      )}
+      <ol className="auth-steps" aria-label="登录进度">
+        {["验证手机号", "核验短信", "登录账号", "确认授权"].map((label, index) => (
+          <li
+            key={label}
+            aria-current={
+              ["phone", "code", "password", "approve"][index] === props.step ? "step" : undefined
+            }
+          >
+            {label}
+          </li>
+        ))}
+      </ol>
       {props.step === "approve" ? (
         <>
           {props.pendingApproval === true ? (
@@ -86,7 +129,7 @@ export function BuyerAuthorizeView(props: {
               <button type="submit">批准</button>
             </form>
           ) : null}
-          <form action="/authorize/buyer/submit" method="post">
+          <form action="/authorize/buyer/submit" method="post" className="secondary-action">
             <input type="hidden" name="intent" value="logout" />
             <button type="submit">退出登录</button>
           </form>
@@ -107,7 +150,7 @@ export function BuyerAuthorizeView(props: {
           <p className="hint">
             {devStubs
               ? "本地开发不会发送短信。验证码填写 123456。"
-              : "完成图形人机验证后再发送短信。验证参数由验证码组件回填，不要手改。"}
+              : "完成图形人机验证后再发送短信。"}
           </p>
           <button id="captcha-send" type="submit" disabled={devStubs ? undefined : true}>
             发送验证码
@@ -157,6 +200,7 @@ export function BuyerAuthorizeView(props: {
           </a>
         </form>
       ) : null}
+      <p className="hint">手机号、密码和验证码只在此浏览器输入，不要发送给 Agent。</p>
     </main>
   );
 }
@@ -183,7 +227,7 @@ function buyerLede(
   if (step === "approve") {
     const who = `当前登录 ${phone}。`;
     return pendingApproval
-      ? `${who}确认后，这个 Agent 可以代表你访问已授权的范围。`
+      ? `${who}确认后，买家 Agent 可以为你下单并查询自己的订单。`
       : `${who}当前没有待批准的授权请求。请从 Agent 重新发起授权后再批准。`;
   }
   if (step === "code") {
@@ -203,23 +247,35 @@ export function AccountKeyView(props: {
   secret: string | null;
 }): ReactNode {
   return (
-    <main className="sheet">
+    <main className="ml-auth">
       <p className="kicker">脚本</p>
       <h1>API Key</h1>
       <p className="lede">只给没有浏览器的服务器脚本使用。授权页不会发放密钥。</p>
-      {props.secret === null ? null : <p className="secret">新密钥只显示一次：{props.secret}</p>}
+      {props.secret === null ? null : (
+        <div className="secret" role="status">
+          <p>新密钥只显示一次，请妥善保存：</p>
+          <code>{props.secret}</code>
+        </div>
+      )}
       <form action="/api/v1/api-keys" method="post">
         <button type="submit">创建密钥</button>
       </form>
-      <ul>
+      {props.keys.length === 0 ? <p className="hint">尚未创建脚本密钥。</p> : null}
+      <ul className="key-list">
         {props.keys.map((key) => (
           <li key={key.id}>
             <span>{key.prefix}</span>
             {key.revoked ? <span>已撤销</span> : <span>有效</span>}
-            <form action={`/api/v1/api-keys/${key.id}`} method="post">
-              <input type="hidden" name="_method" value="delete" />
-              <button type="submit">撤销</button>
-            </form>
+            {key.revoked ? null : (
+              <form
+                action={`/api/v1/api-keys/${key.id}`}
+                method="post"
+                className="secondary-action"
+              >
+                <input type="hidden" name="_method" value="delete" />
+                <button type="submit">撤销</button>
+              </form>
+            )}
           </li>
         ))}
       </ul>
@@ -229,25 +285,56 @@ export function AccountKeyView(props: {
 
 export function AdminView(props: { notice: string | null }): ReactNode {
   return (
-    <main className="sheet">
+    <main className="ml-auth">
       <p className="kicker">管理</p>
-      <h1>店主</h1>
+      <h1>修改店主密码</h1>
       <p className="lede">
         这一套部署只有一家店。这个账号就是店主，用同一手机号和密码到商家授权页批准
         Agent。默认目录已经建好。
       </p>
-      {props.notice === null ? null : <p className="notice">{props.notice}</p>}
+      {props.notice === null ? null : (
+        <p className="notice" role="alert" aria-live="polite">
+          {props.notice}
+        </p>
+      )}
       <form action="/admin/submit" method="post" className="stack">
         <input type="hidden" name="intent" value="password" />
         <label>
           当前密码
-          <input name="currentPassword" type="password" required />
+          <input name="currentPassword" type="password" autoComplete="current-password" required />
         </label>
         <label>
           新密码
-          <input name="nextPassword" type="password" required />
+          <input name="nextPassword" type="password" autoComplete="new-password" required />
         </label>
         <button type="submit">修改密码</button>
+      </form>
+    </main>
+  );
+}
+
+export function AdminLoginView({ notice }: { notice: string | null }): ReactNode {
+  return (
+    <main className="ml-auth">
+      <p className="kicker">MercLink</p>
+      <h1>店主登录</h1>
+      <p className="lede">登录后可以修改店主密码。管理商品请把商家 Skill 交给 Agent。</p>
+      {notice === null ? null : (
+        <p className="notice" role="alert">
+          {notice}
+        </p>
+      )}
+      <form action="/admin/submit" method="post" className="stack">
+        <input type="hidden" name="intent" value="login" />
+        <label>
+          手机号
+          <input name="phone" inputMode="numeric" autoComplete="username" required />
+        </label>
+        <label>
+          密码
+          <input name="password" type="password" autoComplete="current-password" required />
+        </label>
+        <button type="submit">登录</button>
       </form>
     </main>
   );

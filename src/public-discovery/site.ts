@@ -6,7 +6,7 @@ export const storeExplanation = "帮中小商家做自己的店，并让各种 A
 
 export const emptyProductsNote = "没有可展示的商品。";
 
-export const viewAllProductsLabel = "查看全部商品";
+export const viewAllProductsLabel = "查看更多";
 
 export const siteName = "MercLink";
 

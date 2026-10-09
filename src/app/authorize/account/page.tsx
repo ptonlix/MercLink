@@ -23,7 +23,8 @@ export default async function AccountPage({
       : readSession(token, runtime.env.OAUTH_SIGNING_SECRET, runtime.clock.now());
   if (session === null || session.kind !== "account") {
     return (
-      <main className="sheet">
+      <main className="ml-auth">
+        <p className="kicker">MercLink · 脚本</p>
         <h1>请先登录</h1>
         <p>登录后才能创建 API Key。</p>
       </main>

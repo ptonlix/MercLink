@@ -1,7 +1,35 @@
 :root {
   color-scheme: light;
+  --ml-paper: #f6f4ee;
+  --ml-surface: #fff;
+  --ml-ink: #26332b;
+  --ml-muted: #60695f;
+  --ml-moss: #4e653e;
+  --ml-line: #d8ddd1;
+  --ml-error: #a13e30;
+  --ml-serif: "Iowan Old Style", "Songti SC", "Noto Serif CJK SC", serif;
+  --ml-sans: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 body {
   margin: 0;
+  background: var(--ml-paper);
+  color: var(--ml-ink);
+  font-family: var(--ml-sans);
+  line-height: 1.65;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ml-moss);
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
 }

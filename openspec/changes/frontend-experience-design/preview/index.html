@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>MercLink 前端设计预览</title>
+  <style>
+    :root{--paper:#f6f4ee;--surface:#fff;--ink:#26332b;--muted:#60695f;--moss:#4e653e;--line:#d8ddd1;--soft:#e9edde;--error:#a13e30;--serif:"Iowan Old Style","Songti SC","Noto Serif CJK SC",serif;--sans:"Avenir Next","PingFang SC","Microsoft YaHei",sans-serif}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 var(--sans)}button,input,select,textarea{font:inherit}button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}a{color:inherit;text-underline-offset:4px}button{cursor:pointer}button:disabled{cursor:default;opacity:.5}a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,textarea:focus-visible{outline:2px solid var(--moss);outline-offset:4px}p,h1,h2,h3,ul,ol,dl,figure{margin:0}h1,h2,h3{line-height:1.25}h1{font-family:var(--serif);font-size:48px;font-weight:500;letter-spacing:-.035em}h2{font-size:24px;font-weight:600}h3{font-size:18px;font-weight:600}svg{display:block}button svg,a svg{width:20px;height:20px;flex-shrink:0}.muted{color:var(--muted)}.small{font-size:13px}.mono{font-family:"SF Mono",Consolas,monospace;font-size:13px;overflow-wrap:anywhere}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}[hidden]{display:none!important}
+    .preview-bar{position:relative;z-index:10;background:#e9ecdf;border-bottom:1px solid #c9d0c0;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:13px}.preview-title{display:flex;align-items:center;gap:10px;white-space:nowrap}.preview-title strong{font-weight:600}.preview-badge{border:1px solid #b9c2ad;padding:3px 8px;border-radius:5px;font-size:11px}.preview-nav{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}.preview-nav a{padding:8px 11px;min-height:40px;border-radius:5px;text-decoration:none;white-space:nowrap}.preview-nav a[aria-current=page]{background:var(--ink);color:#fff}.preview-state{display:flex;align-items:center;gap:8px;white-space:nowrap}.preview-state select{max-width:140px;height:38px;background:transparent;border:1px solid #b9c2ad;border-radius:5px;font-size:12px;padding:0 7px;color:var(--ink)}.preview-state{display:none}.js .preview-state{display:flex}.preview-note{margin-top:24px;text-align:center;color:var(--muted);font-size:12px}
+    .view{padding:0 40px 40px;border-bottom:1px solid var(--line)}.js .view:not(.active){display:none}.container{width:100%;max-width:1160px;margin:auto}.store-intro{padding:54px 0 38px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center}.store-heading{display:flex;gap:22px;align-items:center}.store-logo{width:68px;height:76px;flex-shrink:0;border:1px solid #aebaa1;border-radius:34px 34px 8px 8px;display:grid;place-items:center;color:var(--moss)}.store-logo svg{width:38px;height:38px}.store-intro h1{font-size:56px}.store-intro .summary{max-width:610px;margin-top:14px;color:var(--muted);font-size:16px}.store-meta{color:var(--muted);font-size:13px;text-align:right;display:grid;gap:5px;padding-top:14px}.store-meta p:first-child{font-size:14px;color:var(--ink)}
+    .section-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}.section-heading h2{font-size:19px}.shelf-actions{display:flex;gap:8px}.icon-button{border:1px solid var(--line);background:transparent;color:var(--ink);width:44px;height:44px;border-radius:50%;display:grid;place-items:center}.icon-button:hover{border-color:var(--moss)}.shelf{display:flex;gap:20px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:12px;scrollbar-color:#b1bba7 transparent;scrollbar-width:thin}.product-card{flex:0 0 calc((100% - 60px)/4);min-width:0;scroll-snap-align:start;display:block;text-decoration:none}.product-card:hover .card-title{text-decoration:underline;text-underline-offset:4px}.cover{display:grid;place-items:center;aspect-ratio:1;border-radius:12px;overflow:hidden;background:#e9edde}.cover svg{width:100%;height:100%}.cover[data-art=lamp]{background:#e5e9da}.cover[data-art=bag]{background:#e9e1d1}.cover[data-art=bottle]{background:#dde7e5}.cover[data-art=keyboard]{background:#e7e3eb}.cover[data-art=notebook]{background:#e1e2d8}.cover[data-art=tray]{background:#ede2d9}.card-title{font-size:16px;font-weight:500;margin-top:15px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.8em;line-height:1.4}.card-meta{margin-top:8px;display:flex;align-items:baseline;justify-content:space-between;gap:12px}.price{color:var(--moss);font-weight:600;font-size:20px;letter-spacing:-.025em;font-variant-numeric:tabular-nums}.price .decimals{font-size:15px}.availability{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.availability:before{content:"";height:5px;width:5px;background:var(--moss);border-radius:50%;flex:none}.availability.out:before{background:#9f8b70}.cover-placeholder{display:grid;place-items:center;gap:10px;color:var(--muted);font-size:13px}.cover-placeholder svg{width:30px;height:30px}.cover.no-image>svg{display:none}.cover.no-image:after{content:"暂无图片";font-size:14px;color:var(--muted)}.empty-state{text-align:center;padding:56px 24px;background:#eeeee5;border:1px dashed #bec7b2;border-radius:12px}.empty-state svg{width:44px;height:44px;margin:0 auto 20px;color:var(--moss)}.empty-state p{color:var(--muted);margin-top:10px}.empty-state a{display:inline-flex;margin-top:20px;min-height:44px;align-items:center}
+    .site-footer{border-top:1px solid var(--line);margin-top:42px;padding-top:32px}.footer-top{display:grid;grid-template-columns:1.08fr 1fr 1fr;gap:40px}.platform-name{font-size:20px;font-weight:600;letter-spacing:-.04em;display:flex;align-items:center;gap:8px}.platform-name svg{width:24px;height:24px;color:var(--moss)}.slogan{font:500 21px/1.5 var(--serif);color:var(--moss);margin-top:10px;max-width:280px}.explanation{font-size:13px;color:var(--muted);margin-top:10px;max-width:280px}.skill-block{padding:4px 0}.skill-block h3{font-size:15px;margin-bottom:8px}.skill-block p{font-size:13px;color:var(--muted);min-height:44px}.copy-line{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);margin-top:12px;padding-top:8px}.copy-line a{font-size:12px;font-family:"SF Mono",Consolas,monospace;overflow-wrap:anywhere}.copy-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;background:transparent;border:0;padding:0 2px;color:var(--moss);font-size:12px;min-height:44px;white-space:nowrap}.copy-button svg{width:15px;height:15px}.footer-bottom{display:flex;align-items:center;justify-content:space-between;gap:24px;border-top:1px solid var(--line);margin-top:26px;padding:15px 0 0;font-size:12px;color:var(--muted)}.footer-links{display:flex;flex-wrap:wrap;gap:8px 24px}.footer-links a{display:flex;align-items:center;min-height:44px;text-decoration:none}.footer-links a:hover{text-decoration:underline}
+    .inner-nav{padding:25px 0;display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid var(--line);align-items:center}.inner-nav a{text-decoration:none;min-height:44px;display:inline-flex;align-items:center;gap:8px}.inner-nav .platform-name{font-size:19px}.nav-links{display:flex;gap:24px;font-size:13px}.page-heading{padding:42px 0 30px;display:flex;justify-content:space-between;align-items:end;gap:24px}.page-heading p{margin-top:10px;color:var(--muted);font-size:14px}.page-heading .small{color:var(--muted)}.product-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:36px 20px}.product-grid .product-card{min-width:0}.pagination{display:flex;justify-content:center;border-top:1px solid var(--line);padding-top:24px;margin-top:36px}.btn{min-height:46px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 20px;border-radius:8px;border:1px solid var(--moss);background:var(--moss);color:white;text-decoration:none;font-size:14px;font-weight:500}.btn:hover{background:#405433}.btn.secondary{background:transparent;color:var(--ink);border-color:var(--line)}.btn.secondary:hover{border-color:var(--moss);background:#ecefe3}.btn.full{width:100%}.text-link{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;color:var(--moss);font-size:13px}.text-link svg{width:16px;height:16px}.breadcrumbs{padding:25px 0;font-size:13px}.breadcrumbs a{display:inline-flex;align-items:center;gap:8px;min-height:44px;text-decoration:none;color:var(--muted)}
+    .detail-layout{display:grid;grid-template-columns:1fr 1.06fr;gap:64px;align-items:start}.detail-cover{grid-column:1;grid-row:1 / span 2;position:relative}.detail-cover .cover{aspect-ratio:1;border-radius:16px}.art-note{font-size:12px;color:var(--muted);text-align:center;margin-top:12px}.detail-title{grid-column:2;grid-row:1}.detail-title h1{font-size:38px;letter-spacing:-.04em}.detail-title p{margin-top:10px;color:var(--muted);font-size:13px}.detail-body{grid-column:2;grid-row:2;margin-top:-38px}.detail-price{display:flex;align-items:baseline;gap:12px;margin-top:14px}.detail-price .price{font-size:38px}.detail-price .price small{font-size:22px}.detail-price .muted{font-size:13px}.variant-set{border:0;padding:0;margin:25px 0 20px;min-width:0}.variant-set legend{font-size:14px;font-weight:600;margin-bottom:12px}.variant{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:12px;padding:13px 14px;background:rgba(255,255,255,.5);border:1px solid var(--line);border-radius:8px;margin-top:9px;align-items:start;cursor:pointer}.variant:has(input:checked){border-color:var(--moss);background:#eef1e5;outline:1px solid var(--moss)}.variant:has(input:disabled){cursor:default;background:transparent}.variant input{accent-color:var(--moss);width:16px;height:16px;margin-top:4px}.variant strong{display:block;font-size:14px;font-weight:500}.variant .mono{font-size:10px;color:var(--muted);display:block;margin-top:2px}.variant-side{font-size:14px;text-align:right;font-weight:600}.variant-side small{display:block;font-size:11px;font-weight:400;color:var(--muted)}.purchase-note{font-size:12px;color:var(--muted);margin-top:12px}.detail-actions{display:flex;gap:12px;align-items:center}.detail-actions .btn{flex:1}.copy-feedback{font-size:13px;min-height:22px;margin-top:8px;color:var(--moss)}.facts-section{display:grid;grid-template-columns:1fr 1.06fr;gap:64px;border-top:1px solid var(--line);margin-top:42px;padding-top:28px}.facts-section h2{font-size:18px;margin-bottom:18px}.facts{display:grid;grid-template-columns:minmax(100px,.75fr) minmax(0,1fr);font-size:14px}.facts dt,.facts dd{padding:10px 0;border-bottom:1px solid var(--line)}.facts dt{color:var(--muted)}.facts dd{margin:0;overflow-wrap:anywhere}.facts-section details{margin-top:18px;font-size:13px}.facts-section summary{cursor:pointer;min-height:44px;padding:10px 0;color:var(--moss)}pre{font-size:12px;line-height:1.8;overflow:auto;max-width:100%;border:1px solid var(--line);border-radius:8px;padding:16px;background:#efefe8;color:var(--ink)}.simple-footer{border-top:1px solid var(--line);margin-top:48px;padding:18px 0;display:flex;gap:16px;justify-content:space-between;font-size:12px;color:var(--muted)}.simple-footer a{display:inline-flex;min-height:44px;align-items:center}
+    .identity-wrap{padding:44px 0 36px;max-width:920px;margin:auto;display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:72px;align-items:start}.identity-context{padding-top:45px}.identity-context h1{font-size:40px;line-height:1.45;max-width:330px}.identity-context>p{margin-top:20px;color:var(--muted);font-size:14px;max-width:290px}.identity-process{margin-top:38px;list-style:none;padding:0;display:grid;gap:21px;counter-reset:steps}.identity-process li{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--muted);counter-increment:steps}.identity-process li:before{content:counter(steps);display:grid;place-items:center;flex:none;width:27px;height:27px;border:1px solid #bfc8b3;border-radius:50%;font-size:12px;color:var(--moss)}.identity-panel{padding:32px;background:rgba(255,255,255,.72);border:1px solid var(--line);border-radius:14px;min-width:0}.identity-panel h2{font-size:24px;letter-spacing:-.025em;margin-top:22px}.identity-panel .intro{font-size:13px;color:var(--muted);margin:12px 0 22px}.role-label{font-size:11px;background:var(--soft);color:var(--moss);padding:5px 9px;border-radius:4px;display:inline-block}.step-dots{display:flex;gap:5px;margin-top:23px}.step-dots span{height:3px;flex:1;background:#e0e5d9;border-radius:2px}.step-dots .done{background:var(--moss)}.demo-label{display:block;font-size:13px;margin:18px 0 7px}.demo-input{width:100%;background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 13px;min-height:48px;color:#75806c;font-size:14px}.demo-input.code{font-size:22px;letter-spacing:.12em;text-align:center;color:var(--ink);font-variant-numeric:tabular-nums}.identity-panel .btn{margin-top:20px}.identity-panel .btn+.text-link{display:flex}.fine-print{border-top:1px solid var(--line);padding-top:18px;margin-top:24px;color:var(--muted);font-size:12px}.captcha-demo{border:1px dashed #bac4ae;background:#f2f4ec;padding:15px;border-radius:8px;margin-top:18px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:12px}.captcha-demo svg{width:22px;height:22px;flex-shrink:0;color:var(--moss)}.permission-list{list-style:none;padding:0;margin-top:20px;display:grid;gap:15px}.permission-list li{display:flex;gap:12px;font-size:13px}.permission-list svg{width:19px;height:19px;color:var(--moss);flex:none;margin-top:3px}.permission-list small{color:var(--muted);display:block;margin-top:2px}.signed-account{border:1px solid var(--line);padding:13px 14px;border-radius:8px;font-size:13px;display:flex;align-items:center;gap:10px;margin-top:16px}.avatar{height:32px;width:32px;background:var(--soft);border-radius:50%;display:grid;place-items:center;font-size:12px;color:var(--moss)}.notice{background:#f9ece7;color:var(--error);border-left:3px solid var(--error);padding:12px 14px;font-size:13px;margin:18px 0}.success-symbol{width:56px;height:56px;border:1px solid #b5c3a6;border-radius:50%;display:grid;place-items:center;background:#eaf0df;color:var(--moss);margin-top:25px}.success-symbol svg{width:26px;height:26px}.account-tabs{display:flex;gap:8px;border-bottom:1px solid var(--line);padding-bottom:13px}.account-tabs button{min-height:44px;padding:6px 12px;font-size:13px;border:0;background:transparent;color:var(--muted);border-radius:7px}.account-tabs button[aria-pressed=true]{background:var(--soft);color:var(--moss)}.account-note{font-size:13px;color:var(--muted);max-width:330px;margin-top:16px}.script-wrap{max-width:760px;margin:44px auto}.script-wrap h1{font-size:38px;margin:18px 0 12px}.script-wrap>p{color:var(--muted);font-size:14px;max-width:540px}.script-toolbar{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:30px 0 18px}.script-toolbar h2{font-size:17px}.key-list{border-top:1px solid var(--line);list-style:none;padding:0}.key-row{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding:18px 0;font-size:13px}.key-row>div{display:flex;gap:16px;align-items:center}.state-label{color:var(--moss);background:var(--soft);border-radius:4px;padding:4px 9px;font-size:11px}.revoked .state-label{color:var(--muted);background:#e8e8e0}.key-row button{font-size:12px;min-height:44px;color:var(--error);background:transparent;border:0;padding:8px 14px}.preview-document{margin:40px auto 0;max-width:1160px;padding:20px;background:#eeefe6;border:1px solid var(--line);border-radius:10px;font-size:13px}.preview-document summary{cursor:pointer;min-height:44px;display:list-item;padding:8px 0}.preview-document p{color:var(--muted);margin-top:10px}.preview-document a{overflow-wrap:anywhere}.js .preview-document{display:none}
+    dialog{max-width:540px;width:calc(100% - 32px);border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);padding:28px}dialog::backdrop{background:rgba(38,51,43,.24)}dialog h2{font-size:22px;margin-bottom:12px}dialog p{font-size:14px;color:var(--muted)}dialog textarea{margin-top:18px;width:100%;min-height:100px;padding:14px;border:1px solid var(--line);border-radius:8px;font-size:13px;color:var(--ink);background:#fff}dialog .dialog-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:20px}.toast{position:fixed;right:24px;bottom:24px;z-index:40;background:var(--ink);color:white;padding:13px 20px;border-radius:8px;font-size:13px;max-width:calc(100% - 40px);box-shadow:0 4px 16px rgba(38,51,43,.1)}.no-script{padding:14px 24px;font-size:13px;text-align:center}
+    #home .store-intro{padding-top:42px;padding-bottom:30px}
+    #home .banner-shelf .banner-card{flex:0 0 calc((100% - 20px)/2);display:grid;grid-template-columns:.95fr 1.05fr;min-height:270px;max-width:none;border-radius:14px;overflow:hidden;background:#e5e9da;align-items:stretch}
+    #home .banner-card[data-product=bag]{background:#e9e1d1}#home .banner-card[data-product=bottle]{background:#dde7e5}#home .banner-card[data-product=keyboard]{background:#e7e3eb}#home .banner-card[data-product=notebook]{background:#e1e2d8}#home .banner-card[data-product=tray]{background:#ede2d9}
+    #home .banner-card .cover{aspect-ratio:auto;border-radius:0;background:transparent;min-width:0;height:100%}#home .banner-card .cover svg{height:100%;width:100%;object-fit:contain}
+    .banner-copy{padding:30px 0 28px 28px;display:flex;flex-direction:column;align-items:start;justify-content:center;min-width:0}.banner-copy .card-title{font:500 28px/1.35 var(--serif);min-height:0;margin:0;letter-spacing:-.025em}.banner-copy .card-meta{display:flex;flex-direction:column;align-items:start;gap:8px;margin-top:17px}.banner-copy .price{font-size:24px}.banner-copy .decimals{font-size:17px}.banner-copy .availability{font-size:12px;color:#4d5a49}.banner-open{display:inline-flex;align-items:center;gap:7px;margin-top:25px;font-size:12px;color:var(--ink)}.banner-open svg{height:15px;width:15px}.banner-more{display:flex;justify-content:flex-end;margin-top:15px}.banner-more .btn{min-width:140px}
+    .usage-section{border-top:1px solid var(--line);margin-top:38px;padding-top:34px}.usage-heading{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:26px}.usage-heading h2{font:500 30px/1.3 var(--serif);letter-spacing:-.03em}.usage-heading p{font-size:13px;color:var(--muted);margin-top:9px}.usage-tabs{display:flex;gap:4px;flex-shrink:0;border:1px solid var(--line);padding:4px;border-radius:9px}.usage-tabs button{min-height:44px;padding:9px 15px;font-size:13px;border:0;border-radius:6px;color:var(--muted);background:transparent}.usage-tabs button[aria-selected=true]{background:var(--moss);color:white}.usage-role-label{font-size:17px;margin:20px 0}.js .usage-role-label{display:none}.js .usage-flow:not(.active){display:none}.usage-steps{counter-reset:guide;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:26px;list-style:none;padding:0}.usage-steps li{counter-increment:guide;min-width:0;position:relative;border-top:1px solid var(--line);padding-top:19px}.step-number{display:grid;place-items:center;width:32px;height:32px;background:var(--soft);color:var(--moss);border-radius:50%;font-size:14px;margin-bottom:16px}.step-number:before{content:counter(guide)}.usage-steps h3{font-size:16px;font-weight:600;line-height:1.45;margin-bottom:10px}.usage-steps p{font-size:13px;color:var(--muted);line-height:1.75}.step-example{background:#eeefe6;border-left:2px solid #b2bea3;padding:9px 11px;margin-top:12px;font-size:12px;line-height:1.6;color:var(--ink)}.usage-steps .copy-line{gap:8px;margin-top:12px}.usage-steps .copy-line a{font-size:11px}.usage-steps .copy-button{font-size:11px}.usage-footer{display:flex;justify-content:space-between;gap:32px;align-items:start;margin-top:42px;padding-top:26px}.usage-footer .slogan{font-size:19px;max-width:none;margin-top:0}.usage-footer .explanation{max-width:520px;font-size:12px;margin-top:5px}.usage-footer-right{text-align:right}.usage-footer-right .footer-links{justify-content:flex-end;gap:8px 20px}.usage-footer-right>p{margin-top:6px;font-size:11px;color:var(--muted)}
+    @media(max-width:1023px){#home .banner-shelf .banner-card{flex-basis:84%;min-height:280px;grid-template-columns:1fr 1fr}.banner-copy{padding-left:32px}.usage-heading{align-items:start;flex-direction:column;gap:20px}.usage-steps{grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}.usage-footer{flex-direction:column;gap:20px}.usage-footer-right{text-align:left}.usage-footer-right .footer-links{justify-content:flex-start}}
+    @media(max-width:767px){#home .store-intro{padding-top:30px;padding-bottom:25px}#home .banner-shelf .banner-card{flex-basis:91%;min-height:220px;grid-template-columns:1fr 1fr}.banner-copy{padding:22px 0 22px 18px}.banner-copy .card-title{font-size:23px}.banner-copy .price{font-size:22px}.banner-copy .card-meta{margin-top:11px;gap:5px}.banner-open{margin-top:18px;font-size:11px}.banner-more{margin-top:12px}.banner-more .btn{width:100%}.usage-section{margin-top:30px;padding-top:26px}.usage-heading{gap:18px;margin-bottom:24px}.usage-heading h2{font-size:26px}.usage-tabs{width:100%}.usage-tabs button{flex:1;padding:9px 8px;font-size:12px}.usage-steps{display:block}.usage-steps li{padding:20px 0 20px 47px;min-height:100px}.step-number{position:absolute;top:20px;left:0;width:30px;height:30px}.usage-steps h3{font-size:16px;margin-bottom:7px}.usage-steps .copy-line{max-width:290px}.usage-steps .copy-line a,.usage-steps .copy-button{font-size:12px}.usage-footer{margin-top:20px;padding-top:22px}.usage-footer .slogan{font-size:18px}.usage-footer-right>p{font-size:11px}}
+    .view h1:focus{outline:none}
+    @media(max-width:1100px){.preview-bar{flex-wrap:wrap;gap:4px 16px}.preview-nav{order:3;flex-basis:100%;justify-content:flex-start}.footer-top{gap:24px}.identity-wrap{gap:36px}.detail-layout,.facts-section{gap:36px}.store-intro h1{font-size:48px}}
+    @media(max-width:1023px){.view{padding-left:28px;padding-right:28px}.shelf .product-card{flex-basis:calc((100% - 40px)/3)}.product-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.footer-top{grid-template-columns:1fr 1fr}.platform-story{grid-column:1 / -1;display:grid;grid-template-columns:1fr 1fr;gap:10px 24px}.platform-story .platform-name{grid-row:1 / 3}.platform-story .slogan{margin-top:0;max-width:none}.platform-story .explanation{max-width:none;margin-top:0}.identity-wrap{grid-template-columns:minmax(0,1fr) 400px;gap:28px}.identity-context h1{font-size:32px}.identity-panel{padding:26px}.detail-title h1{font-size:32px}.detail-body{margin-top:-16px}.detail-actions{flex-wrap:wrap}.detail-actions .btn{flex-basis:100%}}
+    @media(max-width:767px){.preview-bar{padding:10px 16px}.preview-title{gap:6px;font-size:12px}.preview-title .preview-badge{font-size:10px}.preview-state{margin-left:auto}.preview-state span{display:none}.preview-nav{flex-wrap:nowrap;overflow:auto;justify-content:flex-start;gap:0;scrollbar-width:none}.preview-nav a{padding:7px 10px;font-size:12px;min-height:38px}.view{padding:0 20px 26px}.store-intro{grid-template-columns:1fr;padding:34px 0 32px;gap:18px}.store-intro h1{font-size:38px}.store-heading{gap:16px}.store-logo{width:48px;height:56px;border-radius:24px 24px 6px 6px}.store-logo svg{width:29px;height:29px}.store-intro .summary{font-size:14px;margin-top:12px}.store-meta{text-align:left;padding:0;display:flex;flex-wrap:wrap;gap:4px 15px;font-size:12px}.store-meta p:first-child{font-size:12px}.shelf .product-card{flex-basis:79%;max-width:330px}.shelf{gap:16px}.section-heading{margin-bottom:15px}.section-heading h2{font-size:17px}.site-footer{margin-top:28px;padding-top:26px}.footer-top{grid-template-columns:1fr;gap:22px}.platform-story{grid-column:auto;display:block}.platform-story .slogan{margin-top:10px;font-size:20px}.platform-story .explanation{margin-top:8px}.skill-block{padding-top:14px;border-top:1px solid var(--line)}.skill-block p{min-height:0}.footer-bottom{align-items:start;flex-direction:column;gap:5px;margin-top:18px}.footer-links{gap:0 20px}.inner-nav{padding:14px 0}.nav-links{gap:16px;font-size:12px}.inner-nav .platform-name{font-size:17px}.page-heading{padding:30px 0 24px;display:block}.page-heading h1{font-size:34px}.page-heading .small{display:block;margin-top:12px}.product-grid{grid-template-columns:1fr;gap:30px}.product-grid .cover{max-height:450px}.product-grid .card-title{min-height:0}.pagination{margin-top:28px}.breadcrumbs{padding:12px 0}.detail-layout{grid-template-columns:1fr;gap:20px}.detail-title{grid-column:1;grid-row:1}.detail-cover{grid-column:1;grid-row:2}.detail-body{grid-column:1;grid-row:3;margin-top:0}.detail-title h1{font-size:32px}.detail-cover .cover{border-radius:12px}.detail-price{margin-top:0}.detail-price .price{font-size:34px}.variant-set{margin-top:20px}.detail-actions .btn{flex-basis:auto}.detail-actions{display:flex;flex-direction:column;align-items:stretch;gap:5px}.facts-section{grid-template-columns:1fr;gap:30px;margin-top:30px;padding-top:25px}.simple-footer{margin-top:30px;flex-wrap:wrap}.identity-wrap{display:flex;flex-direction:column;gap:24px;padding:26px 0}.identity-context{padding-top:0}.identity-context h1{font-size:30px;max-width:none}.identity-context>p{margin-top:10px;max-width:none;font-size:13px}.identity-process{display:none}.identity-panel{width:100%;max-width:480px;margin:auto;padding:24px;border-radius:12px}.identity-panel h2{font-size:23px}.script-wrap{margin:30px auto}.script-wrap h1{font-size:30px}.key-row>div{flex-direction:column;align-items:start;gap:7px}.script-toolbar{gap:12px}.script-toolbar .btn{padding:10px 12px;font-size:12px}.account-tabs{gap:3px}.account-tabs button{padding:6px 9px;font-size:12px}.toast{right:20px;bottom:20px}.preview-note{text-align:left;font-size:11px}}
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute;overflow:hidden">
+    <defs>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M9 15l6-6M7.5 16.5l-1 1a4.24 4.24 0 0 1-6-6l4-4a4.24 4.24 0 0 1 6 0M16.5 7.5l1-1a4.24 4.24 0 0 1 6 6l-4 4a4.24 4.24 0 0 1-6 0" transform="translate(0 0) scale(.92)" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M15 5V4H4v12h1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m8 12 3 3 5-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+      <symbol id="i-box" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5Zm-9 5v10l9 4 9-4V8M12 13v9M7.5 5.5l9 5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+      <symbol id="i-sprig" viewBox="0 0 48 48"><path d="M24 40V18M24 29C10 31 8 24 8 17c13-1 17 3 16 12Zm0-9C36 21 39 12 37 7c-10-1-14 4-13 13Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 40h24" stroke="currentColor" stroke-width="1.7"/></symbol>
+      <symbol id="art-lamp" viewBox="0 0 400 400">
+        <ellipse cx="210" cy="325" rx="108" ry="12" fill="#cfd7c0"/><path d="M208 165v139" stroke="#77826a" stroke-width="9"/><path d="M203 165v139" stroke="#a9b59a" stroke-width="4"/><path d="M172 143c-30 18-42 33-37 45l151 12c6-37-25-63-54-66Z" fill="#728865"/><path d="M135 188c0-18 150-8 151 12-3 16-154 1-151-12Z" fill="#e2e8d4"/><ellipse cx="213" cy="201" rx="39" ry="7" fill="#b9c8a5"/><path d="M165 300c19-15 78-15 96 0l5 17H160Z" fill="#6f8262"/><ellipse cx="213" cy="318" rx="53" ry="10" fill="#66795b"/><ellipse cx="211" cy="303" rx="45" ry="9" fill="#899d7a"/><path d="M214 138c2-4 7-4 9-1" stroke="#a9b898" stroke-width="3" fill="none"/>
+      </symbol>
+      <symbol id="art-bag" viewBox="0 0 400 400">
+        <ellipse cx="210" cy="331" rx="96" ry="10" fill="#d7cbb7"/><path d="m120 143-13 171c39 19 131 27 189 8l-15-179Z" fill="#d1bea2"/><path d="m129 151-7 155c42 18 118 20 162 7l-13-161Z" fill="#e5d7bd"/><path d="M155 160V96c0-55 99-51 99 0v65" stroke="#b0a084" stroke-width="14" fill="none"/><path d="M156 160V98c0-55 95-51 95-1v65" stroke="#dfd0b4" stroke-width="7" fill="none"/><path d="M136 160h129M132 293c39 12 88 16 139 8" stroke="#c3b092" stroke-width="1.2" stroke-dasharray="3 3" fill="none"/><path d="M189 232v30m0-18c-15 0-17-9-16-14 12 0 18 4 16 14Zm0-9c13 0 15-10 13-17-11 2-15 7-13 17Z" fill="none" stroke="#68785d" stroke-width="2"/>
+      </symbol>
+      <symbol id="art-bottle" viewBox="0 0 400 400">
+        <ellipse cx="203" cy="333" rx="69" ry="10" fill="#c2d4d0"/><path d="M158 124c-5 7-11 27-11 40v143c0 22 107 22 107 0V164c0-13-6-33-12-40Z" fill="#859e98"/><path d="M150 161v141c0 18 22 20 32 22V154Z" fill="#a3b7b1"/><ellipse cx="201" cy="309" rx="53" ry="16" fill="#6e8a83"/><ellipse cx="201" cy="306" rx="53" ry="14" fill="#88a29a"/><path d="M160 119V89c0-12 82-12 82 0v30c-2 14-80 14-82 0Z" fill="#4f6661"/><ellipse cx="201" cy="87" rx="41" ry="10" fill="#758c85"/><path d="M242 96c25 1 26 41 9 54" stroke="#435d56" stroke-width="7" fill="none"/><path d="M174 179v98" stroke="#c6d4ce" stroke-width="3" stroke-linecap="round"/><text x="202" y="237" text-anchor="middle" font-family="serif" font-size="16" fill="#dfebe4">500</text>
+      </symbol>
+      <symbol id="art-keyboard" viewBox="0 0 400 400">
+        <ellipse cx="204" cy="285" rx="145" ry="14" fill="#d0cad7"/><path d="m73 140 260 36-17 114L57 250Z" fill="#8e879d"/><path d="m78 132 259 36-20 112L61 243Z" fill="#b5aec2"/><path d="m88 146 234 33-15 87L75 235Z" fill="#776e88"/>
+        <g fill="#d6d0df" stroke="#b5acbf" stroke-width="2" transform="matrix(.99,.14,-.16,.95,89,150)">
+          <path d="M0 0h19v19H0Zm25 0h19v19H25Zm25 0h19v19H50Zm25 0h19v19H75Zm25 0h19v19H100Zm25 0h19v19H125Zm25 0h19v19H150Zm25 0h19v19H175Zm25 0h25v19H200Z"/>
+          <path d="M0 25h26v19H0Zm32 0h19v19H32Zm25 0h19v19H57Zm25 0h19v19H82Zm25 0h19v19H107Zm25 0h19v19H132Zm25 0h19v19H157Zm25 0h19v19H182Zm25 0h19v19H207Z"/>
+          <path d="M0 50h32v19H0Zm38 0h19v19H38Zm25 0h19v19H63Zm25 0h19v19H88Zm25 0h19v19H113Zm25 0h19v19H138Zm25 0h19v19H163Zm25 0h38v19H188Z"/>
+          <path d="M0 75h21v16H0Zm27 0h21v16H27Zm27 0h112v16H54Zm118 0h21v16H172Zm27 0h27v16H199Z"/>
+        </g><path d="m89 150 19 3-3 17-19-3Z" fill="#758466"/><path d="m291 203 25 4-4 17-24-4Z" fill="#ab9ac0"/>
+      </symbol>
+      <symbol id="art-notebook" viewBox="0 0 400 400"><ellipse cx="210" cy="325" rx="108" ry="12" fill="#c6ccba"/><path d="m119 94 153 19 18 205-157-18Z" fill="#eae7d6"/><path d="m111 88 154 19 17 205-156-18Z" fill="#6e7d58"/><path d="m113 88 11 204" stroke="#a2af8b" stroke-width="3"/><path d="m167 160 58 7M170 181l51 6" stroke="#c7ceb2" stroke-width="2"/><path d="m237 109 8 93 8-7 8 9-9-94Z" fill="#bdb89b"/></symbol>
+      <symbol id="art-tray" viewBox="0 0 400 400"><ellipse cx="208" cy="298" rx="127" ry="13" fill="#dac6b6"/><path d="m101 163 207 12 8 109-232-18Z" fill="#9d7555"/><path d="m104 160 202 13 3 96-216-17Z" fill="#be9470"/><path d="m118 176 173 12 1 65-187-16Z" fill="#d2ae8b"/><path d="m127 185 10 48m23-45 9 49m24-48 8 51m22-49 9 50m22-47 6 50" stroke="#b89069" stroke-width="1" opacity=".6"/><path d="M108 244 290 259" stroke="#e8c8a5" stroke-width="2"/></symbol>
+    </defs>
+  </svg>
+  <div class="preview-bar" aria-label="设计预览工具">
+    <div class="preview-title"><strong>MercLink</strong><span class="preview-badge">设计预览</span><span class="muted">示例数据</span></div>
+    <nav class="preview-nav" aria-label="样稿页面">
+      <a href="#home" aria-current="page">店铺首页</a><a href="#products">商品列表</a><a href="#detail">商品详情</a><a href="#buyer">买家授权</a><a href="#owner">店主</a><a href="#scripts">脚本账号</a>
+    </nav>
+    <label class="preview-state"><span>状态</span><select id="state-select" aria-label="预览状态"><option value="normal">正常展示</option></select></label>
+  </div>
+  <noscript><p class="no-script">已关闭脚本：下方按顺序展示全部样稿。所有店铺、商品和账号均为示例。</p></noscript>
+
+  <main>
+    <section class="view active" id="home" aria-label="店铺首页样稿">
+      <div class="container">
+        <header class="store-intro" id="store-intro">
+          <div>
+            <div class="store-heading"><div class="store-logo" aria-hidden="true"><svg><use href="#i-sprig"/></svg></div><h1 tabindex="-1">拾物日常</h1></div>
+            <p class="summary">为书桌、出门与生活里的小片刻，准备一些耐看、实用的东西。<br>灯、包、杯子，还有陪你把想法写下来的日常工具。</p>
+          </div>
+          <div class="store-meta"><p>服务范围：中国大陆</p><p>上海市静安区愚园路 100 号（示例）</p></div>
+        </header>
+        <section aria-labelledby="shelf-title" style="padding-top:8px">
+          <div class="section-heading"><h2 id="shelf-title">已上架商品</h2><div class="shelf-actions"><button class="icon-button" data-scroll="-1" aria-label="上一张商品 banner"><svg style="transform:rotate(180deg)" aria-hidden="true"><use href="#i-arrow"/></svg></button><button class="icon-button" data-scroll="1" aria-label="下一张商品 banner"><svg aria-hidden="true"><use href="#i-arrow"/></svg></button></div></div>
+          <div class="shelf banner-shelf" id="home-shelf" role="region" aria-label="商品 banner，可左右滚动">
+            <a class="product-card banner-card" href="#detail" data-product="lamp"><div class="banner-copy"><h3 class="card-title">苔绿桌灯</h3><div class="card-meta"><span class="price">¥159<span class="decimals">.00</span></span><span class="availability">有货</span></div><span class="banner-open">查看详情<svg aria-hidden="true"><use href="#i-arrow"/></svg></span></div><figure class="cover" data-art="lamp"><svg role="img" aria-label="苔绿桌灯示意图"><use href="#art-lamp"/></svg></figure></a>
+            <a class="product-card banner-card" href="#detail" data-product="bag"><div class="banner-copy"><h3 class="card-title">原色帆布托特包</h3><div class="card-meta"><span class="price">¥89<span class="decimals">.00</span></span><span class="availability">有货</span></div><span class="banner-open">查看详情<svg aria-hidden="true"><use href="#i-arrow"/></svg></span></div><figure class="cover" data-art="bag"><svg role="img" aria-label="原色帆布托特包示意图"><use href="#art-bag"/></svg></figure></a>
+            <a class="product-card banner-card" href="#detail" data-product="bottle"><div class="banner-copy"><h3 class="card-title">雾青随行杯</h3><div class="card-meta"><span class="price">¥129<span class="decimals">.00</span></span><span class="availability">有货</span></div><span class="banner-open">查看详情<svg aria-hidden="true"><use href="#i-arrow"/></svg></span></div><figure class="cover" data-art="bottle"><svg role="img" aria-label="雾青随行杯示意图"><use href="#art-bottle"/></svg></figure></a>
+            <a class="product-card banner-card" href="#detail" data-product="keyboard"><div class="banner-copy"><h3 class="card-title">暮紫机械键盘</h3><div class="card-meta"><span class="price">¥369<span class="decimals">.00</span></span><span class="availability">有货</span></div><span class="banner-open">查看详情<svg aria-hidden="true"><use href="#i-arrow"/></svg></span></div><figure class="cover" data-art="keyboard"><svg role="img" aria-label="暮紫机械键盘示意图"><use href="#art-keyboard"/></svg></figure></a>
+            <a class="product-card banner-card" href="#detail" data-product="notebook"><div class="banner-copy"><h3 class="card-title">松绿随手本</h3><div class="card-meta"><span class="price">¥39<span class="decimals">.00</span></span><span class="availability">有货</span></div><span class="banner-open">查看详情<svg aria-hidden="true"><use href="#i-arrow"/></svg></span></div><figure class="cover" data-art="notebook"><svg role="img" aria-label="松绿随手本示意图"><use href="#art-notebook"/></svg></figure></a>
+            <a class="product-card banner-card" href="#detail" data-product="tray"><div class="banner-copy"><h3 class="card-title">橡木桌面收纳盘</h3><div class="card-meta"><span class="price">¥79<span class="decimals">.00</span></span><span class="availability out">缺货</span></div><span class="banner-open">查看详情<svg aria-hidden="true"><use href="#i-arrow"/></svg></span></div><figure class="cover" data-art="tray"><svg role="img" aria-label="橡木桌面收纳盘示意图"><use href="#art-tray"/></svg></figure></a>
+          </div>
+          <div class="empty-state" id="home-empty" hidden><svg aria-hidden="true"><use href="#i-box"/></svg><h3>暂无可展示的商品</h3><p>商品上架后会出现在这里。</p></div>
+          <div class="banner-more"><a class="btn secondary" id="more-products" href="#products">查看更多<svg aria-hidden="true"><use href="#i-arrow"/></svg></a></div>
+        </section>
+        <section class="usage-section" aria-labelledby="usage-title">
+          <div class="usage-heading"><div><h2 id="usage-title">如何使用 MercLink</h2><p>把 Skill 交给你的 Agent，在自己的浏览器里确认授权。</p></div><div class="usage-tabs" role="tablist" aria-label="选择使用方式"><button id="guide-buyer-tab" role="tab" data-guide="buyer" aria-controls="guide-buyer" aria-selected="true" tabindex="0">我是买家，想购买</button><button id="guide-merchant-tab" role="tab" data-guide="merchant" aria-controls="guide-merchant" aria-selected="false" tabindex="-1">我是店主，想上架</button></div></div>
+          <section class="usage-flow active" id="guide-buyer" role="tabpanel" aria-labelledby="guide-buyer-tab"><h3 class="usage-role-label">买家购买：四步开始</h3><ol class="usage-steps">
+            <li><span class="step-number" aria-hidden="true"></span><h3>把 Skill 交给 Agent</h3><p>复制买家 Skill 地址，发给你的 Agent，让它了解查询和购买的方法。</p><div class="copy-line"><a href="#preview-documents" data-doc="buyer">/skill.md</a><button class="copy-button" data-copy="buyer"><svg aria-hidden="true"><use href="#i-copy"/></svg>复制地址</button></div></li>
+            <li><span class="step-number" aria-hidden="true"></span><h3>说出你的购买需求</h3><p>告诉 Agent 想买什么、预算多少，它会查询商品和可售规格。查商品无需登录。</p><div class="step-example">“找一款桌灯，预算 200 元。”</div></li>
+            <li><span class="step-number" aria-hidden="true"></span><h3>下单前登录并批准</h3><p>打开 Agent 给出的授权地址，在浏览器里用手机号验证或注册，并批准。密码和验证码留在浏览器里。</p></li>
+            <li><span class="step-number" aria-hidden="true"></span><h3>确认商品，完成付款</h3><p>确认规格和数量，再到支付宝收银台付款。付款后让 Agent 查询订单，确认已经支付。</p></li>
+          </ol></section>
+          <section class="usage-flow" id="guide-merchant" role="tabpanel" aria-labelledby="guide-merchant-tab"><h3 class="usage-role-label">店主管理：四步上架</h3><ol class="usage-steps">
+            <li><span class="step-number" aria-hidden="true"></span><h3>把商家 Skill 交给 Agent</h3><p>复制商家 Skill 地址，发给你的 Agent，让它了解这家店的管理方法。</p><div class="copy-line"><a href="#preview-documents" data-doc="merchant">/merchant/skill.md</a><button class="copy-button" data-copy="merchant"><svg aria-hidden="true"><use href="#i-copy"/></svg>复制地址</button></div></li>
+            <li><span class="step-number" aria-hidden="true"></span><h3>店主登录并批准</h3><p>打开 Agent 给出的授权地址，用店主账号登录。首次登录先修改初始密码，再批准 Agent。</p></li>
+            <li><span class="step-number" aria-hidden="true"></span><h3>告诉 Agent 商品资料</h3><p>提供商品名、售价、库存、图片和属性；有颜色、尺码时，说明实际出售的组合。</p><div class="step-example">“上架这款桌灯，159 元，库存 24 件。”</div></li>
+            <li><span class="step-number" aria-hidden="true"></span><h3>检查资料，完成上架</h3><p>Agent 补齐字段和可售规格，上传封面，再上架。成功后，商品出现在店铺首页和商品列表。</p></li>
+          </ol></section>
+        </section>
+        <footer class="site-footer usage-footer"><div><p class="slogan">在 AI 时代，让天下没有难做的生意</p><p class="explanation">帮中小商家做自己的店，并让各种 Agent 直接找到商品、完成购买。</p></div><div class="usage-footer-right"><nav class="footer-links" aria-label="API 与发现入口"><a href="#preview-documents" data-doc="api">API 根地址</a><a href="#preview-documents" data-doc="llms">llms.txt</a><a href="#preview-documents" data-doc="sitemap">sitemap.xml</a></nav><p>店铺、商品与图片均为设计示例</p></div></footer>
+      </div>
+    </section>
+
+    <section class="view" id="products" aria-label="商品列表样稿">
+      <div class="container">
+        <header class="inner-nav"><a class="platform-name" href="#home"><svg aria-hidden="true"><use href="#i-link"/></svg>MercLink</a><nav class="nav-links" aria-label="列表导航"><a href="#home">返回首页</a><a href="#preview-documents" data-doc="buyer">买家 Skill</a></nav></header>
+        <div class="page-heading"><div><h1 tabindex="-1">已上架商品</h1><p>查看商品事实与可售规格，把购买交给你的 Agent。</p></div><span class="small">当前页展示 4 件示例商品</span></div>
+        <div class="product-grid" id="product-grid">
+          <a class="product-card" href="#detail" data-product="lamp"><figure class="cover" data-art="lamp"><svg role="img" aria-label="苔绿桌灯示意图"><use href="#art-lamp"/></svg></figure><h3 class="card-title">苔绿桌灯</h3><div class="card-meta"><span class="price">¥159<span class="decimals">.00</span></span><span class="availability">有货</span></div></a>
+          <a class="product-card" href="#detail" data-product="bag"><figure class="cover" data-art="bag"><svg role="img" aria-label="原色帆布托特包示意图"><use href="#art-bag"/></svg></figure><h3 class="card-title">原色帆布托特包</h3><div class="card-meta"><span class="price">¥89<span class="decimals">.00</span></span><span class="availability">有货</span></div></a>
+          <a class="product-card" href="#detail" data-product="bottle"><figure class="cover" data-art="bottle"><svg role="img" aria-label="雾青随行杯示意图"><use href="#art-bottle"/></svg></figure><h3 class="card-title">雾青随行杯</h3><div class="card-meta"><span class="price">¥129<span class="decimals">.00</span></span><span class="availability">有货</span></div></a>
+          <a class="product-card" href="#detail" data-product="keyboard"><figure class="cover" data-art="keyboard"><svg role="img" aria-label="暮紫机械键盘示意图"><use href="#art-keyboard"/></svg></figure><h3 class="card-title">暮紫机械键盘</h3><div class="card-meta"><span class="price">¥369<span class="decimals">.00</span></span><span class="availability">有货</span></div></a>
+        </div>
+        <div class="empty-state" id="list-empty" hidden><svg aria-hidden="true"><use href="#i-box"/></svg><h3>暂无可展示的商品</h3><p>商品上架后会出现在这里。</p><a href="#home">返回店铺首页</a></div>
+        <div class="pagination" id="pagination"><button class="btn secondary" id="next-page">下一页示例<svg aria-hidden="true"><use href="#i-arrow"/></svg></button></div>
+        <footer class="simple-footer"><span>MercLink · 商品数据为示例</span><a href="#preview-documents" data-doc="merchant">商家 Skill</a></footer>
+      </div>
+    </section>
+
+    <section class="view" id="detail" aria-label="商品详情样稿">
+      <div class="container">
+        <header class="inner-nav"><a class="platform-name" href="#home"><svg aria-hidden="true"><use href="#i-link"/></svg>MercLink</a><nav class="nav-links" aria-label="详情导航"><a href="#products">商品列表</a><a href="#preview-documents" data-doc="buyer">买家 Skill</a></nav></header>
+        <nav class="breadcrumbs" aria-label="返回"><a href="#products"><svg style="transform:rotate(180deg)" aria-hidden="true"><use href="#i-arrow"/></svg>返回商品列表</a></nav>
+        <div id="detail-content">
+          <div class="detail-layout">
+            <figure class="detail-cover"><div class="cover" id="detail-cover" data-art="lamp"><svg role="img" aria-label="商品封面示意图"><use href="#art-lamp"/></svg></div><figcaption class="art-note">封面为离线矢量示意 · 生产使用商家上传图片</figcaption></figure>
+            <div class="detail-title"><h1 tabindex="-1" id="detail-name">苔绿桌灯</h1><p>商品信息与规格由店铺公开，购买前请让 Agent 确认。</p></div>
+            <div class="detail-body">
+              <div class="detail-price"><span class="price" id="detail-price">¥159<small>.00</small></span><span class="muted" id="price-label">起 · CNY</span><span class="availability" id="detail-availability">有货</span></div>
+              <fieldset class="variant-set"><legend>可售规格</legend><div id="variant-options">
+                <label class="variant"><input type="radio" name="variant" value="var_demo_lamp_green" checked><span><strong>苔绿 / 标准款</strong><span class="mono">var_demo_lamp_green · SKU LAMP-G</span></span><span class="variant-side">¥159.00<small>库存 24</small></span></label>
+                <label class="variant"><input type="radio" name="variant" value="var_demo_lamp_white"><span><strong>米白 / 标准款</strong><span class="mono">var_demo_lamp_white · SKU LAMP-W</span></span><span class="variant-side">¥169.00<small>不限库存</small></span></label>
+                <label class="variant"><input type="radio" name="variant" value="var_demo_lamp_black" disabled><span><strong>炭黑 / 标准款</strong><span class="mono">var_demo_lamp_black · SKU LAMP-B</span></span><span class="variant-side">¥169.00<small>缺货 · 库存 0</small></span></label>
+              </div></fieldset>
+              <div class="detail-actions"><button class="btn" id="copy-purchase"><svg aria-hidden="true"><use href="#i-copy"/></svg>复制购买需求给 Agent</button><a href="#preview-documents" class="text-link" data-doc="buyer">查看买家 Skill</a></div>
+              <p class="purchase-note">Agent 会先查询当前价格与库存，再向你确认购买。支付在支付宝完成。</p><p class="copy-feedback" id="variant-feedback" role="status" aria-live="polite"></p>
+            </div>
+          </div>
+          <section class="facts-section" aria-label="公开商品信息"><div><h2>公开字段</h2><dl class="facts" id="product-fields"><dt>material</dt><dd>铝合金</dd><dt>weight_g</dt><dd>680</dd><dt>dimmable</dt><dd>是</dd><dt>note</dt><dd>未填写</dd></dl></div><div><h2>商品信息</h2><dl class="facts"><dt>商品 ID</dt><dd class="mono" id="product-id">prd_demo_lamp</dd><dt>目录 ID</dt><dd class="mono" id="catalog-id">cat_demo_desk</dd><dt>货币</dt><dd>CNY</dd></dl><details><summary>查看结构化商品信息</summary><pre id="product-json">{"id":"prd_demo_lamp","price":15900,"currency":"CNY"}</pre></details></div></section>
+        </div>
+        <div id="detail-missing" class="empty-state" hidden><svg aria-hidden="true"><use href="#i-box"/></svg><h1 tabindex="-1" style="font-size:32px">没有找到商品</h1><p>商品可能已下架，或此地址不可访问。</p><a href="#products">返回商品列表</a></div>
+        <footer class="simple-footer"><span>MercLink · 商品数据为示例</span><a href="#home">返回店铺首页</a></footer>
+      </div>
+    </section>
+
+    <section class="view" id="buyer" aria-label="买家授权样稿">
+      <div class="container">
+        <header class="inner-nav"><a class="platform-name" href="#home"><svg aria-hidden="true"><use href="#i-link"/></svg>MercLink</a><span class="small muted">人工授权 · 演示流程</span></header>
+        <div class="identity-wrap">
+          <div class="identity-context"><h1 tabindex="-1">让 Agent 操作，<br>由你确认。</h1><p>账号验证和批准在你的浏览器里完成。授权后，Agent 才能为你下单和查询自己的订单。</p><ol class="identity-process"><li>核对 Agent 给出的短码</li><li>在浏览器里验证买家账号</li><li>确认后，返回 Agent 继续</li></ol></div>
+          <div class="identity-panel" id="buyer-panel">
+            <span class="role-label">买家授权</span><div class="step-dots" aria-label="当前：核对短码"><span class="done"></span><span></span><span></span></div>
+            <h2>核对设备码</h2><p class="intro">确认这个短码与 Agent 显示的一致。短码几分钟后失效。</p>
+            <label class="demo-label" for="demo-device">设备码（演示）</label><input class="demo-input code" id="demo-device" value="DEMO-CODE" readonly tabindex="-1" aria-readonly="true">
+            <button class="btn full" data-buyer-step="phone">查看登录步骤</button><p class="fine-print">此样稿不发送请求，也不收集账号信息。请勿在预览中填写真实密码或验证码。</p>
+          </div>
+        </div>
+        <footer class="simple-footer"><span>此处展示样式，未发起真实授权</span><a href="#home">返回店铺首页</a></footer>
+      </div>
+    </section>
+
+    <section class="view" id="owner" aria-label="店主页面样稿">
+      <div class="container">
+        <header class="inner-nav"><a class="platform-name" href="#home"><svg aria-hidden="true"><use href="#i-link"/></svg>MercLink</a><span class="small muted">店主账号 · 演示数据</span></header>
+        <div class="identity-wrap"><div class="identity-context"><h1 tabindex="-1">一家店，<br>一个店主账号。</h1><p>账号在部署时创建。管理页修改密码；日常目录与商品管理交给商家 Agent。</p><ol class="identity-process"><li>把商家 Skill 地址交给 Agent</li><li>店主登录、首次改密并批准</li><li>告诉 Agent 商品信息，由它上架</li></ol><p class="account-note">例如：“上架一款桌灯，售价 159 元，库存 24 件。”Agent 会补齐字段和规格，再调用上架接口。</p><a class="text-link" href="#preview-documents" data-doc="merchant">查看商家 Skill</a></div>
+          <div class="identity-panel"><div class="account-tabs" aria-label="店主样稿"><button data-owner-mode="password" aria-pressed="true">账号改密</button><button data-owner-mode="merchant" aria-pressed="false">商家授权</button></div><div id="owner-panel"><h2>修改店主密码</h2><p class="intro">管理页只用于修改密码。手机号与商家授权页共用。</p><label class="demo-label">当前密码</label><div class="demo-input" aria-label="当前密码演示占位">••••••••</div><label class="demo-label">新密码</label><div class="demo-input" aria-label="新密码演示占位">新密码输入区域（演示）</div><button class="btn full" data-owner-action="save">演示修改密码</button><p class="fine-print">这里使用固定占位，不输入、不保存真实密码。</p></div></div>
+        </div>
+        <footer class="simple-footer"><span>店主商品管理由 Agent 通过 API 完成</span><a href="#home">返回店铺首页</a></footer>
+      </div>
+    </section>
+
+    <section class="view" id="scripts" aria-label="脚本账号样稿">
+      <div class="container"><header class="inner-nav"><a class="platform-name" href="#home"><svg aria-hidden="true"><use href="#i-link"/></svg>MercLink</a><span class="small muted">服务器脚本 · 演示数据</span></header>
+        <div class="script-wrap" id="script-content"><span class="role-label">独立账号工具</span><h1 tabindex="-1">脚本 API Key</h1><p>仅给没有浏览器的服务器脚本使用。Agent 请通过设备码授权，无需把密钥复制到对话中。</p><div class="script-toolbar"><h2>已创建的密钥</h2><button class="btn" id="create-key">演示创建密钥</button></div><div id="script-notice" role="status"></div><ul class="key-list"><li class="key-row" id="sample-key"><div><span class="mono">demo_prefix</span><span class="state-label">有效</span></div><button id="revoke-key">演示撤销</button></li><li class="key-row revoked"><div><span class="mono">old_demo_prefix</span><span class="state-label">已撤销</span></div></li></ul><p class="fine-print">样稿只显示前缀。真实新密钥仅在创建成功时显示一次，之后不能查看完整值。</p></div>
+        <div class="script-wrap empty-state" id="script-login" hidden><h1 tabindex="-1" style="font-size:30px">请先登录</h1><p>登录后才能创建服务器脚本使用的 API Key。</p></div>
+        <footer class="simple-footer"><span>此页面不属于 Agent 授权流程</span><a href="#home">返回店铺首页</a></footer>
+      </div>
+    </section>
+  </main>
+  <details class="preview-document" id="preview-documents"><summary>预览说明与文档入口</summary><p>这是离线设计附件。实际站点保留 <span class="mono">/skill.md</span>、<span class="mono">/merchant/skill.md</span>、<span class="mono">/api/v1</span>、<span class="mono">/llms.txt</span> 与 <span class="mono">/sitemap.xml</span>；本样稿不连接这些服务。</p><p><a href="../design.md">阅读完整设计方案</a> · <a href="../tasks.md">阅读实施任务</a></p></details>
+  <dialog id="copy-dialog" aria-labelledby="dialog-title"><h2 id="dialog-title">预览说明</h2><p id="dialog-description"></p><textarea id="dialog-text" readonly aria-label="可手动复制的示例文本"></textarea><div class="dialog-actions"><button class="btn secondary" id="close-dialog">关闭</button><button class="btn" id="dialog-copy">复制示例文本</button></div></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script>
+    (() => {
+      document.documentElement.classList.add("js");
+      const $ = (selector) => document.querySelector(selector);
+      const $$ = (selector) => [...document.querySelectorAll(selector)];
+      const fixtures = {
+        lamp:{title:"苔绿桌灯",price:15900,catalog:"cat_demo_desk",fields:{material:"铝合金",weight_g:680,dimmable:true,note:null},variants:[{id:"var_demo_lamp_green",name:"苔绿 / 标准款",price:15900,stock:24,sku:"LAMP-G"},{id:"var_demo_lamp_white",name:"米白 / 标准款",price:16900,stock:null,sku:"LAMP-W"},{id:"var_demo_lamp_black",name:"炭黑 / 标准款",price:16900,stock:0,sku:"LAMP-B"}]},
+        bag:{title:"原色帆布托特包",price:8900,catalog:"cat_demo_everyday",fields:{material:"棉帆布",weight_g:220,washable:true},variants:[{id:"var_demo_bag_natural",name:"原色 / 标准款",price:8900,stock:32,sku:"BAG-N"}]},
+        bottle:{title:"雾青随行杯",price:12900,catalog:"cat_demo_cups",fields:{material:"不锈钢",volume_ml:500,insulated:true},variants:[{id:"var_demo_bottle_500",name:"雾青 / 500ml",price:12900,stock:18,sku:"CUP-500"},{id:"var_demo_bottle_750",name:"雾青 / 750ml",price:14900,stock:12,sku:"CUP-750"}]},
+        keyboard:{title:"暮紫机械键盘",price:36900,catalog:"cat_demo_desk",fields:{switch_type:"茶轴",keys:68,wireless:true},variants:[{id:"var_demo_keyboard_tea",name:"暮紫 / 茶轴",price:36900,stock:9,sku:"KEY-T"},{id:"var_demo_keyboard_red",name:"暮紫 / 红轴",price:36900,stock:15,sku:"KEY-R"}]},
+        notebook:{title:"松绿随手本",price:3900,catalog:"cat_demo_desk",fields:{paper_gsm:100,pages:160,ruled:false},variants:[{id:"var_demo_notebook_a5",name:"松绿 / A5",price:3900,stock:null,sku:"BOOK-A5"}]},
+        tray:{title:"橡木桌面收纳盘",price:7900,catalog:"cat_demo_desk",fields:{material:"橡木",weight_g:340},variants:[{id:"var_demo_tray_oak",name:"橡木 / 标准款",price:7900,stock:0,sku:"TRAY-O"}]}
+      };
+      let currentProduct="lamp", currentState="normal", buyerStep="device", ownerMode="password", listPage=1, toastTimer;
+      const money=(minor)=>(minor/100).toFixed(2);
+      const esc=(value)=>String(value).replace(/[&<>"']/g, char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+      const icon=(name)=>'<svg aria-hidden="true"><use href="#i-'+name+'"/></svg>';
+      function showToast(message){clearTimeout(toastTimer);$("#toast").textContent=message;$("#toast").hidden=false;toastTimer=setTimeout(()=>{$("#toast").hidden=true;},6000);}
+      const documents={
+        buyer:{title:"买家 Skill",text:"https://store.example.invalid/skill.md",description:"正式站点的买家入口为 /skill.md。把对应真实地址交给 Agent，就能查商品并开始设备码授权。下面是不可访问的保留示例域名。"},
+        merchant:{title:"商家 Skill",text:"https://store.example.invalid/merchant/skill.md",description:"正式站点的商家入口为 /merchant/skill.md。店主把真实地址交给 Agent，在浏览器登录并批准。此处只展示入口样式。"},
+        api:{title:"API 根地址",text:"https://store.example.invalid/api/v1",description:"API 入口复用当前注册表。此样稿不创建 API，也不向服务端请求数据。"},
+        llms:{title:"llms.txt",text:"https://store.example.invalid/llms.txt",description:"发现文件指向首页、商品列表、两份 Skill 和 API，不复制完整商品目录。"},
+        sitemap:{title:"sitemap.xml",text:"https://store.example.invalid/sitemap.xml",description:"站点地图只收录允许公开的页面和商品。此处为离线样稿说明。"}
+      };
+      function openDialog(title,description,text){$("#dialog-title").textContent=title;$("#dialog-description").textContent=description;$("#dialog-text").value=text;$("#copy-dialog").showModal();}
+      async function copyText(text,description){
+        try{if(!navigator.clipboard)throw new Error("Unavailable");await navigator.clipboard.writeText(text);showToast("已复制示例文本");}
+        catch{openDialog("请手动复制",description+" 浏览器未允许剪贴板操作，可选择下面的文本。",text);$("#dialog-text").focus();$("#dialog-text").select();}
+      }
+      function card(key){const p=fixtures[key];return '<a class="product-card" href="#detail" data-product="'+key+'"><figure class="cover" data-art="'+key+'"><svg role="img" aria-label="'+esc(p.title)+'示意图"><use href="#art-'+key+'"/></svg></figure><h3 class="card-title">'+esc(p.title)+'</h3><div class="card-meta"><span class="price">¥'+money(p.price)+'</span><span class="availability'+(p.variants.every(v=>v.stock===0)?' out':'')+'">'+(p.variants.every(v=>v.stock===0)?'缺货':'有货')+'</span></div></a>';}
+      function renderDetail(){
+        const p=fixtures[currentProduct],missing=currentState==="hidden",out=currentState==="stock";
+        $("#detail-content").hidden=missing;$("#detail-missing").hidden=!missing;
+        $("#detail-name").textContent=p.title;$("#detail-cover").dataset.art=currentProduct;
+        $("#detail-cover svg use").setAttribute("href","#art-"+currentProduct);
+        $("#detail-cover svg").setAttribute("aria-label",p.title+"示意图");
+        $("#detail-cover").classList.toggle("no-image",currentState==="noimage");
+        $("#detail-price").innerHTML="¥"+money(p.price).split(".")[0]+"<small>."+money(p.price).split(".")[1]+"</small>";
+        $("#price-label").textContent=p.variants.some(v=>v.price!==p.price)?"起 · CNY":"CNY";
+        $("#detail-availability").textContent=out||p.variants.every(v=>v.stock===0)?"缺货":"有货";
+        $("#detail-availability").classList.toggle("out",out||p.variants.every(v=>v.stock===0));
+        let checked=false;
+        $("#variant-options").innerHTML=p.variants.map(v=>{
+          const noStock=out||v.stock===0,select=!checked&&!noStock;if(select)checked=true;
+          return '<label class="variant"><input type="radio" name="variant" value="'+v.id+'"'+(select?' checked':'')+(noStock?' disabled':'')+'><span><strong>'+esc(v.name)+'</strong><span class="mono">'+v.id+' · SKU '+v.sku+'</span></span><span class="variant-side">¥'+money(v.price)+'<small>'+(noStock?'缺货 · 库存 0':v.stock===null?'不限库存':'库存 '+v.stock)+'</small></span></label>';
+        }).join("");
+        $("#copy-purchase").disabled=!checked;
+        $("#variant-feedback").textContent=checked?"":"当前没有有货规格，暂时无法复制购买需求。";
+        $("#product-fields").innerHTML=Object.entries(p.fields).map(([key,value])=>"<dt>"+esc(key)+"</dt><dd>"+esc(value===null?"未填写":typeof value==="boolean"?(value?"是":"否"):value)+"</dd>").join("");
+        $("#product-id").textContent="prd_demo_"+currentProduct;$("#catalog-id").textContent=p.catalog;
+        $("#product-json").textContent=JSON.stringify({id:"prd_demo_"+currentProduct,catalog_id:p.catalog,title:p.title,currency:"CNY",offer:{price:p.price,availability:out||p.variants.every(v=>v.stock===0)?"out_of_stock":"in_stock"},fields:p.fields,variants:p.variants.map(v=>({id:v.id,price:v.price,stock:out?0:v.stock,option_values:{款式:v.name},sku:v.sku}))},null,2);
+      }
+      function steps(n){return '<div class="step-dots" aria-label="当前演示阶段"><span class="'+(n>=1?'done':'')+'"></span><span class="'+(n>=2?'done':'')+'"></span><span class="'+(n>=3?'done':'')+'"></span></div>';}
+      function demoField(label,value,code){return '<label class="demo-label">'+label+'</label><div class="demo-input'+(code?' code':'')+'">'+value+'</div>';}
+      function buyerButton(step,text){return '<button class="btn full" data-buyer-step="'+step+'">'+text+'</button>';}
+      function renderBuyer(){
+        const error=currentState==="error",expired=currentState==="expired",idle=currentState==="idle";
+        let html='<span class="role-label">买家授权</span>';
+        if(expired){html+=steps(1)+'<h2>短码已失效</h2><p class="intro">请返回 Agent，重新发起设备码授权并取得新的短码。</p><div class="notice" role="alert">演示状态：当前短码已经过期，无法继续。</div><button class="btn full" data-reset-buyer>重新查看演示</button>';}
+        else if(idle){html+=steps(3)+'<h2>没有待批准的授权</h2><p class="intro">账号已登录。请从 Agent 重新发起授权，再回到这里确认。</p><div class="signed-account"><span class="avatar">买</span><span>买家账号（演示）</span></div>';}
+        else if(buyerStep==="device"){html+=steps(1)+'<h2>核对设备码</h2><p class="intro">确认短码与 Agent 显示的一致。短码几分钟后失效。</p>'+demoField('设备码（演示）','DEMO-CODE',true)+buyerButton("phone","查看登录步骤");}
+        else if(buyerStep==="phone"){html+=steps(2)+'<h2>登录买家账号</h2><p class="intro">未注册的手机号将在验证后创建账号。邮箱不是登录标识。</p>'+demoField('手机号（演示）','138 **** 0000')+'<div class="captcha-demo">'+icon("shield")+'<span>真实页面先完成人机验证<br><small>本样稿不加载验证码服务</small></span></div>'+(error?'<div class="notice" role="alert">演示状态：人机验证未通过，请重新验证。</div>':'')+buyerButton("code","查看验证完成后的步骤");}
+        else if(buyerStep==="code"){html+=steps(2)+'<h2>填写短信验证码</h2><p class="intro">核验发送给 138 **** 0000 的短信。这里不发送真实短信。</p>'+demoField('短信验证码（演示）','••••••',true)+buyerButton("password","查看短信核验后的步骤")+'<button class="text-link" style="border:0;background:transparent;width:100%" data-buyer-step="phone">换个手机号</button>';}
+        else if(buyerStep==="password"){html+=steps(2)+'<h2>设置登录密码</h2><p class="intro">新账号完成注册后，留在本页确认授权。</p>'+demoField('密码（演示）','新密码输入区域')+demoField('邮箱（可选）','可选资料，不作为登录标识')+buyerButton("approve","查看批准步骤");}
+        else if(buyerStep==="approve"){html+=steps(3)+'<h2>批准 Agent</h2><p class="intro">确认后，Agent 可以代表这个买家账号执行已授权的操作。</p><div class="signed-account"><span class="avatar">买</span><span>138 **** 0000 <span class="muted">（演示）</span></span></div><ul class="permission-list"><li>'+icon("check")+'<span>创建订单<small>用当前买家账号下单</small></span></li><li>'+icon("check")+'<span>查看自己的订单<small>查询订单与支付结果</small></span></li></ul>'+buyerButton("done","演示批准")+'<button class="text-link" style="border:0;background:transparent;width:100%" data-buyer-step="phone">演示退出登录</button>';}
+        else{html+=steps(3)+'<div class="success-symbol">'+icon("check")+'</div><h2>授权完成（演示）</h2><p class="intro">真实授权完成后，返回 Agent 继续。本次演示没有创建授权记录。</p><button class="btn full" data-reset-buyer>重新查看演示</button>';}
+        html+='<p class="fine-print">所有账号内容为固定占位。密码和短信验证码只在真实浏览器授权页输入，不交给 Agent。</p>';
+        $("#buyer-panel").innerHTML=html;
+      }
+      function renderOwner(stage){
+        let html="";
+        if(ownerMode==="password"){
+          html='<h2>修改店主密码</h2><p class="intro">管理页只用于修改密码。手机号与商家授权页共用。</p>'+demoField("当前密码","••••••••")+demoField("新密码","新密码输入区域（演示）")+(currentState==="error"?'<div class="notice" role="alert">演示状态：当前密码不正确，请重新输入。</div>':'')+'<button class="btn full" data-owner-action="save">演示修改密码</button>';
+        }else if(stage==="approve"||currentState==="approved"){
+          html='<h2>批准商家 Agent</h2><p class="intro">目录与商品由 Agent 通过 API 管理。以下是商家角色能做的操作说明。</p><div class="signed-account"><span class="avatar">店</span><span>当前店主（演示）</span></div><ul class="permission-list"><li>'+icon("check")+'<span>管理目录、字段和商品</span></li><li>'+icon("check")+'<span>查看目录内的订单</span></li></ul><button class="btn full" data-owner-action="approve">演示批准</button>';
+        }else if(stage==="first"||currentState==="first"){
+          html='<h2>先修改初始密码</h2><p class="intro">首次登录必须修改密码，完成后才能批准 Agent。</p><div class="notice" role="alert">演示状态：初始密码尚未修改。</div>'+demoField("当前密码","••••••••")+demoField("新密码","新密码输入区域（演示）")+'<button class="btn full" data-owner-action="change">演示改密后继续</button><button class="btn secondary full" disabled>先改密，再批准</button>';
+        }else{
+          html='<h2>店主登录</h2><p class="intro">使用启动时的店主手机号和密码，与管理页相同。</p>'+demoField("店主手机号","店主手机号输入区域（演示）")+demoField("密码","••••••••")+(currentState==="error"?'<div class="notice" role="alert">演示状态：请使用店主手机号登录。</div>':'')+'<button class="btn full" data-owner-action="login">查看首次登录步骤</button><p class="account-note">商家授权页只有登录和批准，不提供注册。</p>';
+        }
+        html+='<p class="fine-print">此样稿不输入、不保存真实密码，也不实际修改账号或批准 Agent。</p>';
+        $("#owner-panel").innerHTML=html;$$("[data-owner-mode]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.ownerMode===ownerMode)));
+      }
+      const stateOptions={
+        home:[["normal","正常展示"],["empty","暂无商品"],["unpublished","店铺未发布"],["noimage","无封面"],["error","读取失败"]],
+        products:[["normal","正常展示"],["empty","暂无商品"],["noimage","无封面"],["error","读取失败"]],
+        detail:[["normal","正常展示"],["noimage","无封面"],["stock","全部缺货"],["hidden","商品不可公开"]],
+        buyer:[["normal","正常流程"],["error","验证失败"],["expired","短码过期"],["idle","无待批准请求"]],
+        owner:[["normal","正常展示"],["first","首次改密"],["approved","商家待批准"],["error","登录或改密失败"]],
+        scripts:[["normal","已登录"],["loggedout","未登录"]]
+      };
+      function updateBannerControls(){
+        const shelf=$("#home-shelf"),last=Math.max(0,shelf.scrollWidth-shelf.clientWidth);
+        $$("[data-scroll]").forEach(button=>{button.disabled=shelf.hidden||(Number(button.dataset.scroll)<0?shelf.scrollLeft<=1:shelf.scrollLeft>=last-1);});
+      }
+      function selectGuide(role,focus){
+        $$("[data-guide]").forEach(button=>{const selected=button.dataset.guide===role;button.setAttribute("aria-selected",String(selected));button.tabIndex=selected?0:-1;if(selected&&focus)button.focus();});
+        $$(".usage-flow").forEach(panel=>panel.classList.toggle("active",panel.id==="guide-"+role));
+      }
+      function viewId(){const name=location.hash.slice(1);return stateOptions[name]?name:"home";}
+      function applyState(){
+        const view=viewId(),state=currentState;
+        if(view==="home"){
+          $("#store-intro").hidden=state==="unpublished";$("#home-shelf").hidden=state==="empty"||state==="error";
+          $(".shelf-actions").hidden=state==="empty"||state==="error";$("#home-empty").hidden=!(state==="empty"||state==="error");
+          $("#home-empty h3").textContent=state==="error"?"暂时无法读取商品":"暂无可展示的商品";
+          $("#home-empty p").textContent=state==="error"?"请稍后重试。当前展示的是读取失败的演示状态。":"商品上架后会出现在这里。";
+          $$("#home-shelf .cover").forEach(c=>c.classList.toggle("no-image",state==="noimage"));
+          updateBannerControls();
+        }else if(view==="products"){
+          $("#product-grid").hidden=state==="empty"||state==="error";$("#pagination").hidden=state==="empty"||state==="error";$("#list-empty").hidden=!(state==="empty"||state==="error");
+          $("#list-empty h3").textContent=state==="error"?"暂时无法读取商品":"暂无可展示的商品";$("#list-empty p").textContent=state==="error"?"请稍后重试。此状态与没有商品不同。":"商品上架后会出现在这里。";
+          $("#products .page-heading .small").textContent=state==="empty"||state==="error"?"示例状态":listPage===1?"当前页展示 4 件示例商品":"当前页展示 2 件示例商品";
+          $$("#product-grid .cover").forEach(c=>c.classList.toggle("no-image",state==="noimage"));
+        }else if(view==="detail"){renderDetail();}
+        else if(view==="buyer"){if(state==="error")buyerStep="phone";renderBuyer();}
+        else if(view==="owner"){if(state==="first"||state==="approved")ownerMode="merchant";renderOwner();}
+        else{$("#script-content").hidden=state==="loggedout";$("#script-login").hidden=state!=="loggedout";}
+      }
+      function setView(focus){
+        const view=viewId();currentState="normal";
+        $$(".view").forEach(v=>v.classList.toggle("active",v.id===view));
+        $$(".preview-nav a").forEach(a=>a.setAttribute("aria-current",a.hash==="#"+view?"page":"false"));
+        $("#state-select").innerHTML=stateOptions[view].map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join("");
+        applyState();window.scrollTo({top:0,behavior:"instant"});
+        document.title={home:"店铺首页",products:"商品列表",detail:"商品详情",buyer:"买家授权",owner:"店主",scripts:"脚本账号"}[view]+" · MercLink 设计预览";
+        if(focus){const heading=$("#"+view+" h1");if(heading)heading.focus({preventScroll:true});}
+      }
+      $("#state-select").addEventListener("change",event=>{currentState=event.target.value;applyState();});
+      window.addEventListener("hashchange",()=>setView(true));
+      document.addEventListener("click",event=>{
+        const target=event.target.closest("button,a");if(!target)return;
+        if(target.dataset.guide){selectGuide(target.dataset.guide,false);}
+        if(target.dataset.product){currentProduct=target.dataset.product;if(viewId()==="detail")renderDetail();}
+        if(target.dataset.scroll){const shelf=$("#home-shelf"),card=shelf.querySelector(".product-card");shelf.scrollBy({left:Number(target.dataset.scroll)*(card.getBoundingClientRect().width+(parseFloat(getComputedStyle(shelf).columnGap)||0)),behavior:"instant"});}
+        if(target.dataset.doc){event.preventDefault();const doc=documents[target.dataset.doc];openDialog(doc.title+" · 离线预览",doc.description,doc.text);}
+        if(target.dataset.copy){const doc=documents[target.dataset.copy];copyText(doc.text,doc.description);}
+        if(target.dataset.buyerStep){buyerStep=target.dataset.buyerStep;currentState="normal";$("#state-select").value="normal";renderBuyer();$("#buyer-panel h2").setAttribute("tabindex","-1");$("#buyer-panel h2").focus({preventScroll:true});}
+        if(target.hasAttribute("data-reset-buyer")){buyerStep="device";currentState="normal";$("#state-select").value="normal";renderBuyer();}
+        if(target.dataset.ownerMode){ownerMode=target.dataset.ownerMode;currentState="normal";$("#state-select").value="normal";renderOwner();}
+        if(target.dataset.ownerAction){
+          const action=target.dataset.ownerAction;
+          if(action==="save"){showToast("密码修改成功（演示），没有修改真实账号");}
+          if(action==="login"){currentState="first";$("#state-select").value="first";renderOwner("first");}
+          if(action==="change"){currentState="approved";$("#state-select").value="approved";renderOwner("approve");}
+          if(action==="approve"){showToast("商家授权完成（演示），未创建真实授权");}
+        }
+      });
+      $("#home-shelf").addEventListener("scroll",updateBannerControls,{passive:true});
+      window.addEventListener("resize",updateBannerControls);
+      $(".usage-tabs").addEventListener("keydown",event=>{
+        if(!["ArrowLeft","ArrowRight","Home","End"].includes(event.key))return;
+        event.preventDefault();const selected=$("[data-guide][aria-selected=true]").dataset.guide;
+        selectGuide(event.key==="Home"?"buyer":event.key==="End"?"merchant":selected==="buyer"?"merchant":"buyer",true);
+      });
+      $("#copy-purchase").addEventListener("click",()=>{
+        const variant=$("#variant-options input:checked");if(!variant||variant.disabled)return;
+        copyText("这是设计样稿的示例数据。请查询商品 prd_demo_"+currentProduct+"，选择规格 "+variant.value+"。请先查询当前价格和库存，向我确认后再购买。","以下是带示例 ID 的购买需求，不用于真实交易。");
+      });
+      $("#variant-options").addEventListener("change",event=>{
+        const v=fixtures[currentProduct].variants.find(v=>v.id===event.target.value);
+        $("#variant-feedback").textContent="已选择 "+v.name+" · ¥"+money(v.price)+"，仅改变本页选择。";
+      });
+      $("#next-page").addEventListener("click",()=>{
+        listPage=listPage===1?2:1;$("#product-grid").innerHTML=(listPage===1?["lamp","bag","bottle","keyboard"]:["notebook","tray"]).map(card).join("");
+        $("#next-page").innerHTML=(listPage===1?"下一页示例":"返回第一页示例")+icon("arrow");applyState();showToast("已切换示例分页；生产使用真实 cursor 链接");
+      });
+      $("#create-key").addEventListener("click",()=>{$("#script-notice").innerHTML='<p class="notice" style="background:var(--soft);color:var(--moss);border-color:var(--moss)">创建结果（演示）：真实新密钥只在这里显示一次。样稿不生成或展示秘密。</p>';});
+      $("#revoke-key").addEventListener("click",()=>{$("#sample-key").classList.add("revoked");$("#sample-key .state-label").textContent="已撤销（演示）";$("#revoke-key").disabled=true;showToast("密钥撤销状态已展示（演示）");});
+      $("#close-dialog").addEventListener("click",()=>$("#copy-dialog").close());
+      $("#dialog-copy").addEventListener("click",async()=>{
+        try{if(!navigator.clipboard)throw new Error("Unavailable");await navigator.clipboard.writeText($("#dialog-text").value);$("#copy-dialog").close();showToast("已复制示例文本");}
+        catch{$("#dialog-description").textContent="浏览器未允许剪贴板操作，请选择下面文本后手动复制。";$("#dialog-text").focus();$("#dialog-text").select();}
+      });
+      setView(false);
+    })();
+  </script>
+</body>
+</html>

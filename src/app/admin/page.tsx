@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { ensureSuperAdmin, findAdmin } from "../../app-services/identity/admin";
 import { appRuntime } from "../../app-services/identity/runtime";
 import { readSession, adminCookie } from "../../app-services/identity/session";
-import { AdminView } from "../authorize/views";
+import { AdminLoginView, AdminView } from "../authorize/views";
 import "./admin.css";
 
 export const dynamic = "force-dynamic";
@@ -26,24 +26,7 @@ export default async function AdminPage({
       : readSession(header, runtime.env.OAUTH_SIGNING_SECRET, runtime.clock.now());
   const admin = session?.kind === "admin" ? await findAdmin(runtime.sql) : null;
   if (admin === null || session === null || session.kind !== "admin") {
-    return (
-      <main className="sheet">
-        <h1>店主</h1>
-        {params.notice === undefined ? null : <p className="notice">{params.notice}</p>}
-        <form action="/admin/submit" method="post" className="stack">
-          <input type="hidden" name="intent" value="login" />
-          <label>
-            手机号
-            <input name="phone" autoComplete="username" required />
-          </label>
-          <label>
-            密码
-            <input name="password" type="password" autoComplete="current-password" required />
-          </label>
-          <button type="submit">登录</button>
-        </form>
-      </main>
-    );
+    return <AdminLoginView notice={params.notice ?? null} />;
   }
   return <AdminView notice={params.notice ?? null} />;
 }

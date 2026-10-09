@@ -18,6 +18,7 @@ describe("authorization pages", () => {
       }),
     );
     expect(html).toContain(unknownMerchantMessage);
+    expect(html).toContain('role="alert"');
     expect(html).toContain("登录");
     expect(html).toContain('name="phone"');
     expect(html).not.toContain('value="approve"');
@@ -48,7 +49,8 @@ describe("authorization pages", () => {
       }),
     );
     expect(mustChange).toContain("修改密码");
-    expect(mustChange).toContain('value="approve"');
+    expect(mustChange).not.toContain('value="approve"');
+    expect(mustChange).toContain("先修改初始密码");
     expect(mustChange).not.toContain('name="phone"');
   });
 
@@ -66,10 +68,11 @@ describe("authorization pages", () => {
     expect(html).toContain("首次登录即注册");
     expect(html).toContain("发送验证码");
     expect(html).toContain("captcha-element");
+    expect(html).toMatch(/id="captcha-send"[^>]*disabled/);
     expect(html).toContain('name="captchaVerifyParam"');
     expect(html).toContain('data-captcha-prefix="captcha-prefix"');
     expect(html).toContain('data-captcha-region="cn"');
-    expect(html).not.toContain("核验短信");
+    expect(html).not.toContain('value="check"');
     expect(html).not.toContain("批准");
     expect(html).not.toContain("人机验证参数");
     expect(html).not.toContain("API Key");
@@ -94,7 +97,7 @@ describe("authorization pages", () => {
     expect(code).toContain("13800138000");
     expect(code).toContain("核验短信");
     expect(code).toContain('type="hidden" name="phone"');
-    expect(code).not.toContain("发送验证码");
+    expect(code).not.toContain('value="sms"');
     expect(code).not.toContain("批准");
 
     const password = renderToStaticMarkup(
