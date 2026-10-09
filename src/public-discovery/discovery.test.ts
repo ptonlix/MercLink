@@ -57,6 +57,7 @@ describe("discovery files", () => {
         `${origin}/products`,
         `${origin}/skill.md`,
         `${origin}/merchant/skill.md`,
+        `${origin}/storefront/skill.md`,
         `${origin}/products/${first.id}`,
         `${origin}/products/${second.id}`,
       ]),
@@ -99,6 +100,7 @@ describe("discovery files", () => {
     expect(body).toContain(`${origin}/products`);
     expect(body).toContain(`${origin}/skill.md`);
     expect(body).toContain(`${origin}/merchant/skill.md`);
+    expect(body).toContain(`${origin}/storefront/skill.md`);
     expect(body).toContain(`${origin}/api/v1`);
     expect(body).not.toContain(hiddenTitle);
     expect(body).not.toContain("prd_llms");
@@ -134,6 +136,7 @@ describe("discovery files", () => {
     expect(body).toContain(`${origin}/products`);
     expect(body).toContain(`${origin}/skill.md`);
     expect(body).toContain(`${origin}/merchant/skill.md`);
+    expect(body).toContain(`${origin}/storefront/skill.md`);
     expect(body).toContain(`${origin}/api/v1`);
     expect(body).not.toContain(hiddenTitle);
     expect(body).not.toContain("prd_llms");

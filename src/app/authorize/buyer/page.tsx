@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import {
+  authorizeLocation,
+  storefrontAuthorizeTarget,
+} from "../../../app-services/storefront/serve";
 import { findBuyerById, safeBuyerPhone } from "../../../app-services/identity/buyers";
 import { appRuntime } from "../../../app-services/identity/runtime";
 import { accountCookie, readSession } from "../../../app-services/identity/session";
@@ -16,6 +21,10 @@ export default async function BuyerAuthorizePage({
   searchParams: Promise<{ notice?: string; mode?: string; step?: string; phone?: string }>;
 }): Promise<ReactNode> {
   const params = await searchParams;
+  const target = await storefrontAuthorizeTarget("buyer");
+  if (target !== null) {
+    redirect(authorizeLocation(target, params));
+  }
   const runtime = appRuntime();
   const { cookies } = await import("next/headers");
   const jar = await cookies();

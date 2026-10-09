@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": ["storefront/**"],
   "ignoreIssues": {
     "src/db/client.ts": ["exports", "types"],
     "src/ports/**": ["exports", "types"],

@@ -12,6 +12,7 @@ import {
   authorizationCreatesMerchant,
   buyerApprovalScopes,
   fixedApprovalScopes,
+  grantedApprovalScopes,
   merchantApprovalScopes,
   selectAuthorizationPage,
 } from "./scopes";
@@ -29,6 +30,7 @@ describe("authorization scopes", () => {
   it("opens the merchant page for catalog scopes and the buyer page for order scopes", () => {
     expect(selectAuthorizationPage(["field:write", "order:write"])).toBe("merchant");
     expect(selectAuthorizationPage(["product:write"])).toBe("merchant");
+    expect(selectAuthorizationPage(["storefront:write"])).toBe("merchant");
     expect(selectAuthorizationPage(["order:write", "order:read"])).toBe("buyer");
     expect(selectAuthorizationPage(["product:read"])).toBe("invalid");
     expect(selectAuthorizationPage([])).toBe("invalid");
@@ -39,6 +41,15 @@ describe("authorization scopes", () => {
     expect(fixedApprovalScopes("merchant")).toEqual(merchantApprovalScopes);
     expect(fixedApprovalScopes("buyer")).toEqual(buyerApprovalScopes);
     expect(fixedApprovalScopes("merchant")).not.toContain("order:write");
+    expect(grantedApprovalScopes("merchant", ["product:write"])).toEqual(merchantApprovalScopes);
+    expect(grantedApprovalScopes("merchant", ["product:write"])).not.toContain("storefront:write");
+    expect(grantedApprovalScopes("merchant", ["product:write", "storefront:write"])).toContain(
+      "storefront:write",
+    );
+    expect(grantedApprovalScopes("merchant", ["storefront:write"])).not.toContain("order:write");
+    expect(grantedApprovalScopes("buyer", ["order:write", "storefront:write"])).toEqual(
+      buyerApprovalScopes,
+    );
     expect(authorizationCreatesMerchant()).toBe(false);
   });
 });

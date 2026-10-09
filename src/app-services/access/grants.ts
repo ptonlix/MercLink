@@ -1,6 +1,6 @@
 import Provider from "oidc-provider";
 import type { Sql } from "../../db/client";
-import { fixedApprovalScopes, type AuthorizationPage } from "../../domain/access/scopes";
+import { grantedApprovalScopes, type AuthorizationPage } from "../../domain/access/scopes";
 import { tokenHash } from "../../domain/access/tokens";
 import { agentClientId, finishInteraction, requestedInteractionScopes } from "./provider";
 
@@ -11,7 +11,7 @@ function accountIdFor(ownerType: "merchant" | "buyer", ownerId: string): string 
 }
 
 function approvalScopes(page: AuthorizationPage, requested: readonly string[]): string[] {
-  const granted = new Set<string>(fixedApprovalScopes(page));
+  const granted = new Set<string>(grantedApprovalScopes(page, requested));
   for (const scope of requested) {
     if (protocolScopes.has(scope)) {
       granted.add(scope);

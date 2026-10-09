@@ -1,4 +1,9 @@
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import {
+  authorizeLocation,
+  storefrontAuthorizeTarget,
+} from "../../../app-services/storefront/serve";
 import { findMerchant } from "../../../app-services/identity/merchants";
 import { appRuntime } from "../../../app-services/identity/runtime";
 import { accountCookie, readSession } from "../../../app-services/identity/session";
@@ -14,6 +19,10 @@ export default async function MerchantAuthorizePage({
   searchParams: Promise<{ notice?: string }>;
 }): Promise<ReactNode> {
   const params = await searchParams;
+  const target = await storefrontAuthorizeTarget("merchant");
+  if (target !== null) {
+    redirect(authorizeLocation(target, params));
+  }
   const runtime = appRuntime();
   const { cookies } = await import("next/headers");
   const token = (await cookies()).get(accountCookie)?.value;

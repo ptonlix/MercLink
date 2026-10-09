@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import nextConfig from "../../next.config";
 import { GET as buyerSkill } from "../app/agent-docs/buyer-skill/route";
 import { GET as merchantSkill } from "../app/agent-docs/merchant-skill/route";
+import { GET as storefrontSkill } from "../app/agent-docs/storefront-skill/route";
 import { apiRoutes, routesFor } from "../shared/api-routes";
 import { minorUnits } from "../shared/money";
 import { publicProducts, resetPublicProducts } from "../shared/seams/public-products";
@@ -10,6 +11,7 @@ import { publicStore, resetPublicStore } from "../shared/seams/public-store";
 
 const buyerFile = "src/agent-docs/skill.md";
 const merchantFile = "src/agent-docs/merchant-skill.md";
+const storefrontFile = "src/agent-docs/storefront-skill.md";
 const apiPathPattern = /\/api\/v1(?:\/(?:[A-Za-z0-9_-]+|\{[A-Za-z0-9_]+\}))+/g;
 
 describe("buyer skill", () => {
@@ -149,6 +151,9 @@ describe("merchant skill", () => {
       expect(body).toContain("Neither action marks the order paid.");
       expect(body).toContain("failure_reason");
       expect(body).toContain("也不能下单");
+      expect(body).toContain("未申请 `storefront:write` 时，批准结果固定是这四项");
+      expect(body).toContain("申请了 `storefront:write` 时，只在这四项之外多这一项");
+      expect(body).not.toContain("批准结果固定是这四项。");
       expect(body).toContain("买家令牌不能调用商家写接口");
       expect(body).toContain("`paid`");
       expect(body).toContain("`forbidden` `40300`");
@@ -220,6 +225,50 @@ describe("merchant profile skill", () => {
   });
 });
 
+describe("storefront skill", () => {
+  it("locks the page-edit rules and does not teach upload as activation", async () => {
+    const response = await storefrontSkill();
+    const body = await response.text();
+    const file = await readFile(storefrontFile, "utf8");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/markdown");
+    expect(body).toBe(file);
+    expect(body).toContain("不得替换、遮盖或把未知路径回退到这些地址");
+    expect(body).toContain("`/products/{id}`");
+    expect(body).toContain("不得向用户索要支付宝密码");
+    expect(body).toContain("Do not ask for an Alipay password.");
+    expect(body).toContain("只有订单状态 `paid` 才算成功");
+    expect(body).toContain("/authorize/buyer/submit");
+    expect(body).toContain("/authorize/merchant/submit");
+    expect(body).toContain("不得增加商家注册入口");
+    expect(body).toContain("未完成人机验证，不得请求发送短信");
+    expect(body).toContain("`payment_channel`");
+    expect(body).toContain("不得改用 User-Agent 猜测渠道");
+    expect(body).toContain("会随后端变化的事实必须用槽位");
+    expect(body).toContain("不得把当时的值写死在 HTML 里");
+    expect(body).toContain("只有槽位值为 `paid` 时，页面才能显示支付成功");
+    expect(body).toContain("`order_id` 不是公开查询");
+    expect(body).toContain("GET /api/v1/orders/{id}");
+    expect(body).toContain("products.next");
+    expect(body).toContain("不得把支付成功建立在回跳上");
+    expect(body).toContain("sitemap、下架地址和不可收录状态由服务端决定");
+    expect(body).toContain("不得把上传当成已经上线");
+    expect(body).toContain("node accept.mjs");
+    expect(body).toContain("验收失败就不要确认激活");
+    expect(body).toContain("不必再次激活");
+    expect(body).toContain("不要为了预览去打开生产环境的跨域访问");
+    expect(body).toContain("GET /api/v1/storefront/source");
+    expect(body).toContain("POST /api/v1/storefront/releases");
+    expect(body).toContain("POST /api/v1/storefront/releases/{id}/activate");
+    expect(body).toContain("POST /api/v1/storefront/rollback");
+    expect(body).toContain('{"confirm": true}');
+    expect(missingAssignedPaths(body, routesFor("storefront"))).toEqual([]);
+    expect(body).not.toContain("Bearer ");
+    expect(body).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}/);
+  });
+});
+
 describe("skill paths match the route table", () => {
   it("fails when an assigned path is removed or an unlisted /api/v1 path is added", async () => {
     const buyer = await readFile(buyerFile, "utf8");
@@ -230,6 +279,19 @@ describe("skill paths match the route table", () => {
     expect(missingAssignedPaths(merchant, routesFor("merchant"))).toEqual([]);
     expect(unlistedApiPaths(buyer, listed)).toEqual([]);
     expect(unlistedApiPaths(merchant, listed)).toEqual([]);
+    const storefront = await readFile(storefrontFile, "utf8");
+    expect(unlistedApiPaths(storefront, listed)).toEqual([]);
+    expect(missingAssignedPaths(storefront, routesFor("storefront"))).toEqual([]);
+    expect(merchant).toContain("/storefront/skill.md");
+    expect(merchant).toContain("本文档不讲页面上传、激活或回滚");
+    expect(merchant).not.toContain("/api/v1/storefront/");
+    expect(buyer).not.toContain("/api/v1/storefront/");
+
+    const storefrontOmitted = "/api/v1/storefront/source";
+    const storefrontWithoutPath = storefront.split(storefrontOmitted).join("REMOVED");
+    expect(missingAssignedPaths(storefrontWithoutPath, routesFor("storefront"))).toContain(
+      storefrontOmitted,
+    );
 
     const omitted = "/api/v1/catalogs/{id}/schema";
     const buyerWithoutPath = buyer.split(omitted).join("REMOVED");
@@ -251,6 +313,7 @@ describe("skill paths match the route table", () => {
     expect(rewrites).toEqual([
       { source: "/skill.md", destination: "/agent-docs/buyer-skill" },
       { source: "/merchant/skill.md", destination: "/agent-docs/merchant-skill" },
+      { source: "/storefront/skill.md", destination: "/agent-docs/storefront-skill" },
     ]);
   });
 });

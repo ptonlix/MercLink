@@ -14,9 +14,17 @@ export const buyerSkillPath = "/skill.md";
 
 export const merchantSkillPath = "/merchant/skill.md";
 
+export const storefrontSkillPath = "/storefront/skill.md";
+
 export const apiRootPath = "/api/v1";
 
-export const publicPagePaths = ["/", "/products", buyerSkillPath, merchantSkillPath] as const;
+export const publicPagePaths = [
+  "/",
+  "/products",
+  buyerSkillPath,
+  merchantSkillPath,
+  storefrontSkillPath,
+] as const;
 
 export const disallowedPaths = ["/authorize", "/admin", "/oauth", "/api", "/dev"] as const;
 
@@ -51,7 +59,7 @@ export function publicRobots(origin = publicBaseUrl()): RobotsPolicy {
   return {
     rules: {
       userAgent: "*",
-      allow: ["/", "/products", buyerSkillPath, merchantSkillPath],
+      allow: ["/", "/products", buyerSkillPath, merchantSkillPath, storefrontSkillPath],
       disallow: [...disallowedPaths],
     },
     sitemap: absoluteUrl("/sitemap.xml", origin),
@@ -87,6 +95,7 @@ export function llmsText(origin = publicBaseUrl(), store: StoreQuote | null = nu
     `- [商品列表](${absoluteUrl("/products", origin)}): 当前已上架商品`,
     `- [买家 Skill](${absoluteUrl(buyerSkillPath, origin)}): 如何查询商品、下单并查询自己的订单`,
     `- [商家 Skill](${absoluteUrl(merchantSkillPath, origin)}): 如何管理目录、字段、商品和规格`,
+    `- [店面 Skill](${absoluteUrl(storefrontSkillPath, origin)}): 如何改页面，以及哪些事实和协议不能改`,
     `- [API](${absoluteUrl(apiRootPath, origin)}): HTTP API 根地址`,
     "",
   );

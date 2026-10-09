@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>商品</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <p><merclink-slot name="store.display_name"></merclink-slot></p>
+    <template data-merclink="product">
+      <article>
+        <a href="/products/{id}">
+          <merclink-slot name="product.name"></merclink-slot>
+          <merclink-slot name="product.cover"></merclink-slot>
+          <merclink-slot name="product.fields"></merclink-slot>
+          <merclink-slot name="product.variants"></merclink-slot>
+          <merclink-slot name="product.stock"></merclink-slot>
+          <merclink-slot name="product.availability"></merclink-slot>
+          <merclink-slot name="product.price"></merclink-slot>
+        </a>
+      </article>
+    </template>
+    <merclink-slot name="products.next"></merclink-slot>
+  </body>
+</html>

@@ -17,6 +17,12 @@ import { systemClock } from "../ports/clock";
 import { imageUploadPolicies } from "../ports/rate-limit";
 import { createObjectStorageClient, createS3ObjectStorage } from "../adapters/s3";
 import { bindMediaRuntime } from "../app-services/catalog/media-runtime";
+import {
+  bindStorefrontRuntime,
+  storefrontUploadPolicies,
+} from "../app-services/storefront/runtime";
+import { readStorefrontOrderStatus } from "../app-services/storefront/order-status";
+import { createSqlStore } from "../app-services/storefront/sql-store";
 import { assertRuntimeDependencies } from "./runtime-deps";
 import { loadEnv, secretValues, type AppEnv } from "../shared/env";
 import { redactText } from "../shared/log";
@@ -103,15 +109,24 @@ async function bindObjectStorage(env: AppEnv): Promise<void> {
     const raw = error instanceof Error ? error.message : "runtime dependency failed";
     throw new Error(redactText(raw, secretValues(env)));
   }
+  const rateLimit = createRedisRateLimit({
+    url: env.REDIS_URL,
+    policies: { ...imageUploadPolicies, ...storefrontUploadPolicies() },
+    client: redis,
+  });
+  const sql = getDatabase(env.DATABASE_URL).sql;
   bindMediaRuntime({
-    rateLimit: createRedisRateLimit({
-      url: env.REDIS_URL,
-      policies: imageUploadPolicies,
-      client: redis,
-    }),
+    rateLimit,
     objectStorage,
     mediaBaseUrl: env.APP_BASE_URL,
     clock: systemClock,
+  });
+  bindStorefrontRuntime({
+    rateLimit,
+    objectStorage,
+    clock: systemClock,
+    store: createSqlStore(sql),
+    readOrderStatus: (input) => readStorefrontOrderStatus(input),
   });
 }
 

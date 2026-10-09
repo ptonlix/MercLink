@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>买家登录</title>
+  </head>
+  <body>
+    <h1>买家登录</h1>
+    <form action="/authorize/buyer/submit" method="post">
+      <input type="hidden" name="intent" value="sms" />
+      <label>手机号 <input name="phone" inputmode="numeric" /></label>
+      <button type="submit">发送验证码</button>
+    </form>
+  </body>
+</html>

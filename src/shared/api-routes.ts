@@ -1,4 +1,4 @@
-export const apiAudiences = ["buyer", "merchant"] as const;
+export const apiAudiences = ["buyer", "merchant", "storefront"] as const;
 
 export type ApiAudience = (typeof apiAudiences)[number];
 
@@ -13,6 +13,7 @@ export type ApiRoute = {
 const buyer = ["buyer"] as const satisfies readonly ApiAudience[];
 const merchant = ["merchant"] as const satisfies readonly ApiAudience[];
 const buyerAndMerchant = ["buyer", "merchant"] as const satisfies readonly ApiAudience[];
+const storefront = ["storefront"] as const satisfies readonly ApiAudience[];
 
 // Sole path list. Skill tests read this file and must not invent a second registry.
 export const apiRoutes = [
@@ -81,6 +82,14 @@ export const apiRoutes = [
   { method: "GET", path: "/api/v1/payments/easypay/notify", audiences: [] },
   { method: "POST", path: "/api/v1/payments/easypay/notify", audiences: [] },
   { method: "GET", path: "/.well-known/oauth-protected-resource", audiences: [] },
+  { method: "GET", path: "/api/v1/storefront/source", audiences: storefront },
+  { method: "POST", path: "/api/v1/storefront/releases", audiences: storefront },
+  {
+    method: "POST",
+    path: "/api/v1/storefront/releases/{id}/activate",
+    audiences: storefront,
+  },
+  { method: "POST", path: "/api/v1/storefront/rollback", audiences: storefront },
 ] as const satisfies readonly ApiRoute[];
 
 export function routesFor(audience: ApiAudience): readonly ApiRoute[] {

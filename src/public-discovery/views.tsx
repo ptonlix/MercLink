@@ -17,6 +17,7 @@ import {
   buyerSkillPath,
   emptyProductsNote,
   merchantSkillPath,
+  storefrontSkillPath,
   storeExplanation,
   storeSlogan,
   viewAllProductsLabel,
@@ -224,6 +225,7 @@ function EmptyProducts(): ReactNode {
 function PlatformUsageGuide(): ReactNode {
   const buyerUrl = absoluteUrl(buyerSkillPath);
   const merchantUrl = absoluteUrl(merchantSkillPath);
+  const storefrontUrl = absoluteUrl(storefrontSkillPath);
   return (
     <section className={styles.usage} aria-labelledby="usage-title">
       <h2 id="usage-title">如何使用 MercLink</h2>
@@ -275,6 +277,11 @@ function PlatformUsageGuide(): ReactNode {
                 </a>
                 <code className={styles.url}>{merchantUrl}</code>
                 <CopyText text={merchantUrl} label="复制商家 Skill 地址" />
+                <a className={styles.skillLink} href={storefrontSkillPath}>
+                  查看店面 Skill
+                </a>
+                <code className={styles.url}>{storefrontUrl}</code>
+                <CopyText text={storefrontUrl} label="复制店面 Skill 地址" />
               </li>
               <li>
                 <h4>店主登录并批准</h4>

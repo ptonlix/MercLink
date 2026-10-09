@@ -4,6 +4,7 @@ export const scopes = [
   "product:read",
   "order:read",
   "order:write",
+  "storefront:write",
 ] as const;
 
 export type Scope = (typeof scopes)[number];
