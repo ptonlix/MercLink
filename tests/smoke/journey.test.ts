@@ -13,6 +13,8 @@ describe("journey", () => {
     client.clearCookies();
     const pending = await placePendingOrder(client, merchant.token, buyer);
     expect(pending.status).toBe("pending");
+    expect(pending.provider).toMatch(/^(alipay|easypay)$/);
+    expect(pending.action).toMatch(/^https:\/\//);
 
     const confirmed = await client.request(`/dev/pay/${pending.paymentId}/confirm`, {
       method: "POST",

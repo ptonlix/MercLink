@@ -57,6 +57,9 @@ export const payments = pgTable(
     provider: text("provider").notNull(),
     channel: text("channel").notNull().default("desktop"),
     providerTradeNo: text("provider_trade_no"),
+    actionUrl: text("action_url"),
+    clientAddress: text("client_address"),
+    stockReleaseAt: timestamp("stock_release_at", { withTimezone: true, mode: "date" }),
     status: text("status").notNull(),
     amount: integer("amount").notNull(),
     currency: text("currency").notNull(),
@@ -70,3 +73,17 @@ export const payments = pgTable(
       .where(sql`${table.providerTradeNo} is not null`),
   ],
 );
+
+export const unappliedReceipts = pgTable("unapplied_receipts", {
+  id: text("id").primaryKey(),
+  paymentId: text("payment_id")
+    .notNull()
+    .unique()
+    .references(() => payments.id),
+  providerTradeNo: text("provider_trade_no").notNull(),
+  amount: integer("amount").notNull(),
+  status: text("status").notNull(),
+  failureReason: text("failure_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
+});

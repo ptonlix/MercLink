@@ -1,6 +1,12 @@
 import type { ErrorCode } from "../../shared/errors";
 import { apiFailure, httpStatusFor } from "../../shared/errors";
-import type { StoredGraph, StoredItem, StoredOrder, StoredPayment } from "./repository";
+import type {
+  StoredGraph,
+  StoredItem,
+  StoredOrder,
+  StoredPayment,
+  StoredReceipt,
+} from "./repository";
 
 export function httpStatus(error: ErrorCode): number {
   return httpStatusFor(error);
@@ -15,6 +21,7 @@ export function orderJson(
   items: readonly StoredItem[],
   payment: StoredPayment | null,
   action: unknown,
+  receipt: StoredReceipt | null = null,
 ): {
   id: string;
   status: StoredOrder["status"];
@@ -28,6 +35,12 @@ export function orderJson(
     channel: StoredPayment["channel"];
     status: StoredPayment["status"];
     action: unknown;
+  } | null;
+  unapplied_receipt: {
+    status: StoredReceipt["status"];
+    amount: number;
+    provider_trade_no: string;
+    failure_reason: string | null;
   } | null;
 } {
   return {
@@ -52,9 +65,22 @@ export function orderJson(
             status: payment.status,
             action,
           },
+    unapplied_receipt:
+      receipt === null
+        ? null
+        : {
+            status: receipt.status,
+            amount: receipt.amount,
+            provider_trade_no: receipt.providerTradeNo,
+            failure_reason: receipt.failureReason,
+          },
   };
 }
 
-export function graphJson(graph: StoredGraph, action: unknown): ReturnType<typeof orderJson> {
-  return orderJson(graph.order, graph.items, graph.payment, action);
+export function graphJson(
+  graph: StoredGraph,
+  action: unknown,
+  receipt: StoredReceipt | null = null,
+): ReturnType<typeof orderJson> {
+  return orderJson(graph.order, graph.items, graph.payment, action, receipt);
 }

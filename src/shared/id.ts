@@ -14,6 +14,7 @@ export const idPrefixes = {
   order: "ord_",
   orderLine: "oli_",
   payment: "pay_",
+  receipt: "rcp_",
   apiKey: "key_",
   grant: "grn_",
   challenge: "chg_",

@@ -8,6 +8,7 @@ import type {
   VerifyNotificationResult,
 } from "../../ports/payment";
 import { devPaymentTokenMatches } from "../../shared/dev-stubs";
+import { minorUnits, type MinorUnits } from "../../shared/money";
 
 export type DevPaymentConfig = {
   appBaseUrl: string;
@@ -17,6 +18,7 @@ export type DevPaymentConfig = {
 type DevPaymentState = {
   status: PaymentViewStatus;
   providerTradeNo: string;
+  amount: MinorUnits;
 };
 
 const payments = new Map<string, DevPaymentState>();
@@ -43,13 +45,18 @@ export function devPaidNotification(input: {
   paymentId: string;
   providerTradeNo: string;
   token: string;
+  amount?: number;
 }): string {
-  return new URLSearchParams({
+  const params = new URLSearchParams({
     out_trade_no: input.paymentId,
     trade_no: input.providerTradeNo,
     trade_status: "TRADE_SUCCESS",
     dev_token: input.token,
-  }).toString();
+  });
+  if (input.amount !== undefined) {
+    params.set("amount", String(input.amount));
+  }
+  return params.toString();
 }
 
 function readParam(params: URLSearchParams, key: string): string | null {
@@ -59,9 +66,15 @@ function readParam(params: URLSearchParams, key: string): string | null {
 
 export function createDevPaymentPort(config: DevPaymentConfig): PaymentPort {
   return {
+    upstreamClose: "supported",
+
     createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
       const providerTradeNo = `dev_${input.paymentId}`;
-      payments.set(input.paymentId, { status: "pending", providerTradeNo });
+      payments.set(input.paymentId, {
+        status: "pending",
+        providerTradeNo,
+        amount: input.amount,
+      });
       return Promise.resolve({
         ok: true,
         action: devPaymentAction(config.appBaseUrl, input.paymentId, input.channel),
@@ -76,12 +89,14 @@ export function createDevPaymentPort(config: DevPaymentConfig): PaymentPort {
           ok: true,
           status: "pending",
           providerTradeNo: input.providerTradeNo,
+          amount: null,
         });
       }
       return Promise.resolve({
         ok: true,
         status: stored.status,
         providerTradeNo: stored.providerTradeNo,
+        amount: stored.status === "paid" ? stored.amount : null,
       });
     },
 
@@ -90,7 +105,7 @@ export function createDevPaymentPort(config: DevPaymentConfig): PaymentPort {
       if (stored !== undefined && stored.status === "pending") {
         payments.set(input.paymentId, { ...stored, status: "closed" });
       }
-      return Promise.resolve({ ok: true });
+      return Promise.resolve({ ok: true, outcome: "closed" });
     },
 
     verifyNotification(input): Promise<VerifyNotificationResult> {
@@ -114,12 +129,22 @@ export function createDevPaymentPort(config: DevPaymentConfig): PaymentPort {
       }
       const stored = payments.get(paymentId);
       const tradeNo = stored?.providerTradeNo ?? providerTradeNo;
-      payments.set(paymentId, { status: "paid", providerTradeNo: tradeNo });
+      const amountText = params.get("amount");
+      const parsedAmount =
+        amountText !== null && /^\d+$/.test(amountText) ? Number(amountText) : null;
+      const amount =
+        parsedAmount !== null && Number.isSafeInteger(parsedAmount)
+          ? minorUnits(parsedAmount)
+          : (stored?.amount ?? null);
+      if (amount !== null) {
+        payments.set(paymentId, { status: "paid", providerTradeNo: tradeNo, amount });
+      }
       return Promise.resolve({
         ok: true,
         status: "paid",
         providerTradeNo: tradeNo,
         paymentId,
+        amount,
       });
     },
   };

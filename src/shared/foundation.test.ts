@@ -85,9 +85,11 @@ describe("foundation files", () => {
       checkCode: () => Promise.resolve({ ok: true }),
     };
     const payment: PaymentPort = {
+      upstreamClose: "supported",
       createPayment: () => Promise.resolve({ ok: true, action: {}, providerTradeNo: null }),
-      queryPayment: () => Promise.resolve({ ok: true, status: "pending", providerTradeNo: null }),
-      cancelPayment: () => Promise.resolve({ ok: true }),
+      queryPayment: () =>
+        Promise.resolve({ ok: true, status: "pending", providerTradeNo: null, amount: null }),
+      cancelPayment: () => Promise.resolve({ ok: true, outcome: "closed" }),
       verifyNotification: () =>
         Promise.resolve({
           ok: false,

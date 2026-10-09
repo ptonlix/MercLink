@@ -11,6 +11,7 @@ export async function POST(request: Request): Promise<Response> {
     body,
     headers,
     runtime: commerceRuntime(),
+    provider: "alipay",
   });
   return new Response(result.ok ? "success" : "fail", {
     status: 200,

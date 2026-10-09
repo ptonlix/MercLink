@@ -51,6 +51,7 @@ import { runMigrations } from "../../src/db/migrate";
 import { loadLanding, loadProduct } from "../../src/public-discovery/model";
 import { apiRoutes, routesFor } from "../../src/shared/api-routes";
 import { buyerActor, merchantActor } from "../../src/shared/actor";
+import { minorUnits } from "../../src/shared/money";
 import { resetAuthenticator } from "../../src/shared/seams/authenticate";
 import { resetDefaultCatalog } from "../../src/shared/seams/default-catalog";
 import { resetPublicProducts } from "../../src/shared/seams/public-products";
@@ -490,11 +491,17 @@ function fakePayment(cancels: string[]): PaymentPort {
         action: `https://pay.example/${input.orderId}`,
         providerTradeNo: null,
       }),
+    upstreamClose: "supported",
     queryPayment: (input) =>
-      Promise.resolve({ ok: true, status: "pending", providerTradeNo: input.providerTradeNo }),
+      Promise.resolve({
+        ok: true,
+        status: "pending",
+        providerTradeNo: input.providerTradeNo,
+        amount: null,
+      }),
     cancelPayment: (input) => {
       cancels.push(input.paymentId);
-      return Promise.resolve({ ok: true });
+      return Promise.resolve({ ok: true, outcome: "closed" });
     },
     verifyNotification: () =>
       Promise.resolve({
@@ -510,12 +517,15 @@ function paidRuntime(runtime: CommerceRuntime): CommerceRuntime {
     ...runtime,
     payment: {
       ...runtime.payment,
-      queryPayment: (input) =>
-        Promise.resolve({
-          ok: true,
-          status: "paid",
+      queryPayment: async (input) => {
+        const payment = await runtime.repo.findPaymentById(input.paymentId);
+        return {
+          ok: true as const,
+          status: "paid" as const,
           providerTradeNo: input.providerTradeNo ?? "trade_paid",
-        }),
+          amount: payment === null ? null : minorUnits(payment.amount),
+        };
+      },
     },
   };
 }

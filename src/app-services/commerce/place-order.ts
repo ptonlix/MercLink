@@ -17,7 +17,12 @@ import type { Actor } from "../../shared/actor";
 import { createPublicId } from "../../shared/id";
 import { sellableVariants } from "../../shared/seams/sellable-variants";
 import { isUniqueViolation, type StoredGraph, type StoredItem } from "./repository";
-import type { CommerceRuntime } from "./runtime";
+import {
+  paymentPortFor,
+  startupProviderOf,
+  startupProviderReady,
+  type CommerceRuntime,
+} from "./runtime";
 import { httpStatus } from "./view";
 
 const itemSchema = z.strictObject({
@@ -97,6 +102,7 @@ export async function placeOrder(input: {
   actor: Actor;
   body: unknown;
   runtime: CommerceRuntime;
+  clientAddress?: string | null;
 }): Promise<PlaceOrderResult> {
   const buyer = assertBuyerPlaces(input.actor);
   if (!buyer.ok) {
@@ -105,6 +111,39 @@ export async function placeOrder(input: {
   const parsed = parsePlaceOrderBody(input.body);
   if (!parsed.ok) {
     return { ...parsed, httpStatus: httpStatus(parsed.error) };
+  }
+
+  if (!startupProviderReady(input.runtime)) {
+    const existing = await input.runtime.repo.transaction((unit) =>
+      unit.findByClientNo(buyer.buyer.buyerId, parsed.clientOrderNo),
+    );
+    if (existing === null) {
+      return {
+        ok: false,
+        error: "dependency_unavailable",
+        message: "支付网关不可用。",
+        httpStatus: httpStatus("dependency_unavailable"),
+      };
+    }
+    return fulfillPayment(existing, input.runtime, input.clientAddress ?? null);
+  }
+
+  if (
+    startupProviderOf(input.runtime) === "easypay" &&
+    !hasConnectionAddress(input.clientAddress)
+  ) {
+    const existing = await input.runtime.repo.transaction((unit) =>
+      unit.findByClientNo(buyer.buyer.buyerId, parsed.clientOrderNo),
+    );
+    if (
+      existing === null ||
+      (existing.payment.provider === "easypay" &&
+        existing.order.status === "pending" &&
+        existing.payment.status === "pending" &&
+        !hasConnectionAddress(existing.payment.clientAddress))
+    ) {
+      return paymentRetryable();
+    }
   }
 
   let graph: StoredGraph;
@@ -159,9 +198,12 @@ export async function placeOrder(input: {
         payment: {
           id: createPaymentId(),
           orderId,
-          provider: "alipay",
+          provider: startupProviderOf(input.runtime),
           channel: parsed.channel,
           providerTradeNo: null,
+          actionUrl: null,
+          clientAddress: input.clientAddress ?? null,
+          stockReleaseAt: null,
           status: "pending",
           amount,
           currency: locked.line.currency,
@@ -190,17 +232,51 @@ export async function placeOrder(input: {
     graph = raced;
   }
 
+  return fulfillPayment(graph, input.runtime, input.clientAddress ?? null);
+}
+
+async function fulfillPayment(
+  graph: StoredGraph,
+  runtime: CommerceRuntime,
+  clientAddress: string | null,
+): Promise<PlaceOrderResult> {
   if (graph.order.status !== "pending" || graph.payment.status !== "pending") {
     return { ok: true, graph, action: null };
   }
+  const port = paymentPortFor(runtime, graph.payment.provider);
+  if (port === null) {
+    return {
+      ok: false,
+      error: "payment_retryable",
+      message: "支付创建失败，请重试。",
+      httpStatus: httpStatus("payment_retryable"),
+    };
+  }
+  if (port.upstreamClose === "unsupported" && graph.payment.actionUrl !== null) {
+    return { ok: true, graph, action: graph.payment.actionUrl };
+  }
+  if (
+    graph.payment.provider === "easypay" &&
+    !hasConnectionAddress(graph.payment.clientAddress) &&
+    !hasConnectionAddress(clientAddress)
+  ) {
+    return paymentRetryable();
+  }
+  let address = graph.payment.clientAddress;
+  if (address === null && clientAddress !== null && clientAddress !== "") {
+    await runtime.repo.saveClientAddress(graph.payment.id, clientAddress);
+    address = clientAddress;
+    graph = { ...graph, payment: { ...graph.payment, clientAddress: address } };
+  }
   const subject = graph.items[0]?.titleSnapshot ?? "order";
-  const created = await input.runtime.payment.createPayment({
+  const created = await port.createPayment({
     paymentId: graph.payment.id,
     orderId: graph.order.id,
     amount: minorUnits(graph.order.amount),
     currency: graph.order.currency,
     subject,
     channel: graph.payment.channel,
+    clientAddress: address,
   });
   if (!created.ok) {
     return {
@@ -211,13 +287,33 @@ export async function placeOrder(input: {
     };
   }
   if (created.providerTradeNo !== null) {
-    await input.runtime.repo.saveProviderTradeNo(graph.payment.id, created.providerTradeNo);
+    await runtime.repo.saveProviderTradeNo(graph.payment.id, created.providerTradeNo);
     graph = {
       ...graph,
       payment: { ...graph.payment, providerTradeNo: created.providerTradeNo },
     };
   }
+  if (typeof created.action === "string") {
+    await runtime.repo.saveActionUrl(graph.payment.id, created.action);
+    graph = {
+      ...graph,
+      payment: { ...graph.payment, actionUrl: created.action },
+    };
+  }
   return { ok: true, graph, action: created.action };
+}
+
+function hasConnectionAddress(value: string | null | undefined): boolean {
+  return value !== null && value !== undefined && value.trim() !== "";
+}
+
+function paymentRetryable(): PlaceOrderResult {
+  return {
+    ok: false,
+    error: "payment_retryable",
+    message: "支付创建失败，请重试。",
+    httpStatus: httpStatus("payment_retryable"),
+  };
 }
 
 function createPaymentId(): string {

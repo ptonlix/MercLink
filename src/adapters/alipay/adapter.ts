@@ -8,6 +8,7 @@ import type {
   QueryPaymentResult,
   VerifyNotificationResult,
 } from "../../ports/payment";
+import { minorUnitsFromYuan } from "../../shared/money";
 import { alipayGateway, alipayMethods, pagePayBizContent, parseForm } from "./sign";
 
 type AlipayProduct = "domestic" | "alipayplus";
@@ -77,6 +78,8 @@ export function createAlipayPaymentPort(config: AlipayAdapterConfig): PaymentPor
   const client = config.client ?? createAlipaySdk(config);
 
   return {
+    upstreamClose: "supported",
+
     createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
       if (input.currency !== "CNY") {
         return Promise.resolve(retryable("当前支付只接受 CNY。"));
@@ -115,11 +118,21 @@ export function createAlipayPaymentPort(config: AlipayAdapterConfig): PaymentPor
         const status = readString(result, "tradeStatus") ?? readString(result, "trade_status");
         const providerTradeNo =
           readString(result, "tradeNo") ?? readString(result, "trade_no") ?? input.providerTradeNo;
+        const subCode = readString(result, "subCode") ?? readString(result, "sub_code");
+        if (subCode === "ACQ.TRADE_NOT_EXIST") {
+          return {
+            ok: true,
+            status: "pending",
+            providerTradeNo,
+            amount: null,
+          };
+        }
         const view = status === null ? null : viewStatus(status);
         if (view === null) {
           return retryable("支付查询失败，请重试。");
         }
-        return { ok: true, status: view, providerTradeNo };
+        const amount = readAmount(result);
+        return { ok: true, status: view, providerTradeNo, amount };
       } catch {
         return unavailable;
       }
@@ -135,11 +148,23 @@ export function createAlipayPaymentPort(config: AlipayAdapterConfig): PaymentPor
         const code = readString(result, "code");
         const subCode = readString(result, "subCode") ?? readString(result, "sub_code");
         if (code === "10000" || subCode === "ACQ.TRADE_NOT_EXIST") {
-          return { ok: true };
+          return { ok: true, outcome: "closed" };
         }
-        return retryable("支付取消失败，请重试。");
+        const queried = await queryTrade(client, input);
+        if (queried.ok && queried.status === "paid") {
+          return {
+            ok: false,
+            outcome: "already_paid",
+            providerTradeNo: queried.providerTradeNo,
+            amount: queried.amount,
+          };
+        }
+        if (queried.ok && queried.status === "closed") {
+          return { ok: true, outcome: "closed" };
+        }
+        return cancelRetryable();
       } catch {
-        return retryable("支付取消失败，请重试。");
+        return cancelRetryable();
       }
     },
 
@@ -177,8 +202,46 @@ export function createAlipayPaymentPort(config: AlipayAdapterConfig): PaymentPor
           message: "通知验签失败。",
         });
       }
-      return Promise.resolve({ ok: true, status, providerTradeNo, paymentId });
+      const amount =
+        params.total_amount === undefined ? null : minorUnitsFromYuan(params.total_amount);
+      return Promise.resolve({ ok: true, status, providerTradeNo, paymentId, amount });
     },
+  };
+}
+
+async function queryTrade(
+  client: AlipayOpenApi,
+  input: { paymentId: string; providerTradeNo: string | null },
+): Promise<QueryPaymentResult> {
+  const biz: Record<string, string> = { out_trade_no: input.paymentId };
+  if (input.providerTradeNo !== null && input.providerTradeNo !== "") {
+    biz.trade_no = input.providerTradeNo;
+  }
+  const result = await client.exec(alipayMethods.query, { bizContent: biz });
+  const status = readString(result, "tradeStatus") ?? readString(result, "trade_status");
+  const providerTradeNo =
+    readString(result, "tradeNo") ?? readString(result, "trade_no") ?? input.providerTradeNo;
+  const view = status === null ? null : viewStatus(status);
+  if (view === null) {
+    return retryable("支付查询失败，请重试。");
+  }
+  return { ok: true, status: view, providerTradeNo, amount: readAmount(result) };
+}
+
+function readAmount(record: Record<string, unknown>): ReturnType<typeof minorUnitsFromYuan> {
+  const raw =
+    readString(record, "totalAmount") ??
+    readString(record, "total_amount") ??
+    readString(record, "buyerPayAmount");
+  return raw === null ? null : minorUnitsFromYuan(raw);
+}
+
+function cancelRetryable(): CancelPaymentResult {
+  return {
+    ok: false,
+    outcome: "retryable",
+    error: "payment_retryable",
+    message: "支付取消失败，请重试。",
   };
 }
 
@@ -211,9 +274,10 @@ function isAbsoluteHttpsUrl(value: string): boolean {
 
 function closedInternationalPort(): PaymentPort {
   return {
+    upstreamClose: "supported",
     createPayment: () => Promise.resolve(internationalUnavailable),
     queryPayment: () => Promise.resolve(internationalUnavailable),
-    cancelPayment: () => Promise.resolve(internationalUnavailable),
+    cancelPayment: () => Promise.resolve(cancelRetryable()),
     verifyNotification: () =>
       Promise.resolve({
         ok: false,

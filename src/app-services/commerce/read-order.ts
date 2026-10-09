@@ -6,13 +6,14 @@ import {
   type CommerceFailure,
 } from "../../domain/commerce/order";
 import type { Actor } from "../../shared/actor";
-import type { StoredGraph } from "./repository";
+import type { StoredGraph, StoredReceipt } from "./repository";
 import { reconcilePending } from "./payment-sync";
 import type { CommerceRuntime } from "./runtime";
 import { httpStatus } from "./view";
 
 export type ReadOrderResult =
-  { ok: true; graph: StoredGraph } | (CommerceFailure & { httpStatus: number });
+  | { ok: true; graph: StoredGraph; receipt: StoredReceipt | null }
+  | (CommerceFailure & { httpStatus: number });
 
 export async function readBuyerOrder(input: {
   actor: Actor;
@@ -32,14 +33,22 @@ export async function readBuyerOrder(input: {
       httpStatus: httpStatus("not_found"),
     };
   }
-  return { ok: true, graph: await reconcilePending(input.runtime, graph) };
+  const reconciled = await reconcilePending(input.runtime, graph);
+  return {
+    ok: true,
+    graph: reconciled,
+    receipt: await input.runtime.repo.findReceipt(reconciled.payment.id),
+  };
 }
 
 export async function listMerchantOrders(input: {
   actor: Actor;
   catalogId?: string;
   runtime: CommerceRuntime;
-}): Promise<{ ok: true; graphs: StoredGraph[] } | (CommerceFailure & { httpStatus: number })> {
+}): Promise<
+  | { ok: true; graphs: StoredGraph[]; receipts: ReadonlyMap<string, StoredReceipt> }
+  | (CommerceFailure & { httpStatus: number })
+> {
   const merchant = assertMerchantReads(input.actor);
   if (!merchant.ok) {
     return { ...merchant, httpStatus: httpStatus(merchant.error) };
@@ -60,5 +69,12 @@ export async function listMerchantOrders(input: {
   for (const graph of visible) {
     reconciled.push(await reconcilePending(input.runtime, graph));
   }
-  return { ok: true, graphs: reconciled };
+  const receipts = new Map<string, StoredReceipt>();
+  for (const graph of reconciled) {
+    const receipt = await input.runtime.repo.findReceipt(graph.payment.id);
+    if (receipt !== null) {
+      receipts.set(graph.payment.id, receipt);
+    }
+  }
+  return { ok: true, graphs: reconciled, receipts };
 }

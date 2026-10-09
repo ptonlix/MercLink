@@ -53,6 +53,11 @@ describe("buyer skill", () => {
     expect(body).toContain("不会切换渠道");
     expect(body).toContain("电脑收银台");
     expect(body).toContain("`paid`");
+    expect(body).toContain("The buyer does not choose the payment provider.");
+    expect(body).toContain("The provider is fixed by server startup configuration.");
+    expect(body).toContain("`payment_channel` only chooses desktop or mobile.");
+    expect(body).toContain("A closed order with an unapplied receipt is not success");
+    expect(body).toContain("Do not pay a closed order's old link.");
     expect(body).toContain("商品不存在");
     expect(body).toContain("已下架");
     expect(body).toContain("库存不足");
@@ -133,6 +138,11 @@ describe("merchant skill", () => {
       expect(body).toContain("soft delete");
       expect(body).toContain("field retirement");
       expect(body).toContain("不能把订单标成已支付");
+      expect(body).toContain("/api/v1/manage/payments/{paymentId}/unapplied-receipt");
+      expect(body).toContain("fulfill_manually");
+      expect(body).toContain("full EasyPay refund");
+      expect(body).toContain("Neither action marks the order paid.");
+      expect(body).toContain("failure_reason");
       expect(body).toContain("也不能下单");
       expect(body).toContain("买家令牌不能调用商家写接口");
       expect(body).toContain("`paid`");

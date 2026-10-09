@@ -42,6 +42,16 @@ describe("startup refusal", () => {
     expect(result.output).not.toContain("BEGIN PRIVATE KEY");
   }, 20_000);
 
+  it("does not require Alipay keys when the startup provider is easypay", () => {
+    const source = filledEnv();
+    delete source.ALIPAY_PRIVATE_KEY;
+    delete source.ALIPAY_APP_ID;
+    delete source.ALIPAY_PUBLIC_KEY;
+    delete source.ALIPAY_NOTIFY_URL;
+    source.MERCLINK_PAYMENT_PROVIDER = "easypay";
+    expect(loadEnv(source).ok).toBe(true);
+  });
+
   it("exits non-zero without REDIS_URL and does not add a second Redis variable", async () => {
     expect(requiredEnvKeys.filter((key) => key.includes("REDIS"))).toEqual(["REDIS_URL"]);
     const env = filledEnv();

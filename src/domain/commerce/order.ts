@@ -4,6 +4,11 @@ import type { ErrorCode } from "../../shared/errors";
 import { minorUnits, type MinorUnits } from "../../shared/money";
 
 const orderLifetimeMs = 30 * 60 * 1000;
+const finiteStockGraceMs = 5 * 60 * 1000;
+
+const paymentProviders = ["alipay", "easypay"] as const;
+
+export type PaymentProviderName = (typeof paymentProviders)[number];
 
 export type OrderStatus = "pending" | "paid" | "closed";
 
@@ -125,6 +130,35 @@ export function lineAmount(unitPrice: MinorUnits, qty: number): MinorUnits {
 
 export function orderExpiresAt(createdAt: Date): Date {
   return new Date(createdAt.getTime() + orderLifetimeMs);
+}
+
+export function stockReleaseAt(expiresAt: Date): Date {
+  return new Date(expiresAt.getTime() + finiteStockGraceMs);
+}
+
+export function graceStillOpen(releaseAt: Date | null, now: Date): boolean {
+  return releaseAt !== null && now.getTime() < releaseAt.getTime();
+}
+
+export function amountsMatch(expected: number, reported: number | null): boolean {
+  return reported !== null && Number.isSafeInteger(reported) && reported === expected;
+}
+
+export function shouldRecordUnappliedReceipt(input: {
+  orderStatus: OrderStatus;
+  paymentStatus: OrderStatus;
+  providerStatus: OrderStatus;
+  amountMatches: boolean;
+  upstreamCloseable: boolean;
+}): boolean {
+  if (input.upstreamCloseable || !input.amountMatches || input.providerStatus !== "paid") {
+    return false;
+  }
+  return input.orderStatus === "closed" || input.paymentStatus === "closed";
+}
+
+export function isPaymentProvider(value: string): value is PaymentProviderName {
+  return (paymentProviders as readonly string[]).includes(value);
 }
 
 export function isExpired(expiresAt: Date, now: Date): boolean {

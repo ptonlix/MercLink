@@ -139,11 +139,16 @@ describe("order placement", () => {
     const placeSource = await readFile("src/app-services/commerce/place-order.ts", "utf8");
     const routeSource = await readFile("src/app/api/v1/orders/route.ts", "utf8");
     const domainSource = await readFile("src/domain/commerce/order.ts", "utf8");
-    for (const source of [placeSource, routeSource, domainSource]) {
+    for (const source of [placeSource, domainSource]) {
       expect(source.toLowerCase()).not.toContain("user-agent");
       expect(source.toLowerCase()).not.toContain("sec-ch-ua");
       expect(source.toLowerCase()).not.toContain("x-forwarded-for");
+      expect(source.toLowerCase()).not.toContain("x-real-ip");
     }
+    expect(routeSource.toLowerCase()).not.toContain("user-agent");
+    expect(routeSource.toLowerCase()).not.toContain("sec-ch-ua");
+    expect(routeSource).toContain("clientAddress");
+    expect(routeSource).not.toMatch(/payment_channel/);
 
     const harness = harnessFor({ var_1: variant({ stock: 5 }) });
     useCommerceRuntime(harness.runtime);
@@ -178,6 +183,7 @@ describe("order placement", () => {
     });
     expect(harness.stock("var_1")).toBe(4);
     expect(harness.channels()).toEqual(["desktop"]);
+    expect(harness.graphs()[0]?.payment.clientAddress).toBe("203.0.113.10");
 
     const hinted = await placeOrder({
       actor: buyer(),
@@ -266,6 +272,64 @@ describe("order placement", () => {
         payment: { channel: "mobile", action: null },
       },
     });
+  });
+
+  it("reads a trusted proxy address and does not trust the caller first hop", async () => {
+    const harness = harnessFor({ var_1: variant({ stock: 5 }) });
+    useCommerceRuntime(harness.runtime);
+    registerAuthenticator(() => ({ ok: true, actor: buyer() }));
+
+    const trusted = await placeRoute(
+      new Request("https://merclink.example/api/v1/orders", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer buyer",
+          "x-forwarded-for": "198.51.100.9, 203.0.113.20",
+          "x-real-ip": "2001:db8::10",
+        },
+        body: JSON.stringify({
+          client_order_no: "trusted-ip",
+          items: [{ variant_id: "var_1", qty: 1 }],
+        }),
+      }),
+    );
+    expect(trusted.status).toBe(201);
+    expect(harness.graphs()[0]?.payment.clientAddress).toBe("2001:db8::10");
+    expect(harness.graphs()[0]?.payment.channel).toBe("desktop");
+
+    const lastHop = await placeRoute(
+      new Request("https://merclink.example/api/v1/orders", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer buyer",
+          "x-forwarded-for": "198.51.100.1, 203.0.113.30",
+        },
+        body: JSON.stringify({
+          client_order_no: "last-hop",
+          items: [{ variant_id: "var_1", qty: 1 }],
+        }),
+      }),
+    );
+    expect(lastHop.status).toBe(201);
+    expect(harness.graphs()[1]?.payment.clientAddress).toBe("203.0.113.30");
+
+    const forged = await placeRoute(
+      new Request("https://merclink.example/api/v1/orders", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer buyer",
+          "x-forwarded-for": "not-an-ip, also-bad",
+          "x-real-ip": "buyer-supplied",
+        },
+        body: JSON.stringify({
+          client_order_no: "bad-ip",
+          items: [{ variant_id: "var_1", qty: 1 }],
+        }),
+      }),
+    );
+    expect(forged.status).toBe(201);
+    expect(harness.graphs()[2]?.payment.clientAddress).toBeNull();
+    expect(harness.graphs()[2]?.payment.channel).toBe("desktop");
   });
 
   it("keeps a pending mobile order when payment creation is rejected", async () => {
@@ -415,6 +479,7 @@ describe("payment notification and expiry", () => {
       status: "paid",
       providerTradeNo: "trade_1",
       paymentId: placed.graph.payment.id,
+      amount: minorUnits(placed.graph.payment.amount),
     };
     const paid = await applyPaymentNotification({
       body: "trade_status=TRADE_SUCCESS",
@@ -644,7 +709,12 @@ function harnessFor(
   writes: () => string[][];
   graphs: () => readonly {
     order: { clientOrderNo: string; status: string };
-    payment: { status: string; id: string; channel: string };
+    payment: {
+      status: string;
+      id: string;
+      channel: string;
+      clientAddress: string | null;
+    };
   }[];
   controls: { failCreate: boolean };
   verify: VerifyNotificationResult;
@@ -718,6 +788,7 @@ function harnessFor(
     },
   });
   const payment: PaymentPort = {
+    upstreamClose: "supported",
     createPayment: (input) => {
       paymentIds.push(input.paymentId);
       channels.push(input.channel);
@@ -734,17 +805,22 @@ function harnessFor(
         providerTradeNo: null,
       });
     },
-    queryPayment: () => {
+    queryPayment: (input) => {
       queries += 1;
+      const stored = repo.graphs().find((graph) => graph.payment.id === input.paymentId);
       return Promise.resolve({
         ok: true,
         status: state.queryStatus,
         providerTradeNo: state.queryStatus === "paid" ? "trade_q" : null,
+        amount:
+          state.queryStatus === "paid" && stored !== undefined
+            ? minorUnits(stored.payment.amount)
+            : null,
       });
     },
     cancelPayment: () => {
       cancels += 1;
-      return Promise.resolve({ ok: true });
+      return Promise.resolve({ ok: true, outcome: "closed" as const });
     },
     verifyNotification: () => Promise.resolve(state.verify),
   };
@@ -794,7 +870,7 @@ function wrapWrites(
           ...unit,
           applyStatuses: async (input) => {
             writes.push([...input.writes]);
-            await unit.applyStatuses(input);
+            return unit.applyStatuses(input);
           },
         }),
       ),

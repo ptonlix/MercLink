@@ -60,9 +60,11 @@ export async function confirmDevPay(
       paymentId: payment.id,
       providerTradeNo,
       token: devPaymentToken(loaded.env.OAUTH_SIGNING_SECRET, payment.id, "paid"),
+      amount: payment.amount,
     }),
     headers: {},
     runtime,
+    provider: payment.provider,
   });
   if (!result.ok) {
     return { ok: false, status: 404 };

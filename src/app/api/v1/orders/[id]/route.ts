@@ -21,5 +21,5 @@ export async function GET(
   if (!result.ok) {
     return errorResponse(result.error, result.message, request);
   }
-  return apiSuccess(graphJson(result.graph, null), { request });
+  return apiSuccess(graphJson(result.graph, null, result.receipt), { request });
 }

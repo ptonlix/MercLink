@@ -192,6 +192,79 @@ describe("commerce schema", () => {
   });
 });
 
+describe("easypay finite stock migration", () => {
+  it("adds nullable payment columns and one receipt per payment without changing provider", async () => {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (databaseUrl === undefined || databaseUrl.trim() === "") {
+      throw new Error("DATABASE_URL is required. Start compose.dev.yaml and export DATABASE_URL.");
+    }
+    await withSchema(databaseUrl, async (sql) => {
+      const columns = await sql<{ column_name: string; is_nullable: string }[]>`
+        SELECT column_name, is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'payments'
+          AND column_name IN ('action_url', 'client_address', 'stock_release_at', 'provider')
+      `;
+      expect(columns).toEqual(
+        expect.arrayContaining([
+          { column_name: "action_url", is_nullable: "YES" },
+          { column_name: "client_address", is_nullable: "YES" },
+          { column_name: "stock_release_at", is_nullable: "YES" },
+          { column_name: "provider", is_nullable: "NO" },
+        ]),
+      );
+      await sql`
+        INSERT INTO buyers (id, phone, password_hash)
+        VALUES ('byr_easy', '13900000018', 'hash')
+      `;
+      await insertOrder(sql, "byr_easy", "keep-alipay");
+      await sql`
+        INSERT INTO payments (
+          id, order_id, provider, provider_trade_no, status, amount, currency, created_at, updated_at
+        )
+        SELECT 'pay_easy', id, 'alipay', NULL, 'pending', amount, currency, created_at, updated_at
+        FROM orders
+        WHERE buyer_id = 'byr_easy'
+      `;
+      const stored = await sql<
+        {
+          provider: string;
+          action_url: string | null;
+          client_address: string | null;
+          stock_release_at: Date | null;
+        }[]
+      >`
+        SELECT provider, action_url, client_address, stock_release_at
+        FROM payments
+        WHERE id = 'pay_easy'
+      `;
+      expect(stored).toEqual([
+        {
+          provider: "alipay",
+          action_url: null,
+          client_address: null,
+          stock_release_at: null,
+        },
+      ]);
+      await sql`
+        INSERT INTO unapplied_receipts (
+          id, payment_id, provider_trade_no, amount, status, created_at, updated_at
+        ) VALUES (
+          'rcp_1', 'pay_easy', 'trade_1', 100, 'open', now(), now()
+        )
+      `;
+      await expect(sql`
+        INSERT INTO unapplied_receipts (
+          id, payment_id, provider_trade_no, amount, status, created_at, updated_at
+        ) VALUES (
+          'rcp_2', 'pay_easy', 'trade_1', 100, 'open', now(), now()
+        )
+      `).rejects.toThrow();
+    });
+  });
+});
+
 async function insertOrder(
   sql: postgres.Sql,
   buyerId: string,

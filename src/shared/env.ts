@@ -82,6 +82,16 @@ export function loadEnv(source: Readonly<Record<string, string | undefined>>): L
   const skipped = devStubsEnabled(source)
     ? new Set<string>(vendorCredentials())
     : new Set<string>();
+  if (source.MERCLINK_PAYMENT_PROVIDER === "easypay") {
+    for (const key of [
+      "ALIPAY_APP_ID",
+      "ALIPAY_PRIVATE_KEY",
+      "ALIPAY_PUBLIC_KEY",
+      "ALIPAY_NOTIFY_URL",
+    ] as const) {
+      skipped.add(key);
+    }
+  }
   const missing = requiredEnvKeys.filter((key) => !skipped.has(key) && !isPresent(source[key]));
   if (missing.length > 0) {
     return {

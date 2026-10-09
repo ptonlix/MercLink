@@ -22,14 +22,14 @@ Do not ask the user for a password, SMS code, or API key. Use the device authori
 - 不要把商品和可售规格当成同一个 ID。下单必须用规格 ID，字段是 `variant_id`。只有该商品恰好有一条可售规格时，才可以只传商品 ID。
 - 不要自己传价格。价格是整数分，不是元。
 - 不要只为了换渠道而新开一个 `client_order_no`。重复同一个 `client_order_no` 不会切换渠道。
-- 不要向用户索要支付宝密码。打开 `payment.action` 不等于支付成功。只有状态 `paid` 才算支付成功。
+- 不要向用户索要支付宝密码。打开 `payment.action` 不等于支付成功。只有状态 `paid` 才算支付成功。已关闭订单上的未履约收款不是成功。不要支付已关闭订单的旧链接。
 
 ## 主流程
 
 1. 未登录调用 `GET /api/v1/products` 找到已上架商品。需要字段含义时，再读 `GET /api/v1/catalogs/{id}/schema`。
 2. 用 `GET /api/v1/products/{id}` 确认可售规格。有多条规格时，让用户选定一条，记下 `variants[].id`。
 3. 需要下单时，用设备码让用户在浏览器注册或批准。Agent 不收集验证码或密码。
-4. 第一次下单就带上正确的 `payment_channel`。手机付款人，包括能做 HTTPS 跳转的 Agent 内置页，传 `mobile`。电脑付款人可以不传，缺省渠道是电脑收银台。
+4. 第一次下单就带上正确的 `payment_channel`。手机付款人，包括能做 HTTPS 跳转的 Agent 内置页，传 `mobile`。电脑付款人可以不传，缺省渠道是电脑收银台。买家不选择支付实现。支付实现由服务端启动配置固定。`payment_channel` 只选择电脑或手机。
 5. 用顶层导航打开完整的 `payment.action`。不要放进 iframe，也不要截断 URL。
 6. 用 `GET /api/v1/orders/{id}` 查询状态。只有 `paid` 才告诉用户支付成功。
 
@@ -114,7 +114,9 @@ GET /api/v1/orders/{id}
 
 `GET /api/v1/orders/{id}` 查询订单状态。买家只能看自己的订单。订单 ID 从下单响应的 `data.id` 读取。
 
-订单状态只有 `pending`、`paid`、`closed`。只有状态 `paid` 才算支付成功。`pending` 是尚未支付。`closed` 是已关闭。不要把未支付当成成功。
+订单状态只有 `pending`、`paid`、`closed`。只有状态 `paid` 才算支付成功。`pending` 是尚未支付。`closed` 是已关闭。不要把未支付当成成功。已关闭订单上的未履约收款不是成功。A closed order with an unapplied receipt is not success. 不要支付已关闭订单的旧链接。Do not pay a closed order's old link.
+
+买家不选择支付实现。支付实现由服务端启动配置固定，请求里不要传 `payment_provider`。The buyer does not choose the payment provider. The provider is fixed by server startup configuration. `payment_channel` 只选择电脑或手机，不选择支付实现。`payment_channel` only chooses desktop or mobile.
 
 ## 限制
 

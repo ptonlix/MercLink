@@ -72,10 +72,11 @@ describe("alipay adapter", () => {
       ok: true,
       status: "paid",
       providerTradeNo: "2013112011001004330000121536",
+      amount: null,
     });
     await expect(
       port.cancelPayment({ paymentId: "pay_001", providerTradeNo: "trade_1" }),
-    ).resolves.toEqual({ ok: true });
+    ).resolves.toEqual({ ok: true, outcome: "closed" });
     await expect(
       port.verifyNotification({
         body: "app_id=2014072300007148&trade_status=TRADE_SUCCESS&trade_no=2013112011001004330000121536&out_trade_no=pay_001",
@@ -203,13 +204,30 @@ describe("alipay adapter", () => {
       port.cancelPayment({ paymentId: "pay_m", providerTradeNo: null }),
     ).resolves.toEqual({
       ok: true,
+      outcome: "closed",
     });
     await expect(
       port.verifyNotification({
-        body: "app_id=2014072300007148&trade_status=TRADE_SUCCESS&trade_no=t_m&out_trade_no=pay_m",
+        body: "app_id=2014072300007148&trade_status=TRADE_SUCCESS&trade_no=t_m&out_trade_no=pay_m&total_amount=10",
         headers: {},
       }),
-    ).resolves.toMatchObject({ ok: true, status: "paid", paymentId: "pay_m" });
+    ).resolves.toMatchObject({
+      ok: true,
+      status: "paid",
+      paymentId: "pay_m",
+      amount: minorUnits(1000),
+    });
+    await expect(
+      port.verifyNotification({
+        body: "app_id=2014072300007148&trade_status=TRADE_SUCCESS&trade_no=t_m&out_trade_no=pay_m&total_amount=10.5",
+        headers: {},
+      }),
+    ).resolves.toMatchObject({
+      ok: true,
+      status: "paid",
+      paymentId: "pay_m",
+      amount: minorUnits(1050),
+    });
     expect(calls).toEqual([alipayMethods.createMobile, alipayMethods.query, alipayMethods.close]);
     expect(calls).not.toContain(alipayMethods.create);
 
@@ -234,15 +252,17 @@ describe("alipay adapter", () => {
     expect(signed).not.toContain(keys.privateKey);
 
     const routes = await walk("src/app/api/v1/payments");
-    expect(routes.filter((file) => file.endsWith("route.ts"))).toEqual([
+    expect(routes.filter((file) => file.endsWith("route.ts")).sort()).toEqual([
       "src/app/api/v1/payments/alipay/notify/route.ts",
+      "src/app/api/v1/payments/easypay/notify/route.ts",
     ]);
     const notify = await readFile("src/app/api/v1/payments/alipay/notify/route.ts", "utf8");
     expect(notify).toContain("applyPaymentNotification");
+    expect(notify).toContain('provider: "alipay"');
     expect(notify).not.toContain("wap");
     expect(notify).not.toContain("channel");
     expect(
-      apiRoutes.filter((route) => route.path.includes("notify")).map((route) => route.path),
+      apiRoutes.filter((route) => route.path.includes("/alipay/notify")).map((route) => route.path),
     ).toEqual(["/api/v1/payments/alipay/notify"]);
   });
 

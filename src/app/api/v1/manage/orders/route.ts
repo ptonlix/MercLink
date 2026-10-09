@@ -20,7 +20,9 @@ export async function GET(request: Request): Promise<Response> {
   }
   return apiSuccess(
     {
-      items: result.graphs.map((graph) => graphJson(graph, null)),
+      items: result.graphs.map((graph) =>
+        graphJson(graph, null, result.receipts.get(graph.payment.id) ?? null),
+      ),
     },
     { request },
   );

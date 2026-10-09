@@ -263,7 +263,19 @@ key 以小写英文字母开头，后面只能是小写英文、数字和下划�
 
 没有把订单标成已支付的接口。商家令牌不能把订单标成已支付，也不能下单。买家令牌不能调用商家写接口，`code` 是 `40300`（`forbidden`）。商家令牌调用 `POST /api/v1/orders` 同样是 `40300`。
 
-只有状态 `paid` 才算支付成功。打开支付链接不等于成功。
+只有状态 `paid` 才算支付成功。打开支付链接不等于成功。已关闭订单上的未履约收款不是成功。
+
+未履约收款用 `POST /api/v1/manage/payments/{paymentId}/unapplied-receipt` 处理。只能处理订单行属于自己目录、状态为 `open` 或 `refund_failed` 的收款。正文只接受 `action`，取值为 `fulfill_manually` 或 `refund`。手工补发和易支付原额退款都不会把订单标成已支付，也不改库存。The merchant may choose manual fulfillment or a full EasyPay refund. Neither action marks the order paid.
+
+```json
+{ "action": "fulfill_manually" }
+```
+
+```json
+{ "action": "refund" }
+```
+
+`refund` 只对易支付、只退收款原金额。退款失败时收款变为 `refund_failed`，`code` 是 `50300`（`payment_retryable`）。已补发或已退款再处理时 `code` 是 `40900`（`conflict`）。订单读取里的 `unapplied_receipt` 带 `failure_reason`，没有失败原因时为 `null`。
 
 ## 常见错误用法
 

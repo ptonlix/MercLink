@@ -1,7 +1,7 @@
 import { and, eq, inArray, lte, sql } from "drizzle-orm";
 
 import type { Database } from "../../db/client";
-import { orderItems, orders, payments } from "../../db/schema/commerce";
+import { orderItems, orders, payments, unappliedReceipts } from "../../db/schema/commerce";
 import type {
   FieldsSnapshot,
   OrderStatus,
@@ -12,19 +12,23 @@ import { expiryDue } from "../../domain/commerce/order";
 import type {
   CommerceRepository,
   CommerceUnit,
+  ReceiptStatus,
   StoredGraph,
   StoredItem,
   StoredOrder,
   StoredPayment,
+  StoredReceipt,
 } from "./repository";
 
 type OrderRow = typeof orders.$inferSelect;
 type ItemRow = typeof orderItems.$inferSelect;
 type PaymentRow = typeof payments.$inferSelect;
+type ReceiptRow = typeof unappliedReceipts.$inferSelect;
 
 type RowDb = Pick<Database, "select" | "insert" | "update" | "execute">;
 
 export function createDrizzleCommerceRepository(db: Database): CommerceRepository {
+  const claims = new Set<string>();
   return {
     transaction(run) {
       return db.transaction(async (tx) => {
@@ -51,6 +55,28 @@ export function createDrizzleCommerceRepository(db: Database): CommerceRepositor
     },
     saveProviderTradeNo(paymentId, providerTradeNo) {
       return saveTradeNo(db, paymentId, providerTradeNo);
+    },
+    saveActionUrl(paymentId, actionUrl) {
+      return saveNullablePayment(db, paymentId, { actionUrl });
+    },
+    saveClientAddress(paymentId, clientAddress) {
+      return saveNullablePayment(db, paymentId, { clientAddress });
+    },
+    findReceipt(paymentId) {
+      return loadReceipt(db, paymentId);
+    },
+    insertOpenReceipt(input) {
+      return insertReceipt(db, input);
+    },
+    claimReceipt(input) {
+      return claimReceipt(db, claims, input);
+    },
+    releaseReceiptClaim(paymentId) {
+      claims.delete(paymentId);
+      return Promise.resolve();
+    },
+    resolveReceipt(input) {
+      return updateReceipt(db, input);
     },
     listByCatalogs(catalogIds) {
       return listGraphs(db, catalogIds);
@@ -84,6 +110,10 @@ function createUnit(db: RowDb, seamTx: CommerceUnit["seamTx"] = db): CommerceUni
       await db.insert(orderItems).values(graph.items.map(itemValues));
       await db.insert(payments).values(paymentValues(graph.payment));
     },
+    async lockOrder(orderId) {
+      await db.execute(sql`select id from orders where id = ${orderId} for update`);
+      return loadById(db, orderId);
+    },
     async lockPending(orderId, now) {
       await db.execute(sql`select id from orders where id = ${orderId} for update`);
       const graph = await loadById(db, orderId);
@@ -110,29 +140,19 @@ function createUnit(db: RowDb, seamTx: CommerceUnit["seamTx"] = db): CommerceUni
         .where(and(eq(payments.orderId, orderId), eq(payments.status, "pending")));
       return true;
     },
+    async setStockReleaseAt(orderId, releaseAt, now) {
+      const updated = await db
+        .update(payments)
+        .set({ stockReleaseAt: releaseAt, updatedAt: now })
+        .where(and(eq(payments.orderId, orderId), sql`${payments.stockReleaseAt} is null`))
+        .returning({ id: payments.id });
+      return updated.length > 0;
+    },
     async applyStatuses(input) {
-      for (const write of input.writes) {
-        if (write === "payment") {
-          await db
-            .update(payments)
-            .set({
-              status: input.paymentStatus,
-              updatedAt: input.now,
-              paidAt: input.paymentStatus === "paid" ? input.paidAt : null,
-            })
-            .where(eq(payments.orderId, input.orderId));
-        }
-        if (write === "order") {
-          await db
-            .update(orders)
-            .set({
-              status: input.orderStatus,
-              updatedAt: input.now,
-              paidAt: input.orderStatus === "paid" ? input.paidAt : undefined,
-            })
-            .where(eq(orders.id, input.orderId));
-        }
-      }
+      return applyStatuses(db, input);
+    },
+    insertOpenReceipt(input) {
+      return insertReceipt(db, input);
     },
     listByCatalogs(catalogIds) {
       return listGraphs(db, catalogIds);
@@ -266,6 +286,9 @@ function paymentValues(payment: StoredPayment): typeof payments.$inferInsert {
     provider: payment.provider,
     channel: payment.channel,
     providerTradeNo: payment.providerTradeNo,
+    actionUrl: payment.actionUrl,
+    clientAddress: payment.clientAddress,
+    stockReleaseAt: payment.stockReleaseAt,
     status: payment.status,
     amount: payment.amount,
     currency: payment.currency,
@@ -316,6 +339,9 @@ function mapPayment(row: PaymentRow): StoredPayment {
     provider: row.provider,
     channel: paymentChannel(row.channel),
     providerTradeNo: row.providerTradeNo,
+    actionUrl: row.actionUrl,
+    clientAddress: row.clientAddress,
+    stockReleaseAt: row.stockReleaseAt,
     status: asStatus(row.status),
     amount: row.amount,
     currency: row.currency,
@@ -323,6 +349,226 @@ function mapPayment(row: PaymentRow): StoredPayment {
     updatedAt: row.updatedAt,
     paidAt: row.paidAt,
   };
+}
+
+async function saveNullablePayment(
+  db: RowDb,
+  paymentId: string,
+  patch: { actionUrl?: string; clientAddress?: string },
+): Promise<void> {
+  if (patch.actionUrl !== undefined) {
+    await db
+      .update(payments)
+      .set({ actionUrl: patch.actionUrl, updatedAt: new Date() })
+      .where(and(eq(payments.id, paymentId), sql`${payments.actionUrl} is null`));
+  }
+  if (patch.clientAddress !== undefined) {
+    await db
+      .update(payments)
+      .set({ clientAddress: patch.clientAddress, updatedAt: new Date() })
+      .where(and(eq(payments.id, paymentId), sql`${payments.clientAddress} is null`));
+  }
+}
+
+async function loadReceipt(db: RowDb, paymentId: string): Promise<StoredReceipt | null> {
+  const rows = await db
+    .select()
+    .from(unappliedReceipts)
+    .where(eq(unappliedReceipts.paymentId, paymentId))
+    .limit(1);
+  const row = rows[0];
+  return row === undefined ? null : mapReceipt(row);
+}
+
+async function insertReceipt(
+  db: RowDb,
+  input: {
+    id: string;
+    paymentId: string;
+    providerTradeNo: string;
+    amount: number;
+    now: Date;
+  },
+): Promise<StoredReceipt> {
+  await db
+    .insert(unappliedReceipts)
+    .values({
+      id: input.id,
+      paymentId: input.paymentId,
+      providerTradeNo: input.providerTradeNo,
+      amount: input.amount,
+      status: "open",
+      failureReason: null,
+      createdAt: input.now,
+      updatedAt: input.now,
+    })
+    .onConflictDoNothing({ target: unappliedReceipts.paymentId });
+  const stored = await loadReceipt(db, input.paymentId);
+  if (stored === null) {
+    throw new Error("unapplied receipt was not stored");
+  }
+  return stored;
+}
+
+async function applyStatuses(
+  db: RowDb,
+  input: {
+    orderId: string;
+    paymentStatus: OrderStatus;
+    orderStatus: OrderStatus;
+    paidAt: Date | null;
+    now: Date;
+    writes: readonly ("payment" | "order")[];
+  },
+): Promise<boolean> {
+  const writingPaid = input.paymentStatus === "paid" || input.orderStatus === "paid";
+  if (writingPaid) {
+    if (input.writes.includes("payment")) {
+      const updated = await db
+        .update(payments)
+        .set({
+          status: input.paymentStatus,
+          updatedAt: input.now,
+          paidAt: input.paidAt,
+        })
+        .where(and(eq(payments.orderId, input.orderId), eq(payments.status, "pending")))
+        .returning({ id: payments.id });
+      if (updated.length === 0) {
+        return false;
+      }
+    }
+    if (input.writes.includes("order")) {
+      const updated = await db
+        .update(orders)
+        .set({
+          status: input.orderStatus,
+          updatedAt: input.now,
+          paidAt: input.paidAt,
+        })
+        .where(and(eq(orders.id, input.orderId), eq(orders.status, "pending")))
+        .returning({ id: orders.id });
+      if (updated.length === 0) {
+        throw new Error("paid status was not applied to the locked order");
+      }
+    }
+    return input.writes.includes("payment") || input.writes.includes("order");
+  }
+  for (const write of input.writes) {
+    if (write === "payment") {
+      await db
+        .update(payments)
+        .set({
+          status: input.paymentStatus,
+          updatedAt: input.now,
+          paidAt: input.paymentStatus === "paid" ? input.paidAt : null,
+        })
+        .where(eq(payments.orderId, input.orderId));
+    }
+    if (write === "order") {
+      await db
+        .update(orders)
+        .set({
+          status: input.orderStatus,
+          updatedAt: input.now,
+          paidAt: input.orderStatus === "paid" ? input.paidAt : undefined,
+        })
+        .where(eq(orders.id, input.orderId));
+    }
+  }
+  return true;
+}
+
+async function claimReceipt(
+  db: RowDb,
+  claims: Set<string>,
+  input: {
+    paymentId: string;
+    expectedUpdatedAt: Date;
+    now: Date;
+  },
+): Promise<StoredReceipt | null> {
+  if (claims.has(input.paymentId)) {
+    return null;
+  }
+  claims.add(input.paymentId);
+  try {
+    const updated = await db
+      .update(unappliedReceipts)
+      .set({ updatedAt: input.now })
+      .where(
+        and(
+          eq(unappliedReceipts.paymentId, input.paymentId),
+          inArray(unappliedReceipts.status, ["open", "refund_failed"]),
+          eq(unappliedReceipts.updatedAt, input.expectedUpdatedAt),
+        ),
+      )
+      .returning();
+    const row = updated[0];
+    if (row === undefined) {
+      claims.delete(input.paymentId);
+      return null;
+    }
+    return mapReceipt(row);
+  } catch (error) {
+    claims.delete(input.paymentId);
+    throw error;
+  }
+}
+
+async function updateReceipt(
+  db: RowDb,
+  input: {
+    paymentId: string;
+    status: ReceiptStatus;
+    failureReason: string | null;
+    now: Date;
+    expectedUpdatedAt: Date;
+  },
+): Promise<StoredReceipt | null> {
+  const updated = await db
+    .update(unappliedReceipts)
+    .set({
+      status: input.status,
+      failureReason: input.failureReason,
+      updatedAt: input.now,
+    })
+    .where(
+      and(
+        eq(unappliedReceipts.paymentId, input.paymentId),
+        inArray(unappliedReceipts.status, ["open", "refund_failed"]),
+        eq(unappliedReceipts.updatedAt, input.expectedUpdatedAt),
+      ),
+    )
+    .returning({ id: unappliedReceipts.id });
+  if (updated.length === 0) {
+    return null;
+  }
+  return loadReceipt(db, input.paymentId);
+}
+
+function mapReceipt(row: ReceiptRow): StoredReceipt {
+  return {
+    id: row.id,
+    paymentId: row.paymentId,
+    providerTradeNo: row.providerTradeNo,
+    amount: row.amount,
+    status: receiptStatus(row.status),
+    failureReason: row.failureReason,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function receiptStatus(value: string): ReceiptStatus {
+  if (
+    value === "open" ||
+    value === "fulfilled_manually" ||
+    value === "refunded" ||
+    value === "refund_failed"
+  ) {
+    return value;
+  }
+  throw new Error(`Unexpected receipt status: ${value}`);
 }
 
 function asStatus(value: string): OrderStatus {

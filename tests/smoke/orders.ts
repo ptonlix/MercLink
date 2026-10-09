@@ -5,6 +5,9 @@ export type PendingOrder = {
   orderId: string;
   paymentId: string;
   status: string;
+  provider: string;
+  channel: string;
+  action: string;
 };
 
 export async function placePendingOrder(
@@ -63,6 +66,9 @@ export async function placePendingOrder(
     orderId: field(order.body.data, "id"),
     paymentId: field(payment, "id"),
     status: field(order.body.data, "status"),
+    provider: field(payment, "provider"),
+    channel: field(payment, "channel"),
+    action: field(payment, "action"),
   };
 }
 

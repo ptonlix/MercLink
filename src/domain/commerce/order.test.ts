@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { buyerActor, merchantActor, scriptActor } from "../../shared/actor";
 import { minorUnits } from "../../shared/money";
 import {
+  amountsMatch,
   applyProviderStatus,
+  graceStillOpen,
+  shouldRecordUnappliedReceipt,
+  stockReleaseAt,
   assertBuyerPlaces,
   assertBuyerReads,
   assertMerchantReads,
@@ -231,5 +235,59 @@ describe("payment status copy", () => {
     });
     expect(copy.writes).toEqual(["order"]);
     expect(copy.orderStatus).toBe("paid");
+  });
+
+  it("matches minor units, waits five minutes, and does not mark a closed payment paid", () => {
+    expect(amountsMatch(159900, 159900)).toBe(true);
+    expect(amountsMatch(159900, 159901)).toBe(false);
+    expect(amountsMatch(159900, null)).toBe(false);
+
+    const expiresAt = new Date("2026-05-16T00:30:00.000Z");
+    const releaseAt = stockReleaseAt(expiresAt);
+    expect(releaseAt.toISOString()).toBe("2026-05-16T00:35:00.000Z");
+    expect(graceStillOpen(releaseAt, new Date("2026-05-16T00:34:59.000Z"))).toBe(true);
+    expect(graceStillOpen(releaseAt, releaseAt)).toBe(false);
+    expect(graceStillOpen(null, releaseAt)).toBe(false);
+
+    const closedPaid = applyProviderStatus({
+      orderStatus: "closed",
+      paymentStatus: "closed",
+      providerStatus: "paid",
+      paidAt: null,
+      now,
+    });
+    expect(closedPaid).toMatchObject({
+      changed: false,
+      orderStatus: "closed",
+      paymentStatus: "closed",
+      restoreStock: false,
+    });
+    expect(
+      shouldRecordUnappliedReceipt({
+        orderStatus: "closed",
+        paymentStatus: "closed",
+        providerStatus: "paid",
+        amountMatches: true,
+        upstreamCloseable: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldRecordUnappliedReceipt({
+        orderStatus: "closed",
+        paymentStatus: "closed",
+        providerStatus: "paid",
+        amountMatches: false,
+        upstreamCloseable: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRecordUnappliedReceipt({
+        orderStatus: "closed",
+        paymentStatus: "closed",
+        providerStatus: "paid",
+        amountMatches: true,
+        upstreamCloseable: true,
+      }),
+    ).toBe(false);
   });
 });
