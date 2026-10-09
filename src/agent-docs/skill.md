@@ -31,7 +31,7 @@ Do not ask the user for a password, SMS code, or API key. Use the device authori
 3. 需要下单时，用设备码让用户在浏览器注册或批准。Agent 不收集验证码或密码。
 4. 第一次下单就带上正确的 `payment_channel`。手机付款人，包括能做 HTTPS 跳转的 Agent 内置页，传 `mobile`。电脑付款人可以不传，缺省渠道是电脑收银台。买家不选择支付实现。支付实现由服务端启动配置固定。`payment_channel` 只选择电脑或手机。
 5. 用顶层导航打开完整的 `payment.action`。不要放进 iframe，也不要截断 URL。
-6. 用 `GET /api/v1/orders/{id}` 查询状态。只有 `paid` 才告诉用户支付成功。
+6. 用保存的访问令牌调用 `GET /api/v1/orders/{id}` 查询状态。请求头是 `Authorization: Bearer` 加上这枚令牌。只有 `paid` 才告诉用户支付成功。
 
 ## 认证
 
@@ -51,7 +51,13 @@ scope=order:write order:read
 
 不要使用公网回调地址，也不要使用授权码重定向。Agent 在内网，没有独立的公网服务。不使用密码模式，不使用隐式模式。这里没有访问令牌、刷新令牌或 API Key 的示例值。
 
-访问令牌约 15 分钟。过期后用刷新令牌换新的，旧刷新令牌立即失效。请求已登录接口时使用 `Authorization` 头，方案是 Bearer。不要把令牌写进本文档或对话。
+换到令牌后，Agent 自己保存 `access_token` 和 `refresh_token`。不要给用户，不要写进对话，也不要只留在当次命令的临时变量里。Save the access token and refresh token in the agent's own secret store. Do not ask the user to paste either token back.
+
+`POST /api/v1/orders` 和之后的 `GET /api/v1/orders/{id}` 使用同一个访问令牌。Reuse the same access token for order placement and later order lookup.
+
+访问令牌约 15 分钟。过期后用 `POST /oauth/token` 换新的，`grant_type=refresh_token`，并带原来的 `client_id` 和保存的刷新令牌。旧刷新令牌立即失效，保存新的一对令牌。刷新令牌也没有时，才重新申请设备码。
+
+请求已登录接口时使用 `Authorization` 头，方案是 Bearer。不要把令牌写进本文档或对话。没有这个头时，接口返回 401，`code` 是 `40100`。这只表示这次请求没带令牌。手里还有访问令牌或刷新令牌时，不要重新申请设备码，也不要向用户要令牌。
 
 ## 商品和可售规格
 
@@ -112,7 +118,7 @@ GET /api/v1/orders/{id}
 
 ## 查询订单状态
 
-`GET /api/v1/orders/{id}` 查询订单状态。买家只能看自己的订单。订单 ID 从下单响应的 `data.id` 读取。
+`GET /api/v1/orders/{id}` 查询订单状态。请求带保存的访问令牌。买家只能看自己的订单。订单 ID 从下单响应的 `data.id` 读取。
 
 订单状态只有 `pending`、`paid`、`closed`。只有状态 `paid` 才算支付成功。`pending` 是尚未支付。`closed` 是已关闭。不要把未支付当成成功。已关闭订单上的未履约收款不是成功。A closed order with an unapplied receipt is not success. 不要支付已关闭订单的旧链接。Do not pay a closed order's old link.
 
@@ -137,6 +143,7 @@ GET /api/v1/orders/{id}
 - 手机付款人第一次没传 `payment_channel`，之后用新的 `client_order_no` 再下一单。那会再扣库存，也不会切换原来的渠道。
 - 把 `payment.action` 放进 iframe、截断 URL，或向用户要支付宝密码。
 - 打开支付链接后告诉用户已经支付。必须查到状态 `paid`。
+- 下单后丢掉访问令牌，查单时不带 `Authorization`，再把 `40100` 当成需要重新设备码授权。应保存令牌并在查单时带上。过期则刷新，不要向用户要令牌。
 
 ## 错误
 
@@ -145,7 +152,7 @@ GET /api/v1/orders/{id}
 - 商品不存在：`not_found` `40400`
 - 已下架：`not_found` `40400`。已下架、已删除或没有可售规格的商品，公开查询不返回。
 - 库存不足：`insufficient_stock` `40901`
-- Key 无效：`unauthorized` `40100`。invalid key 指无效的 API Key 或被拒绝的凭证，不是字段 key。
+- 未带令牌或凭证被拒绝：`unauthorized` `40100`。没有 `Authorization` 头时表示这次请求没带令牌。Key 无效：invalid key 指无效的 API Key 或被拒绝的凭证，不是字段 key。手里还有令牌时不要重新申请设备码。
 - 字段不存在：`unknown_field` `40001`
 - 已停用字段：`field_retired` `40002`
 - 必须指定规格：`variant_required` `40004`

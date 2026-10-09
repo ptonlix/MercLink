@@ -71,6 +71,11 @@ describe("buyer skill", () => {
     expect(body).toContain("body 的 `code` 仍是 `200`");
     expect(body).toContain("纯文本");
     expect(body).toContain("`unauthorized`");
+    expect(body).toContain("自己保存 `access_token` 和 `refresh_token`");
+    expect(body).toContain("Save the access token and refresh token");
+    expect(body).toContain("同一个访问令牌");
+    expect(body).toContain("grant_type=refresh_token");
+    expect(body).toContain("不要重新申请设备码");
     expect(body).toContain("`unknown_field`");
     expect(body).toContain("`forbidden`");
     expect(body).not.toMatch(/Bearer\s+[A-Za-z0-9\-._]{12,}/);
