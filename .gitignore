@@ -71,3 +71,11 @@ Thumbs.db
 
 # 本地 Agent 缓存。项目技能本身保留在 .agents/skills。
 .serena/
+
+# 前端设计生成的截图和逐项验证报告。HTML、原始素材与 OpenSpec 文档保留。
+/openspec/changes/frontend-experience-design/preview/*.png
+/openspec/changes/frontend-experience-design/preview/verification.json
+/openspec/changes/frontend-experience-design/implementation/*.png
+/openspec/changes/frontend-experience-design/implementation/verification.json
+/openspec/changes/api-driven-page-plan/preview/*.jpg
+/openspec/changes/api-driven-page-plan/preview/*verification.json

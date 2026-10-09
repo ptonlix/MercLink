@@ -43,7 +43,10 @@ export function BuyerCaptcha(props: { prefix: string; sceneId: string }): ReactN
         element: "#captcha-element",
         button: "#captcha-send",
         language: "cn",
-        slideStyle: { width: 360, height: 40 },
+        slideStyle: {
+          width: Math.min(360, document.querySelector("#captcha-element")?.clientWidth ?? 360),
+          height: 40,
+        },
         success: (captchaVerifyParam) => {
           const field = document.querySelector<HTMLInputElement>("#captchaVerifyParam");
           const button = document.querySelector<HTMLButtonElement>("#captcha-send");
