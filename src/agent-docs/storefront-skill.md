@@ -65,6 +65,12 @@ Do not edit the server repository. Do not treat this document as permission to c
 
 没有这些事实的营销页可以是静态版式。一旦展示上述任一事实，就必须用对应槽位。写死价格、库存、店铺资料或「支付成功」，该页面不得发布。
 
+## 结构化数据
+
+结构化数据由服务端拥有。上传的 HTML 不得包含 `application/ld+json`。服务端在分发前去掉商家写的这段脚本，再按当前槽位事实注入 JSON-LD。价格是由整数分导出的主币单位，库存状态使用 schema.org 的完整 URL。没有店铺或商品槽位的页面不会注入商品或店铺结构。确认激活时如果静态文件仍带有该脚本，返回校验失败，线上页面不变。
+
+不要自己编写价格、库存或店铺的 JSON-LD。
+
 ## 发布接口
 
 令牌必须带 `storefront:write`。只申请目录权限时不会得到这项。只有 `product:write` 不能下载、上传或激活。设备码流程仍按商家 Skill，scope 里额外加上 `storefront:write`。

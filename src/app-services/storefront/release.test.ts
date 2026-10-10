@@ -408,6 +408,252 @@ describe("storefront release", () => {
     expect(listed.map((entry) => entry.url)).toContain(`${origin}/`);
     expect(await storefrontAuthorizeTarget("buyer")).toBeNull();
   });
+
+  it("strips merchant JSON-LD, injects server facts, and rejects activation", async () => {
+    const store = createMemoryStore();
+    const storage = memoryStorage();
+    bind(store, storage.port, allowLimiter());
+    asMerchant(["storefront:write"]);
+    store.pointer.activeId = "sfr_kept";
+    store.pointer.previousId = "sfr_older";
+    const authored = await postStorefrontRelease(
+      uploadRequest(
+        sourceZip(),
+        zipStore([
+          {
+            name: "index.html",
+            bytes: text(
+              '<p>home</p><script type="application/ld&#43;json">{"@type":"Offer","price":"424242.00"}</script>',
+            ),
+          },
+          { name: "products/index.html", bytes: text(productListDocument()) },
+          { name: "products/item.html", bytes: text(productDocument()) },
+        ]),
+      ),
+    );
+    const authoredId = ((await authored.json()) as { data: { id: string } }).data.id;
+    const rejected = await postStorefrontActivate(
+      jsonRequest(`/api/v1/storefront/releases/${authoredId}/activate`, { confirm: true }),
+      authoredId,
+    );
+    expect(rejected.status).toBe(httpStatusFor("validation_error"));
+    await expect(rejected.json()).resolves.toMatchObject({
+      code: businessCode("validation_error"),
+    });
+    expect(store.pointer.activeId).toBe("sfr_kept");
+    expect(store.pointer.previousId).toBe("sfr_older");
+
+    const named = await postStorefrontRelease(
+      uploadRequest(
+        sourceZip(),
+        zipStore([
+          {
+            name: "index.html",
+            bytes: text(
+              '<p>home</p><script type="application/ld&plus;json">{"@type":"Offer","price":"424242.00"}</script>',
+            ),
+          },
+          { name: "products/index.html", bytes: text(productListDocument()) },
+          { name: "products/item.html", bytes: text(productDocument()) },
+        ]),
+      ),
+    );
+    const namedId = ((await named.json()) as { data: { id: string } }).data.id;
+    const rejectedNamed = await postStorefrontActivate(
+      jsonRequest(`/api/v1/storefront/releases/${namedId}/activate`, { confirm: true }),
+      namedId,
+    );
+    expect(rejectedNamed.status).toBe(httpStatusFor("validation_error"));
+    await expect(rejectedNamed.json()).resolves.toMatchObject({
+      code: businessCode("validation_error"),
+    });
+    expect(store.pointer.activeId).toBe("sfr_kept");
+    expect(store.pointer.previousId).toBe("sfr_older");
+
+    const literal = await postStorefrontRelease(
+      uploadRequest(
+        sourceZip(),
+        zipStore([
+          {
+            name: "index.html",
+            bytes: text(
+              '<p>home</p><script type="application/ld+json">{"@type":"OnlineStore"}</script>',
+            ),
+          },
+          { name: "products/index.html", bytes: text(productListDocument()) },
+          { name: "products/item.html", bytes: text(productDocument()) },
+        ]),
+      ),
+    );
+    const literalId = ((await literal.json()) as { data: { id: string } }).data.id;
+    const rejectedLiteral = await postStorefrontActivate(
+      jsonRequest(`/api/v1/storefront/releases/${literalId}/activate`, { confirm: true }),
+      literalId,
+    );
+    expect(rejectedLiteral.status).toBe(httpStatusFor("validation_error"));
+    expect(store.pointer.activeId).toBe("sfr_kept");
+
+    const created = await postStorefrontRelease(
+      uploadRequest(sourceZip(), validStaticZip("MARKETING")),
+    );
+    const releaseId = ((await created.json()) as { data: { id: string } }).data.id;
+    const activated = await postStorefrontActivate(
+      jsonRequest(`/api/v1/storefront/releases/${releaseId}/activate`, { confirm: true }),
+      releaseId,
+    );
+    expect(activated.status).toBe(200);
+    expect(store.pointer.activeId).toBe(releaseId);
+    const homeFile = store.files.find(
+      (file) => file.releaseId === releaseId && file.path === "index.html",
+    );
+    const itemFile = store.files.find(
+      (file) => file.releaseId === releaseId && file.path === "products/item.html",
+    );
+    if (homeFile === undefined || itemFile === undefined) {
+      throw new Error("release files missing");
+    }
+    publicProducts.register({
+      list: () => Promise.resolve({ items: [product("prd_1", 159900)], nextCursor: null }),
+      get: (id) =>
+        id === "prd_1"
+          ? Promise.resolve({ ok: true, product: product("prd_1", 159900) })
+          : Promise.resolve({ ok: false, error: "not_found", message: "没有找到。" }),
+    });
+    storage.objects.set(
+      homeFile.objectKey,
+      text(
+        '<p>MARKETING</p><script type="text/javascript">keep-script</script><script type="application/ld&#43;json">{"@type":"Product","offers":{"price":"424242.00"}}</script>',
+      ),
+    );
+    storage.objects.set(
+      itemFile.objectKey,
+      text(
+        `<script type="application&#47;ld&#x2B;json">{"@type":"Offer","price":"424242.00"}</script>${productDocument()}`,
+      ),
+    );
+    const home = await serveStorefront("/", `${origin}/`);
+    const homeText = await home?.text();
+    expect(homeText).toContain("MARKETING");
+    expect(homeText).toContain("keep-script");
+    expect(homeText).not.toContain("424242");
+    expect(homeText).not.toContain('"@type":"Product"');
+    expect(homeText).not.toContain('"@type":"Offer"');
+    expect(homeText).not.toContain('"@type":"ItemList"');
+    expect(homeText).not.toContain('"@type":"OnlineStore"');
+    expect(homeText).not.toContain("在 AI 时代，让天下没有难做的生意");
+    storage.objects.set(
+      homeFile.objectKey,
+      text(
+        '<p>MARKETING</p><script type="application/ld&plus;json">{"@type":"Offer","price":"424242.00"}</script>',
+      ),
+    );
+    const namedHome = await serveStorefront("/", `${origin}/`);
+    const namedHomeText = await namedHome?.text();
+    expect(namedHomeText).toContain("MARKETING");
+    expect(namedHomeText).not.toContain("424242");
+    storage.objects.set(
+      homeFile.objectKey,
+      text(
+        '<p>MARKETING</p><script type="application&sol;ld+json">{"@type":"Offer","price":"424242.00"}</script>',
+      ),
+    );
+    const slashHome = await serveStorefront("/", `${origin}/`);
+    const slashHomeText = await slashHome?.text();
+    expect(slashHomeText).toContain("MARKETING");
+    expect(slashHomeText).not.toContain("424242");
+    const detail = await serveStorefront("/products/prd_1", `${origin}/products/prd_1`);
+    const detailText = await detail?.text();
+    expect(detailText).not.toContain("424242");
+    expect(detailText).toContain("1599.00");
+    expect(detailText).toContain("https://schema.org/InStock");
+    expect(detailText).toContain("¥1599.00");
+
+    storage.objects.set(
+      homeFile.objectKey,
+      text(
+        '<p>MARKETING</p><script type="application/ld+json">{"@type":"Offer","price":"424242.00"}<p>tail</p>',
+      ),
+    );
+    const unclosed = await serveStorefront("/", `${origin}/`);
+    const unclosedText = await unclosed?.text();
+    expect(unclosedText).toContain("MARKETING");
+    expect(unclosedText).not.toContain("424242");
+    expect(unclosedText).not.toContain("tail");
+
+    storage.objects.set(
+      itemFile.objectKey,
+      text(
+        `${productDocument()}<script type="application/ld+json">{"@type":"Offer","price":"424242.00"}`,
+      ),
+    );
+    const unclosedDetail = await serveStorefront("/products/prd_1", `${origin}/products/prd_1`);
+    const unclosedDetailText = await unclosedDetail?.text();
+    expect(unclosedDetailText).toContain("¥1599.00");
+    expect(unclosedDetailText).toContain("1599.00");
+    expect(unclosedDetailText).not.toContain("424242");
+
+    publicStore.register({
+      get: () =>
+        Promise.resolve({
+          displayName: "南风",
+          summary: "店铺介绍",
+          websiteUrl: null,
+          logoUrl: null,
+          areaServed: null,
+          address: null,
+        }),
+    });
+    storage.objects.set(
+      homeFile.objectKey,
+      text(
+        [
+          "<p>MARKETING</p>",
+          '<script type="application/ld&#43;json">',
+          '<merclink-slot name="product.name"></merclink-slot>',
+          '<merclink-slot name="product.price"></merclink-slot>',
+          '{"@type":"Product","offers":{"price":"424242.00"}}',
+          "</script>",
+        ].join(""),
+      ),
+    );
+    const slotless = await serveStorefront("/", `${origin}/`);
+    const slotlessText = await slotless?.text();
+    expect(slotlessText).toContain("MARKETING");
+    expect(slotlessText).not.toContain("424242");
+    expect(slotlessText).not.toContain('"@type":"Product"');
+    expect(slotlessText).not.toContain('"@type":"Offer"');
+    expect(slotlessText).not.toContain('"@type":"ItemList"');
+    expect(slotlessText).not.toContain('"@type":"OnlineStore"');
+    expect(slotlessText).not.toContain("merclink-slot");
+    storage.objects.set(
+      homeFile.objectKey,
+      text(
+        [
+          "<p>MARKETING</p>",
+          '<merclink-slot name="order.status"></merclink-slot>',
+          '<script type="application/ld+json">',
+          '<merclink-slot name="product.name"></merclink-slot>',
+          '<merclink-slot name="product.price"></merclink-slot>',
+          '<merclink-slot name="store.display_name"></merclink-slot>',
+          '{"@type":"Product","offers":{"price":"424242.00"}}',
+          "</script>",
+        ].join(""),
+      ),
+    );
+    const slotted = await serveStorefront("/", `${origin}/`);
+    const slottedText = await slotted?.text();
+    expect(slottedText).toContain("MARKETING");
+    expect(slottedText).not.toContain("424242");
+    expect(slottedText).not.toContain('"@type":"Product"');
+    expect(slottedText).not.toContain('"@type":"Offer"');
+    expect(slottedText).not.toContain('"@type":"ItemList"');
+    expect(slottedText).not.toContain('"@type":"OnlineStore"');
+    expect(slottedText).not.toContain("merclink-slot");
+    expect(await serveStorefront("/llms.txt", `${origin}/llms.txt`)).toBeNull();
+    expect(await serveStorefront("/sitemap.xml", `${origin}/sitemap.xml`)).toBeNull();
+    expect(await serveStorefront("/robots.txt", `${origin}/robots.txt`)).toBeNull();
+    expect(store.pointer.activeId).toBe(releaseId);
+  });
 });
 
 describe("storefront acceptance command", () => {
@@ -429,6 +675,33 @@ describe("storefront acceptance command", () => {
     );
     await expect(mutated("products/item.html", "<p>商品</p>")).resolves.toContain("missing_slot");
     await expect(mutated("index.html", "<p>售价 1599.00</p>")).resolves.toContain("hardcoded_fact");
+    await expect(
+      mutated("index.html", '<script type="application/ld+json">{"@type":"OnlineStore"}</script>'),
+    ).resolves.toContain("authored_jsonld");
+    await expect(
+      mutated(
+        "index.html",
+        '<script type="application/ld&#43;json">{"@type":"Offer","price":"424242.00"}</script>',
+      ),
+    ).resolves.toContain("authored_jsonld");
+    await expect(
+      mutated(
+        "index.html",
+        '<script type="application/ld&plus;json">{"@type":"Offer","price":"424242.00"}</script>',
+      ),
+    ).resolves.toContain("authored_jsonld");
+    await expect(
+      mutated("index.html", '<script type="application&sol;ld+json">{"@type":"Offer"}</script>'),
+    ).resolves.toContain("authored_jsonld");
+    await expect(
+      mutated("index.html", '<script type="application&#47;ld+json">{"@type":"Offer"}</script>'),
+    ).resolves.toContain("authored_jsonld");
+    await expect(
+      mutated("index.html", '<script type="application/ld&#x2B;json">{"@type":"Offer"}</script>'),
+    ).resolves.toContain("authored_jsonld");
+    await expect(
+      mutated("index.html", '<script type="application/ld+json">{"price":"424242.00"}'),
+    ).resolves.toContain("authored_jsonld");
     await expect(mutated("products/index.html", "<p>商品</p>")).resolves.toContain("missing_slot");
     await expect(mutated("credentials.json", "{}")).resolves.toContain("reserved_path");
     await expect(mutated("id_rsa", "private")).resolves.toContain("reserved_path");

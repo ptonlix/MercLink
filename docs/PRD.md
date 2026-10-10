@@ -373,19 +373,24 @@ API Key 只留给没有浏览器的服务器脚本，在登录后的页面创建
 | `/products/{id}`     | 人、搜索引擎、Agent | 单个已上架商品的全部已公开字段和可售规格           |
 | `/skill.md`          | 买家 Agent          | 如何查商品、下单、付款并查询自己的订单             |
 | `/merchant/skill.md` | 商家 Agent          | 如何建目录、定义字段、建商品和规格、上下架、查订单 |
-| `/llms.txt`          | Agent               | 指向总落地页、商品列表、两份 Skill 和 API          |
-| `/sitemap.xml`       | 搜索引擎            | 总落地页、商品列表、已上架商品、两份 Skill         |
-| `/robots.txt`        | 搜索引擎            | 允许公开页面，不收录授权页、超管页和 API           |
+| `/index.md`          | Agent               | 与总落地页相同的公开事实 Markdown                  |
+| `/products.md`       | Agent               | 与商品列表相同的公开事实 Markdown                  |
+| `/products/{id}.md`  | Agent               | 与商品页相同的公开事实 Markdown                    |
+| `/llms.txt`          | Agent               | 标题、摘要和链接表，指向页面、Markdown 和 Skill    |
+| `/sitemap.xml`       | 搜索引擎            | 总落地页、商品列表、已上架商品 HTML 和 Skill       |
+| `/robots.txt`        | 搜索引擎            | 允许公开 HTML 和 Markdown，不收录授权页、超管页和 API |
 
-商品页从商品记录渲染。不另写一套文案。HTML 里同时给一段 JSON，字段与 API 一致。下架、删除和不可售商品不进入站点地图，并返回不可收录状态。
+商品页从商品记录渲染。不另存一份 SEO 文案。`/api/v1` 和领域层仍用整数分。页面可见价格、meta description 和 JSON-LD 使用同一次换算，把分换成两位主币小数：159900 分是 `1599.00`，800 分是 `8.00`。JSON-LD 的 `price` 不是 API 里的整数分。`in_stock` 写成 `https://schema.org/InStock`，`out_of_stock` 写成 `https://schema.org/OutOfStock`。每个可售规格一个 `Offer`，只复制已有 `sku`。不编造品牌、GTIN、评分、运费或退货政策。
+
+落地页、商品列表和商品页另有 Markdown：`/index.md`、`/products.md`、`/products/{id}.md`。同一 HTML 地址在 `Accept: text/markdown` 时返回相同正文。Markdown 的规范链接指回 HTML，不进入站点地图。下架、删除和不可售商品不进入站点地图，其 HTML 和 Markdown 都返回不可收录状态。站点地图不写 `lastmod`，也不收录分页地址。
 
 这些公开文档都不需要登录。管理 Skill 只讲调用方法，不包含任何商家的商品数据。
 
 搜索优化只做这些，不做排名监测，也不为每个商品写营销稿：
 
 - 每个公开页面有稳定规范链接、标题和一段从事实生成的描述。
-- 总落地页使用 `Organization` 结构。商品列表使用 `ItemList`。商品页使用 `Product` 和 `Offer`，价格、货币和库存状态与 API 一致。
-- `llms.txt` 只给地址和一句说明，不复制全部商品。
+- 已发布店铺的落地页使用 `OnlineStore`。商品列表使用 `ItemList`，只含本次响应的商品。商品页使用 `Product`，每个可售规格一个 `Offer`。JSON-LD 价格是由 API 整数分导出的主币单位，不是分本身。
+- `llms.txt` 是 `text/markdown`，只给标题、摘要和链接，不复制商品行，也不提供 `llms-full.txt`。
 
 ### 9.3 买家 Skill
 

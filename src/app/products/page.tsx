@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { loadProductList } from "../../public-discovery/model";
+import { loadProductList, pageDiscovery } from "../../public-discovery/model";
 import { publicBaseUrl } from "../../public-discovery/site";
 import { ProductListView } from "../../public-discovery/views";
 
@@ -10,14 +10,15 @@ type ProductsPageProps = {
   searchParams?: Promise<{ cursor?: string | string[] }>;
 };
 
-export async function generateMetadata(): Promise<Metadata> {
-  const model = await loadProductList();
+export async function generateMetadata({
+  searchParams,
+}: ProductsPageProps = {}): Promise<Metadata> {
+  const params = searchParams === undefined ? {} : await searchParams;
+  const cursor = typeof params.cursor === "string" ? params.cursor : undefined;
+  const model = await loadProductList(cursor);
   return {
     metadataBase: new URL(publicBaseUrl()),
-    title: model.title,
-    description: model.description,
-    alternates: { canonical: model.canonicalUrl },
-    robots: { index: true, follow: true },
+    ...pageDiscovery(model),
   };
 }
 

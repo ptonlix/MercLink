@@ -10,15 +10,28 @@ import {
   storefrontRewritePath,
 } from "../../domain/storefront/paths";
 import {
+  documentDeclaresProductSlots,
+  documentDeclaresStoreSlots,
   documentHasSlots,
   renderDocument,
+  stripMerchantJsonLd,
   type SlotContext,
   type SlotProduct,
   type SlotStore,
 } from "../../domain/storefront/slots";
+import { jsonLdElement, serverFactJsonLd } from "../../public-discovery/model";
+import {
+  alternateMarkdown,
+  canonicalLink,
+  describedByLlms,
+  isServerMarkdownPath,
+  joinLinks,
+  relationLink,
+} from "../../public-discovery/negotiate";
+import { publicBaseUrl } from "../../public-discovery/site";
 import type { PublicProduct } from "../../shared/seams/public-products";
 import { publicProducts } from "../../shared/seams/public-products";
-import { publicStore } from "../../shared/seams/public-store";
+import { publicStore, type PublicStoreProfile } from "../../shared/seams/public-store";
 import { storefrontRuntime } from "./runtime";
 import type { FileRow } from "./store";
 
@@ -54,7 +67,7 @@ async function releaseGate(): Promise<ReleaseGate> {
 }
 
 export async function shouldRewriteToRelease(pathname: string): Promise<boolean> {
-  if (storefrontRewritePath(pathname, true) === null) {
+  if (isServerMarkdownPath(pathname) || storefrontRewritePath(pathname, true) === null) {
     return false;
   }
   return (await releaseGate()) !== "builtin";
@@ -105,7 +118,11 @@ export async function serveStorefront(
   requestUrl: string,
   request: Request = new Request(requestUrl),
 ): Promise<Response | null> {
-  if (isReservedPath(pathname) || storefrontRewritePath(pathname, true) === null) {
+  if (
+    isServerMarkdownPath(pathname) ||
+    isReservedPath(pathname) ||
+    storefrontRewritePath(pathname, true) === null
+  ) {
     return null;
   }
   const gate = await releaseGate();
@@ -140,12 +157,12 @@ export async function serveStorefront(
   }
   const file = await firstFile(pointer.activeId, staticCandidates(pathname));
   if (file !== null) {
-    return serveFile(pointer.activeId, file, request, false);
+    return serveFile(pointer.activeId, file, request, pathname, false);
   }
   if (release.fallback === fallbackFile) {
     const home = await runtime.store.findFile(pointer.activeId, fallbackFile);
     if (home !== null) {
-      return serveFile(pointer.activeId, home, request, false);
+      return serveFile(pointer.activeId, home, request, pathname, false);
     }
   }
   return textResponse(hiddenBody, 404, false);
@@ -187,7 +204,7 @@ async function serveProduct(
     if (file === null) {
       return textResponse(hiddenBody, 404, true);
     }
-    return serveFile(releaseId, file, request, true);
+    return serveFile(releaseId, file, request, pathname, true);
   }
   const id = productIdFromPath(pathname);
   if (id === null) {
@@ -201,13 +218,14 @@ async function serveProduct(
   if (file === null) {
     return textResponse(hiddenBody, 404, true);
   }
-  return serveFile(releaseId, file, request, true, loaded.product);
+  return serveFile(releaseId, file, request, pathname, true, loaded.product);
 }
 
 async function serveFile(
   releaseId: string,
   file: FileRow,
   request: Request,
+  pathname: string,
   forceRender: boolean,
   onlyProduct?: PublicProduct,
 ): Promise<Response> {
@@ -229,14 +247,37 @@ async function serveFile(
     return byteResponse(object.bytes, file.contentType);
   }
   const text = new TextDecoder().decode(object.bytes);
-  if (!forceRender && !documentHasSlots(text)) {
-    return byteResponse(object.bytes, file.contentType);
+  const stripped = stripMerchantJsonLd(text);
+  if (!forceRender && !documentHasSlots(stripped)) {
+    const body = withDiscoveryTags(stripped, pathname, request, null);
+    return htmlResponse(body, pathname, request, null, file.contentType);
   }
-  const rendered = renderDocument(text, await slotContext(request, onlyProduct));
-  return byteResponse(new TextEncoder().encode(rendered), file.contentType);
+  const facts = await loadFacts(request, onlyProduct);
+  const declaresStore = documentDeclaresStoreSlots(stripped);
+  const declaresProduct = documentDeclaresProductSlots(stripped);
+  let rendered = renderDocument(stripped, facts.context);
+  const jsonLd = serverFactJsonLd({
+    declaresStore,
+    declaresProduct,
+    store: facts.store,
+    products: facts.products,
+    product: facts.product,
+  });
+  if (jsonLd !== null) {
+    rendered = injectJsonLd(rendered, jsonLdElement(jsonLd));
+  }
+  rendered = withDiscoveryTags(rendered, pathname, request, facts.context.nextCursor);
+  return htmlResponse(rendered, pathname, request, facts.context.nextCursor, file.contentType);
 }
 
-async function slotContext(request: Request, onlyProduct?: PublicProduct): Promise<SlotContext> {
+type RenderFacts = {
+  context: SlotContext;
+  store: PublicStoreProfile | null;
+  products: readonly PublicProduct[];
+  product: PublicProduct | null;
+};
+
+async function loadFacts(request: Request, onlyProduct?: PublicProduct): Promise<RenderFacts> {
   const url = new URL(request.url);
   const [store, page] = await Promise.all([
     publicStore.get(),
@@ -251,11 +292,16 @@ async function slotContext(request: Request, onlyProduct?: PublicProduct): Promi
       ? null
       : await runtime.readOrderStatus({ request, orderId });
   return {
-    store: store === null ? null : storeFrom(store),
-    products: onlyProduct === undefined ? page.items.map(slotProduct) : [],
-    product: onlyProduct === undefined ? null : slotProduct(onlyProduct),
-    orderStatus,
-    nextCursor: page.nextCursor,
+    context: {
+      store: store === null ? null : storeFrom(store),
+      products: onlyProduct === undefined ? page.items.map(slotProduct) : [],
+      product: onlyProduct === undefined ? null : slotProduct(onlyProduct),
+      orderStatus,
+      nextCursor: page.nextCursor,
+    },
+    store,
+    products: onlyProduct === undefined ? page.items : [],
+    product: onlyProduct ?? null,
   };
 }
 
@@ -317,6 +363,138 @@ function productPathname(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+function injectJsonLd(html: string, script: string): string {
+  if (/<\/head>/i.test(html)) {
+    return html.replace(/<\/head>/i, `${script}</head>`);
+  }
+  return `${html}${script}`;
+}
+
+function withDiscoveryTags(
+  html: string,
+  pathname: string,
+  request: Request,
+  nextCursor: string | null,
+): string {
+  const tags = discoveryTags(pathname, request, nextCursor);
+  if (tags.length === 0) {
+    return html;
+  }
+  const withoutCanonical = html.replace(/<link\b[^>]*\brel\s*=\s*["']canonical["'][^>]*>/gi, "");
+  const block = tags.join("");
+  if (/<head[^>]*>/i.test(withoutCanonical)) {
+    return withoutCanonical.replace(/<head[^>]*>/i, (head) => `${head}${block}`);
+  }
+  return `${block}${withoutCanonical}`;
+}
+
+function discoveryTags(pathname: string, request: Request, nextCursor: string | null): string[] {
+  const links = discoveryPaths(pathname, request, nextCursor);
+  if (links === null) {
+    return [];
+  }
+  const tags = [
+    `<link rel="canonical" href="${escapeAttr(absolutePublic(links.canonical))}">`,
+    `<link rel="alternate" type="text/markdown" href="${escapeAttr(links.markdown)}">`,
+    `<link rel="describedby" href="/llms.txt">`,
+  ];
+  if (links.prev !== null) {
+    tags.push(`<link rel="prev" href="${escapeAttr(absolutePublic(links.prev))}">`);
+  }
+  if (links.next !== null) {
+    tags.push(`<link rel="next" href="${escapeAttr(absolutePublic(links.next))}">`);
+  }
+  return tags;
+}
+
+function htmlResponse(
+  html: string,
+  pathname: string,
+  request: Request,
+  nextCursor: string | null,
+  contentType: string,
+): Response {
+  const headers = new Headers({
+    "content-type": contentType,
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+  });
+  const link = discoveryLinkHeader(pathname, request, nextCursor);
+  if (link !== null) {
+    headers.set("link", link);
+  }
+  return new Response(html, { status: 200, headers });
+}
+
+function discoveryLinkHeader(
+  pathname: string,
+  request: Request,
+  nextCursor: string | null,
+): string | null {
+  const links = discoveryPaths(pathname, request, nextCursor);
+  if (links === null) {
+    return null;
+  }
+  const parts = [
+    canonicalLink(links.canonical),
+    alternateMarkdown(links.markdown),
+    describedByLlms(),
+  ];
+  if (links.prev !== null) {
+    parts.push(relationLink("prev", links.prev));
+  }
+  if (links.next !== null) {
+    parts.push(relationLink("next", links.next));
+  }
+  return joinLinks(parts);
+}
+
+function discoveryPaths(
+  pathname: string,
+  request: Request,
+  nextCursor: string | null,
+): { canonical: string; markdown: string; prev: string | null; next: string | null } | null {
+  const path = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+  const cursor = new URL(request.url).searchParams.get("cursor");
+  const requested = cursor !== null && cursor.length > 0 ? cursor : null;
+  if (path === "/") {
+    return { canonical: "/", markdown: "/index.md", prev: null, next: null };
+  }
+  if (path === "/products") {
+    return {
+      canonical:
+        requested === null ? "/products" : `/products?cursor=${encodeURIComponent(requested)}`,
+      markdown:
+        requested === null
+          ? "/products.md"
+          : `/products.md?cursor=${encodeURIComponent(requested)}`,
+      prev: requested === null ? null : "/products",
+      next:
+        nextCursor === null || nextCursor.length === 0
+          ? null
+          : `/products?cursor=${encodeURIComponent(nextCursor)}`,
+    };
+  }
+  const id = productIdFromPath(path);
+  if (id === null) {
+    return null;
+  }
+  return {
+    canonical: `/products/${id}`,
+    markdown: `/products/${id}.md`,
+    prev: null,
+    next: null,
+  };
+}
+
+function absolutePublic(path: string): string {
+  return `${publicBaseUrl()}${path}`;
+}
+
+function escapeAttr(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 }
 
 function byteResponse(bytes: Uint8Array, contentType: string): Response {

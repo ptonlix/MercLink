@@ -1,8 +1,25 @@
 import type { PublicAvailability, PublicVariant } from "../shared/seams/public-products";
 
+// Public HTML, Markdown, and JSON-LD share this conversion. Domain and /api/v1 stay in minor units.
+export function majorUnitDecimal(minor: number): string {
+  const negative = minor < 0;
+  const abs = Math.abs(Math.trunc(minor));
+  const whole = Math.floor(abs / 100);
+  const fraction = abs % 100;
+  return `${negative ? "-" : ""}${String(whole)}.${String(fraction).padStart(2, "0")}`;
+}
+
 export function displayPrice(minor: number, currency: string): string {
-  const value = (minor / 100).toFixed(2);
+  const value = majorUnitDecimal(minor);
   return currency === "CNY" ? `¥${value}` : `${currency} ${value}`;
+}
+
+export function schemaAvailability(
+  availability: PublicAvailability,
+): "https://schema.org/InStock" | "https://schema.org/OutOfStock" {
+  return availability === "in_stock"
+    ? "https://schema.org/InStock"
+    : "https://schema.org/OutOfStock";
 }
 
 export function availabilityText(availability: PublicAvailability): string {

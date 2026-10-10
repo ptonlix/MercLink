@@ -27,6 +27,7 @@ import styles from "./public.module.css";
 export function LandingView({ model }: { model: LandingModel }): ReactNode {
   return (
     <main className={styles.page}>
+      <DiscoveryLinks markdownPath={model.markdownPath} />
       <JsonLd value={model.jsonLd} />
       <div className={styles.column}>
         {model.store === null ? null : <StoreHeader store={model.store} />}
@@ -59,6 +60,10 @@ export function LandingView({ model }: { model: LandingModel }): ReactNode {
 export function ProductListView({ model }: { model: ProductListModel }): ReactNode {
   return (
     <PublicShell>
+      <DiscoveryLinks markdownPath={model.markdownPath} />
+      <link rel="canonical" href={model.canonicalUrl} />
+      {model.prevUrl === null ? null : <link rel="prev" href={model.prevUrl} />}
+      {model.nextUrl === null ? null : <link rel="next" href={model.nextUrl} />}
       <JsonLd value={model.jsonLd} />
       <header className={styles.pageHeading}>
         <h1>{model.title}</h1>
@@ -79,6 +84,7 @@ export function ProductListView({ model }: { model: ProductListModel }): ReactNo
         <nav className={styles.pagination} aria-label="商品分页">
           <a
             className={styles.button}
+            rel="next"
             href={`/products?cursor=${encodeURIComponent(model.nextCursor)}`}
           >
             下一页商品
@@ -96,6 +102,7 @@ export function ProductView({ model }: { model: VisibleProductModel }): ReactNod
   const product = model.product;
   return (
     <PublicShell>
+      <DiscoveryLinks markdownPath={model.markdownPath} />
       <JsonLd value={model.jsonLd} />
       <a className={styles.returnLink} href="/products">
         返回商品列表
@@ -349,6 +356,15 @@ function FieldList({ fields }: { fields: PublicProduct["fields"] }): ReactNode {
         </div>
       ))}
     </dl>
+  );
+}
+
+function DiscoveryLinks({ markdownPath }: { markdownPath: string }): ReactNode {
+  return (
+    <>
+      <link rel="alternate" type="text/markdown" href={markdownPath} />
+      <link rel="describedby" href="/llms.txt" />
+    </>
   );
 }
 

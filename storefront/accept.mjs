@@ -26,6 +26,21 @@ const successPattern = /支付成功|付款成功|payment\s+success/i;
 const storeLiteralPattern = /(?:展示名|店铺简介|店名|服务区域|店铺地址|店铺标识)\s*[:：]\s*[^\s<]/;
 const orderLiteralPattern = /订单状态\s*[:：]\s*(?:paid|pending|closed)|status\s*[:=]\s*["']?paid/i;
 const passwordPattern = /支付宝密码|支付密码|alipay\s+password/i;
+const jsonLdMimeType = "application/ld+json";
+// Keep this above the top-level await. A later const is still uninitialized while accept() runs.
+const namedAttributeReferences = {
+  amp: "&",
+  AMP: "&",
+  apos: "'",
+  gt: ">",
+  GT: ">",
+  lt: "<",
+  LT: "<",
+  plus: "+",
+  quot: '"',
+  QUOT: '"',
+  sol: "/",
+};
 const secretNames = new Set([
   ".env",
   ".env.local",
@@ -74,6 +89,9 @@ async function accept(root) {
 }
 
 function inspect(filePath, html) {
+  if (containsMerchantJsonLd(html)) {
+    fail("authored_jsonld", `${filePath} 包含 application/ld+json。`);
+  }
   if (passwordPattern.test(html)) {
     fail("alipay_password", `${filePath} 索要支付宝密码。`);
   }
@@ -113,6 +131,140 @@ function inspect(filePath, html) {
 function stripSlots(html) {
   return html.replace(slotPattern, "");
 }
+
+// Same JSON-LD type check as src/domain/storefront/slots.ts. This file cannot import TypeScript.
+function containsMerchantJsonLd(html) {
+  let cursor = 0;
+  while (cursor < html.length) {
+    const tag = nextScriptOpen(html, cursor);
+    if (tag === null) {
+      return false;
+    }
+    if (tag.type !== null && isMerchantJsonLdType(tag.type)) {
+      return true;
+    }
+    cursor = tag.openEnd > cursor ? tag.openEnd : tag.start + 1;
+  }
+  return false;
+}
+
+function isMerchantJsonLdType(value) {
+  const decoded = decodeAttributeCharacterReferences(value).trim().toLowerCase();
+  if (decoded === jsonLdMimeType) {
+    return true;
+  }
+  if (!decoded.startsWith(jsonLdMimeType)) {
+    return false;
+  }
+  const next = decoded.charAt(jsonLdMimeType.length);
+  return next.length > 0 && /\W/.test(next);
+}
+
+function decodeAttributeCharacterReferences(value) {
+  return value.replace(
+    /&(?:#(?:x([0-9a-fA-F]+)|([0-9]+));?|([A-Za-z]+);)/g,
+    (match, hex, decimal, name) => {
+      if (name !== undefined) {
+        return namedAttributeReferences[name] ?? match;
+      }
+      const digits = hex ?? decimal;
+      if (digits === undefined) {
+        return match;
+      }
+      const codePoint = Number.parseInt(digits, hex === undefined ? 10 : 16);
+      if (
+        !Number.isInteger(codePoint) ||
+        codePoint <= 0 ||
+        codePoint > 0x10ffff ||
+        (codePoint >= 0xd800 && codePoint <= 0xdfff)
+      ) {
+        return "\uFFFD";
+      }
+      return String.fromCodePoint(codePoint);
+    },
+  );
+}
+
+function nextScriptOpen(html, from) {
+  const pattern = /<script\b/gi;
+  pattern.lastIndex = from;
+  const match = pattern.exec(html);
+  if (match === null) {
+    return null;
+  }
+  return parseScriptOpen(html, match.index);
+}
+
+function parseScriptOpen(html, start) {
+  let index = start + "<script".length;
+  let type = null;
+  while (index < html.length) {
+    index = skipWhitespace(html, index);
+    if (index >= html.length) {
+      return { start, openEnd: html.length, type };
+    }
+    const char = html.charAt(index);
+    if (char === ">") {
+      return { start, openEnd: index + 1, type };
+    }
+    if (char === "/" && html.charAt(index + 1) === ">") {
+      return { start, openEnd: index + 2, type };
+    }
+    const nameStart = index;
+    while (index < html.length && !/[\s=/>]/.test(html.charAt(index))) {
+      index += 1;
+    }
+    const name = html.slice(nameStart, index);
+    if (name.length === 0) {
+      index += 1;
+      continue;
+    }
+    index = skipWhitespace(html, index);
+    if (index >= html.length || html.charAt(index) !== "=") {
+      if (type === null && name.toLowerCase() === "type") {
+        type = "";
+      }
+      continue;
+    }
+    index += 1;
+    index = skipWhitespace(html, index);
+    if (index >= html.length) {
+      return { start, openEnd: html.length, type };
+    }
+    const quote = html.charAt(index);
+    let value = "";
+    if (quote === '"' || quote === "'") {
+      index += 1;
+      const valueStart = index;
+      while (index < html.length && html.charAt(index) !== quote) {
+        index += 1;
+      }
+      value = html.slice(valueStart, index);
+      if (index < html.length) {
+        index += 1;
+      }
+    } else {
+      const valueStart = index;
+      while (index < html.length && !/[\s>]/.test(html.charAt(index))) {
+        index += 1;
+      }
+      value = html.slice(valueStart, index);
+    }
+    if (type === null && name.toLowerCase() === "type") {
+      type = value;
+    }
+  }
+  return { start, openEnd: html.length, type };
+}
+
+function skipWhitespace(html, index) {
+  let cursor = index;
+  while (cursor < html.length && /\s/.test(html.charAt(cursor))) {
+    cursor += 1;
+  }
+  return cursor;
+}
+
 
 function isReserved(filePath) {
   const urlPath = `/${filePath}`;

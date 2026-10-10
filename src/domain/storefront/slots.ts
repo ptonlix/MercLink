@@ -26,6 +26,12 @@ const productNextSlot = "products.next";
 
 const slotPattern = /<merclink-slot\s+name="([a-z0-9._-]+)"\s*>\s*<\/merclink-slot>/g;
 
+const storeSlotDeclared = /<merclink-slot\s+name="store\.[a-z0-9._-]+"\s*>/;
+
+const productSlotDeclared = /<merclink-slot\s+name="product\.[a-z0-9._-]+"\s*>/;
+
+const jsonLdMimeType = "application/ld+json";
+
 const productTemplatePattern = /<template\s+data-merclink="product">([\s\S]*?)<\/template>/g;
 
 const paidTemplatePattern = /<template\s+data-merclink="order\.paid">([\s\S]*?)<\/template>/g;
@@ -90,7 +96,206 @@ export function documentHasSlots(html: string): boolean {
   return html.includes("<merclink-slot") || html.includes('data-merclink="');
 }
 
+export function documentDeclaresStoreSlots(html: string): boolean {
+  return storeSlotDeclared.test(html);
+}
+
+export function documentDeclaresProductSlots(html: string): boolean {
+  return productSlotDeclared.test(html);
+}
+
+export function containsMerchantJsonLd(html: string): boolean {
+  let cursor = 0;
+  while (cursor < html.length) {
+    const tag = nextScriptOpen(html, cursor);
+    if (tag === null) {
+      return false;
+    }
+    if (tag.type !== null && isMerchantJsonLdType(tag.type)) {
+      return true;
+    }
+    cursor = tag.openEnd > cursor ? tag.openEnd : tag.start + 1;
+  }
+  return false;
+}
+
+export function stripMerchantJsonLd(html: string): string {
+  let result = "";
+  let cursor = 0;
+  while (cursor < html.length) {
+    const tag = nextScriptOpen(html, cursor);
+    if (tag === null) {
+      return result + html.slice(cursor);
+    }
+    if (tag.type === null || !isMerchantJsonLdType(tag.type)) {
+      const next = tag.openEnd > cursor ? tag.openEnd : tag.start + 1;
+      result += html.slice(cursor, next);
+      cursor = next;
+      continue;
+    }
+    result += html.slice(cursor, tag.start);
+    const closeEnd = scriptCloseEnd(html, tag.openEnd);
+    if (closeEnd === null) {
+      return result;
+    }
+    cursor = closeEnd;
+  }
+  return result;
+}
+
+// HTML decodes numeric and named character references in one attribute-value pass.
+// storefront/accept.mjs duplicates this check; it cannot import TypeScript.
+const namedAttributeReferences: Readonly<Record<string, string>> = {
+  amp: "&",
+  AMP: "&",
+  apos: "'",
+  gt: ">",
+  GT: ">",
+  lt: "<",
+  LT: "<",
+  plus: "+",
+  quot: '"',
+  QUOT: '"',
+  sol: "/",
+};
+
+function isMerchantJsonLdType(value: string): boolean {
+  const decoded = decodeAttributeCharacterReferences(value).trim().toLowerCase();
+  if (decoded === jsonLdMimeType) {
+    return true;
+  }
+  if (!decoded.startsWith(jsonLdMimeType)) {
+    return false;
+  }
+  const next = decoded.charAt(jsonLdMimeType.length);
+  return next.length > 0 && /\W/.test(next);
+}
+
+function decodeAttributeCharacterReferences(value: string): string {
+  return value.replace(
+    /&(?:#(?:x([0-9a-fA-F]+)|([0-9]+));?|([A-Za-z]+);)/g,
+    (match, hex: string | undefined, decimal: string | undefined, name: string | undefined) => {
+      if (name !== undefined) {
+        return namedAttributeReferences[name] ?? match;
+      }
+      const digits = hex ?? decimal;
+      if (digits === undefined) {
+        return match;
+      }
+      const codePoint = Number.parseInt(digits, hex === undefined ? 10 : 16);
+      if (
+        !Number.isInteger(codePoint) ||
+        codePoint <= 0 ||
+        codePoint > 0x10ffff ||
+        (codePoint >= 0xd800 && codePoint <= 0xdfff)
+      ) {
+        return "\uFFFD";
+      }
+      return String.fromCodePoint(codePoint);
+    },
+  );
+}
+
+type ScriptOpen = {
+  start: number;
+  openEnd: number;
+  type: string | null;
+};
+
+function nextScriptOpen(html: string, from: number): ScriptOpen | null {
+  const pattern = /<script\b/gi;
+  pattern.lastIndex = from;
+  const match = pattern.exec(html);
+  if (match === null) {
+    return null;
+  }
+  return parseScriptOpen(html, match.index);
+}
+
+function parseScriptOpen(html: string, start: number): ScriptOpen {
+  let index = start + "<script".length;
+  let type: string | null = null;
+  while (index < html.length) {
+    index = skipWhitespace(html, index);
+    if (index >= html.length) {
+      return { start, openEnd: html.length, type };
+    }
+    const char = html.charAt(index);
+    if (char === ">") {
+      return { start, openEnd: index + 1, type };
+    }
+    if (char === "/" && html.charAt(index + 1) === ">") {
+      return { start, openEnd: index + 2, type };
+    }
+    const nameStart = index;
+    while (index < html.length && !/[\s=/>]/.test(html.charAt(index))) {
+      index += 1;
+    }
+    const name = html.slice(nameStart, index);
+    if (name.length === 0) {
+      index += 1;
+      continue;
+    }
+    index = skipWhitespace(html, index);
+    if (index >= html.length || html.charAt(index) !== "=") {
+      if (type === null && name.toLowerCase() === "type") {
+        type = "";
+      }
+      continue;
+    }
+    index += 1;
+    index = skipWhitespace(html, index);
+    if (index >= html.length) {
+      return { start, openEnd: html.length, type };
+    }
+    const quote = html.charAt(index);
+    let value = "";
+    if (quote === '"' || quote === "'") {
+      index += 1;
+      const valueStart = index;
+      while (index < html.length && html.charAt(index) !== quote) {
+        index += 1;
+      }
+      value = html.slice(valueStart, index);
+      if (index < html.length) {
+        index += 1;
+      }
+    } else {
+      const valueStart = index;
+      while (index < html.length && !/[\s>]/.test(html.charAt(index))) {
+        index += 1;
+      }
+      value = html.slice(valueStart, index);
+    }
+    if (type === null && name.toLowerCase() === "type") {
+      type = value;
+    }
+  }
+  return { start, openEnd: html.length, type };
+}
+
+function skipWhitespace(html: string, index: number): number {
+  let cursor = index;
+  while (cursor < html.length && /\s/.test(html.charAt(cursor))) {
+    cursor += 1;
+  }
+  return cursor;
+}
+
+function scriptCloseEnd(html: string, from: number): number | null {
+  const pattern = /<\/script\s*>/gi;
+  pattern.lastIndex = from;
+  const match = pattern.exec(html);
+  if (match === null) {
+    return null;
+  }
+  return match.index + match[0].length;
+}
+
 export function inspectDocument(filePath: string, html: string): StorefrontResult<true> {
+  if (containsMerchantJsonLd(html)) {
+    return storefrontFail("validation_error", "页面不能包含 application/ld+json。");
+  }
   if (passwordPattern.test(html)) {
     return storefrontFail("validation_error", "页面不能索要支付宝密码。");
   }

@@ -3,7 +3,17 @@ import { validateStaticEntries } from "./archive";
 import { maxStorefrontBytes } from "./limits";
 import { isReservedPath, storefrontRewritePath } from "./paths";
 import { activationConfirmed, pointerAfterActivate, pointerAfterRollback } from "./pointer";
-import { inspectDocument, majorUnitPrice, renderDocument, type SlotProduct } from "./slots";
+import {
+  containsMerchantJsonLd,
+  documentDeclaresProductSlots,
+  documentDeclaresStoreSlots,
+  documentHasSlots,
+  inspectDocument,
+  majorUnitPrice,
+  renderDocument,
+  stripMerchantJsonLd,
+  type SlotProduct,
+} from "./slots";
 
 const productSlots = [
   "product.name",
@@ -55,6 +65,15 @@ describe("storefront rules", () => {
   });
 
   it("blocks hardcoded facts and renders the next fact without another activation", () => {
+    expect(
+      inspectDocument(
+        "index.html",
+        '<script type="application/ld+json">{"@type":"OnlineStore"}</script>',
+      ),
+    ).toMatchObject({
+      ok: false,
+      error: "validation_error",
+    });
     expect(inspectDocument("index.html", "<p>¥12.00</p>")).toMatchObject({
       ok: false,
       error: "validation_error",
@@ -139,6 +158,84 @@ describe("storefront rules", () => {
     expect(first).not.toContain("cursor=");
     expect(second).toContain('href="/products?cursor=page-2"');
     expect(majorUnitPrice(800)).toBe("¥8.00");
+  });
+
+  it("rejects encoded JSON-LD types and strips unclosed scripts without touching prose", () => {
+    const forms = [
+      "application/ld&#43;json",
+      "application&#47;ld+json",
+      "application/ld&#x2B;json",
+      "application&#47;ld&#x2b;json",
+      "Application/LD&#43;JSON",
+      "application/ld&#43json",
+      "application/ld&plus;json",
+      "application&sol;ld+json",
+      "application&sol;ld&plus;json",
+    ];
+    for (const type of forms) {
+      const html = `<p>keep</p><script type="${type}">{"price":"424242.00"}</script><p>after</p>`;
+      expect(containsMerchantJsonLd(html)).toBe(true);
+      expect(stripMerchantJsonLd(html)).toBe("<p>keep</p><p>after</p>");
+      expect(inspectDocument("index.html", html)).toMatchObject({
+        ok: false,
+        error: "validation_error",
+      });
+    }
+    expect(containsMerchantJsonLd("<script type='application/ld&#43;json'></script>")).toBe(true);
+    expect(containsMerchantJsonLd("<script type=application/ld&#43;json></script>")).toBe(true);
+    expect(containsMerchantJsonLd('<script id="x" type="application/ld&#43;json"></script>')).toBe(
+      true,
+    );
+    expect(
+      containsMerchantJsonLd('<script data-x=">" type="application/ld&#43;json"></script>'),
+    ).toBe(true);
+
+    const unclosed =
+      '<p>keep</p><script type="application/ld+json">{"price":"424242.00"}<p>tail</p>';
+    expect(containsMerchantJsonLd(unclosed)).toBe(true);
+    expect(stripMerchantJsonLd(unclosed)).toBe("<p>keep</p>");
+    expect(stripMerchantJsonLd(unclosed)).not.toContain("424242");
+    const unclosedEncoded =
+      '<p>keep</p><script type="application/ld&#x2B;json">{"price":"424242.00"}';
+    expect(stripMerchantJsonLd(unclosedEncoded)).toBe("<p>keep</p>");
+
+    const prose = "<p>正文提到 application/ld+json，标价说明 424242 仍应保留。</p>";
+    expect(containsMerchantJsonLd(prose)).toBe(false);
+    expect(stripMerchantJsonLd(prose)).toBe(prose);
+    const plainScript =
+      '<script type="text/javascript">application/ld+json 424242</script><p>after</p>';
+    expect(containsMerchantJsonLd(plainScript)).toBe(false);
+    expect(stripMerchantJsonLd(plainScript)).toBe(plainScript);
+    expect(containsMerchantJsonLd('<script type="application/ld+jsonextra"></script>')).toBe(false);
+    expect(containsMerchantJsonLd('<div type="application/ld+json"></div>')).toBe(false);
+    expect(containsMerchantJsonLd('<script type="application/ld&amp;plus;json"></script>')).toBe(
+      false,
+    );
+    expect(containsMerchantJsonLd('<script type="application&amp;sol;ld+json"></script>')).toBe(
+      false,
+    );
+
+    const hiddenSlots = [
+      "<p>MARKETING</p>",
+      '<script type="application/ld&#43;json">',
+      '<merclink-slot name="product.name"></merclink-slot>',
+      '<merclink-slot name="store.display_name"></merclink-slot>',
+      '{"price":"424242.00"}',
+      "</script>",
+    ].join("");
+    const stripped = stripMerchantJsonLd(hiddenSlots);
+    expect(stripped).toBe("<p>MARKETING</p>");
+    expect(stripped).not.toContain("424242");
+    expect(documentHasSlots(stripped)).toBe(false);
+    expect(documentDeclaresProductSlots(stripped)).toBe(false);
+    expect(documentDeclaresStoreSlots(stripped)).toBe(false);
+
+    const kept = stripMerchantJsonLd(
+      `<script type="application/ld+json">{"price":"424242.00"}</script>${productSlots}`,
+    );
+    expect(kept).toBe(productSlots);
+    expect(kept).not.toContain("424242");
+    expect(documentDeclaresProductSlots(kept)).toBe(true);
   });
 
   it("moves only the pointer on activate and rollback", () => {
