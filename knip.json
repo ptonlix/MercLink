@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": ["storefront/**", "scripts/render-starter.mjs"],
   "ignoreIssues": {
     "src/db/client.ts": ["exports", "types"],
     "src/ports/**": ["exports", "types"],

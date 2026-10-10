@@ -137,6 +137,7 @@ describe("skill rewrites", () => {
     expect(rewrites).toEqual([
       { source: "/skill.md", destination: "/agent-docs/buyer-skill" },
       { source: "/merchant/skill.md", destination: "/agent-docs/merchant-skill" },
+      { source: "/storefront/skill.md", destination: "/agent-docs/storefront-skill" },
     ]);
   });
 });

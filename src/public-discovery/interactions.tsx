@@ -1,17 +1,9 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- Covers come from the existing public image endpoint and must work without the image optimization service. */
-import {
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type KeyboardEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { PublicVariant } from "../shared/seams/public-products";
 import { availabilityText, displayPrice, optionText, variantStock } from "./presentation";
-import styles from "./public.module.css";
 
 const subscribe = (): (() => void) => () => undefined;
 const hydratedSnapshot = (): boolean => true;
@@ -40,8 +32,8 @@ export function PublicImage({
     check();
   }, [src]);
   return (
-    <span className={logo ? styles.logo : styles.cover}>
-      <span className={styles.placeholder} aria-hidden={src !== null && !failed}>
+    <span className={logo ? "logo" : "cover"}>
+      <span className="placeholder" aria-hidden={src !== null && !failed}>
         {logo ? "店铺标识" : "暂无图片"}
       </span>
       {src === null || failed ? null : (
@@ -91,10 +83,10 @@ export function BannerShelf({ children }: { children: ReactNode }): ReactNode {
   }
   return (
     <>
-      <div className={styles.sectionHeading}>
+      <div className="sectionHeading">
         <h2>已上架商品</h2>
         {hydrated ? (
-          <div className={styles.arrows}>
+          <div className="arrows">
             <button
               type="button"
               aria-label="上一张"
@@ -118,14 +110,14 @@ export function BannerShelf({ children }: { children: ReactNode }): ReactNode {
           </div>
         ) : null}
       </div>
-      <div ref={ref} className={styles.shelf} aria-label="商品 banner">
+      <div ref={ref} className="shelf" aria-label="商品 banner">
         {children}
       </div>
     </>
   );
 }
 
-export function CopyText({
+function CopyText({
   text,
   label,
   disabled = false,
@@ -134,7 +126,6 @@ export function CopyText({
   label: string;
   disabled?: boolean;
 }): ReactNode {
-  const hydrated = useHydrated();
   const [feedback, setFeedback] = useState<"idle" | "success" | "manual">("idle");
   async function copy(): Promise<void> {
     try {
@@ -144,18 +135,12 @@ export function CopyText({
       setFeedback("manual");
     }
   }
-  if (!hydrated) return null;
   return (
-    <div className={styles.copy}>
-      <button
-        className={styles.button}
-        type="button"
-        disabled={disabled}
-        onClick={() => void copy()}
-      >
+    <div className="copy">
+      <button className="button" type="button" disabled={disabled} onClick={() => void copy()}>
         {label}
       </button>
-      <p className={styles.feedback} role="status" aria-live="polite">
+      <p className="feedback" role="status" aria-live="polite">
         {feedback === "success"
           ? "已复制，可粘贴给 Agent。"
           : feedback === "manual"
@@ -183,58 +168,40 @@ export function UsageGuides({
   buyer: ReactNode;
   merchant: ReactNode;
 }): ReactNode {
-  const hydrated = useHydrated();
-  const [selected, setSelected] = useState(0);
-  const tabs = useRef<(HTMLButtonElement | null)[]>([]);
-  function move(event: KeyboardEvent<HTMLButtonElement>): void {
-    let next: number;
-    if (event.key === "ArrowRight" || event.key === "ArrowLeft") next = 1 - selected;
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = 1;
-    else return;
-    event.preventDefault();
-    setSelected(next);
-    tabs.current[next]?.focus();
-  }
   return (
-    <div>
-      {hydrated ? (
-        <div className={styles.tabs} role="tablist" aria-label="选择使用身份">
-          {["我是买家，想购买", "我是店主，想上架"].map((label, index) => (
-            <button
-              key={label}
-              type="button"
-              role="tab"
-              id={`guide-tab-${String(index)}`}
-              aria-selected={selected === index}
-              aria-controls={`guide-panel-${String(index)}`}
-              tabIndex={selected === index ? 0 : -1}
-              ref={(element) => {
-                tabs.current[index] = element;
-              }}
-              onClick={() => {
-                setSelected(index);
-              }}
-              onKeyDown={move}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-      {[buyer, merchant].map((guide, index) => (
-        <div
-          key={index}
-          id={`guide-panel-${String(index)}`}
-          role={hydrated ? "tabpanel" : undefined}
-          aria-labelledby={hydrated ? `guide-tab-${String(index)}` : undefined}
-          hidden={hydrated && selected !== index}
-          tabIndex={hydrated ? 0 : undefined}
-          className={styles.guidePanel}
-        >
-          {guide}
-        </div>
-      ))}
+    <div className="guideTabs">
+      <input
+        className="guideTabInput"
+        type="radio"
+        name="usage-guide"
+        id="usage-buyer"
+        defaultChecked
+      />
+      <input className="guideTabInput" type="radio" name="usage-guide" id="usage-merchant" />
+      <div className="tabs" role="tablist" aria-label="选择使用身份">
+        <label htmlFor="usage-buyer" id="guide-tab-0">
+          我是买家，想购买
+        </label>
+        <label htmlFor="usage-merchant" id="guide-tab-1">
+          我是店主，想上架
+        </label>
+      </div>
+      <div
+        id="guide-panel-0"
+        role="tabpanel"
+        aria-labelledby="guide-tab-0"
+        className="guidePanel buyerPanel"
+      >
+        {buyer}
+      </div>
+      <div
+        id="guide-panel-1"
+        role="tabpanel"
+        aria-labelledby="guide-tab-1"
+        className="guidePanel merchantPanel"
+      >
+        {merchant}
+      </div>
     </div>
   );
 }
@@ -260,14 +227,12 @@ export function VariantChooser({
       : `我想购买商品 ${productId}，规格 ${selected.id}（${optionText(selected.optionValues)}）。请先查询当前价格和库存，向我确认商品、规格和数量后再购买。`;
   return (
     <>
-      <fieldset className={styles.variantFieldset}>
+      <fieldset className="variantFieldset">
         <legend>可售规格</legend>
-        <ul className={styles.variants}>
+        <ul className="variants">
           {variants.map((variant) => (
             <li key={variant.id}>
-              <label
-                className={`${styles.variant} ${selectedId === variant.id ? styles.selected : ""}`}
-              >
+              <label className={`variant ${selectedId === variant.id ? "selected" : ""}`}>
                 {hydrated ? (
                   <input
                     type="radio"
@@ -280,27 +245,23 @@ export function VariantChooser({
                     }}
                   />
                 ) : null}
-                <span className={styles.variantBody}>
-                  <span className={styles.variantTop}>
+                <span className="variantBody">
+                  <span className="variantTop">
                     <strong>{optionText(variant.optionValues)}</strong>
-                    <span className={styles.price}>
-                      {displayPrice(variant.price, variant.currency)}
-                    </span>
+                    <span className="price">{displayPrice(variant.price, variant.currency)}</span>
                   </span>
                   <span>
                     {variantStock(variant)} · {availabilityText(variant.availability)}
                   </span>
-                  {variant.sku === null ? null : (
-                    <span className={styles.muted}>SKU：{variant.sku}</span>
-                  )}
-                  <span className={styles.identifier}>规格 ID：{variant.id}</span>
+                  {variant.sku === null ? null : <span className="muted">SKU：{variant.sku}</span>}
+                  <span className="identifier">规格 ID：{variant.id}</span>
                 </span>
               </label>
             </li>
           ))}
         </ul>
       </fieldset>
-      <div className={styles.assistance}>
+      <div className="assistance">
         <p>
           {available.length === 0
             ? "当前规格均缺货，可以让 Agent 稍后重新查询。"

@@ -8,7 +8,7 @@ Use this document to configure the one store: obtain a merchant token, then main
 
 用户要把商品放进这家店、改字段、上下架、查自己的订单，或发布店铺介绍时，使用本文档。
 
-不要用本文档给买家查商品、下单或查询订单。买家读 `/skill.md`。也不要调用 `/merchants`，没有开店接口。启动时已经创建店主账号和一本名为「默认目录」的目录。店主就是管理页的同一个手机号和密码。
+不要用本文档给买家查商品、下单或查询订单。买家读 `/skill.md`。不要用本文档改公开页面、注册页或支付前页面。改页面只读 `/storefront/skill.md`。本文档不讲页面上传、激活或回滚。也不要调用 `/merchants`，没有开店接口。启动时已经创建店主账号和一本名为「默认目录」的目录。店主就是管理页的同一个手机号和密码。
 
 Do not guide self-registration. Do not ask for a password, SMS code, or API key. The store owner account already exists and is the account created at startup. Log in with that phone and password on the merchant authorization page. Do not ask the user to open another merchant account.
 
@@ -27,6 +27,7 @@ API 源站就是本文档的源站。`robots.txt` 禁止 `/api` 或 `/oauth` 只
 - 不要把下架、软删除和字段停用当成同一件事。
 - 商家令牌不能把订单标成已支付，也不能下单。买家令牌不能调用商家写接口。只有状态 `paid` 才算支付成功。
 - 不要直接写对象存储。不要在上传失败后用外部图片地址凑封面。不要把私有或需要签名的地址写入 `cover`。
+- 不要在本文档里改页面。页面规则只以 `/storefront/skill.md` 为准。
 
 ## 主流程
 
@@ -53,7 +54,7 @@ scope=field:write product:write product:read order:read
 
 用户操作期间，Agent 轮询 `POST /oauth/token`。同样使用 `application/x-www-form-urlencoded`。字段是 `grant_type=urn:ietf:params:oauth:grant-type:device_code`、`client_id=merclink-agent` 和保存的 `device_code`。返回 `authorization_pending` 时继续等。响应若有 `interval`，两次轮询至少间隔这么多秒。返回 `slow_down` 时再拉长间隔。短码 10 分钟后失效，失效后重新申请，不要重复提交已经确认过的短码。
 
-商家批准的权限是 `field:write`、`product:write`、`product:read`、`order:read`。批准结果固定是这四项。这里没有访问令牌、刷新令牌或 API Key 的示例值。
+商家批准的权限是 `field:write`、`product:write`、`product:read`、`order:read`。未申请 `storefront:write` 时，批准结果固定是这四项；申请了 `storefront:write` 时，只在这四项之外多这一项。这里没有访问令牌、刷新令牌或 API Key 的示例值。
 
 访问令牌约 15 分钟。过期后用 `POST /oauth/token` 换新的，`grant_type=refresh_token`，并带原来的 `client_id` 和刷新令牌。旧刷新令牌立即失效，保存新的刷新令牌。请求已登录接口时使用 `Authorization` 头，方案是 Bearer。不要把令牌写进本文档或对话。
 

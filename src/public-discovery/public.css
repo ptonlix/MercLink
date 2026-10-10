@@ -222,24 +222,43 @@
 .usage > p {
   margin-top: 12px;
 }
+.guideTabInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
 .tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 24px;
 }
-.tabs button {
+.tabs label {
+  display: inline-flex;
+  align-items: center;
   min-height: 44px;
   padding: 8px 16px;
   border: 1px solid var(--ml-line);
   background: transparent;
   color: var(--ml-muted);
   border-radius: 8px;
+  cursor: pointer;
 }
-.tabs button[aria-selected="true"] {
+#usage-buyer:checked ~ .tabs label[for="usage-buyer"],
+#usage-merchant:checked ~ .tabs label[for="usage-merchant"] {
   border-color: var(--ml-moss);
   color: var(--ml-moss);
   background: #e9eee3;
+}
+.merchantPanel {
+  display: none;
+}
+#usage-merchant:checked ~ .buyerPanel {
+  display: none;
+}
+#usage-merchant:checked ~ .merchantPanel {
+  display: block;
 }
 .guidePanel {
   margin-top: 24px;
@@ -287,11 +306,15 @@
   color: var(--ml-muted);
 }
 .skillLink {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  width: fit-content;
   min-height: 44px;
   color: var(--ml-moss) !important;
   text-underline-offset: 4px;
+}
+.skillLink + .skillLink {
+  margin-top: 4px;
 }
 .url {
   display: block;

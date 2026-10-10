@@ -2,8 +2,13 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { buyerCaptchaConfig } from "../../app/authorize/buyer-captcha";
+import { buyerCaptchaMarkup } from "../../app/authorize/captcha-markup";
 import {
   AccountKeyView,
+  AdminLoginView,
+  AdminSettledView,
+  AdminView,
+  AuthorizeAppearance,
   BuyerAuthorizeView,
   MerchantAuthorizeView,
 } from "../../app/authorize/views";
@@ -150,6 +155,48 @@ describe("authorization pages", () => {
     expect(idle).toContain('value="logout"');
     expect(idle).not.toContain('value="approve"');
     expect(idle).not.toContain("发送验证码");
+  });
+
+  it("renders captcha markup already placed inside the submitting form", () => {
+    const fields = buyerCaptchaMarkup("captcha-prefix");
+    const html = renderToStaticMarkup(
+      createElement(AuthorizeAppearance, {
+        html: `<form><div id="merclink-authorize-captcha">${fields}</div><button id="captcha-send" disabled>发送验证码</button></form>`,
+        injectCaptcha: true,
+        captchaPrefix: "captcha-prefix",
+        captchaSceneId: "scene-id",
+      }),
+    );
+    expect(html).toContain("captcha-element");
+    expect(html).toContain('data-captcha-prefix="captcha-prefix"');
+    expect(html).toContain('name="captchaVerifyParam"');
+    expect(html.indexOf("<form")).toBeLessThan(html.indexOf("captcha-element"));
+    expect(html.indexOf("captcha-element")).toBeLessThan(html.indexOf("captcha-send"));
+    expect(html.indexOf("captcha-element")).toBe(html.lastIndexOf("captcha-element"));
+  });
+
+  it("does not show the password form after the owner password changed", () => {
+    const settled = renderToStaticMarkup(createElement(AdminSettledView, { notice: null }));
+    expect(settled).toContain("已登录");
+    expect(settled).toContain("不再要求改密");
+    expect(settled).not.toContain('name="currentPassword"');
+    expect(settled).toContain('href="/admin?change=1"');
+
+    const login = renderToStaticMarkup(
+      createElement(AdminLoginView, {
+        notice: "请先登录后再批准重置。",
+        next: "/admin/storefront-resets/srr_example",
+      }),
+    );
+    expect(login).toContain('name="next"');
+    expect(login).toContain("/admin/storefront-resets/srr_example");
+    expect(login).not.toContain("登录后可以修改店主密码");
+
+    const voluntary = renderToStaticMarkup(
+      createElement(AdminView, { notice: null, voluntary: true, next: null }),
+    );
+    expect(voluntary).toContain('name="change"');
+    expect(voluntary).toContain('name="currentPassword"');
   });
 
   it("creates API keys only on the logged-in account page", () => {

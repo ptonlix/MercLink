@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
         source: "/merchant/skill.md",
         destination: "/agent-docs/merchant-skill",
       },
+      {
+        source: "/storefront/skill.md",
+        destination: "/agent-docs/storefront-skill",
+      },
     ];
   },
 };

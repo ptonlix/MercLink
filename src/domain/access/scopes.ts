@@ -13,6 +13,7 @@ export const buyerApprovalScopes = [
 ] as const satisfies readonly Scope[];
 
 const catalogManagement = new Set<Scope>(["field:write", "product:write"]);
+const storefrontWrite = "storefront:write" satisfies Scope;
 
 export type AuthorizationPage = "merchant" | "buyer";
 
@@ -20,7 +21,7 @@ export function selectAuthorizationPage(
   requested: readonly string[],
 ): AuthorizationPage | "invalid" {
   const known = requested.filter(isScope);
-  if (known.some((scope) => catalogManagement.has(scope))) {
+  if (known.some((scope) => catalogManagement.has(scope) || scope === storefrontWrite)) {
     return "merchant";
   }
   if (
@@ -34,6 +35,17 @@ export function selectAuthorizationPage(
 
 export function fixedApprovalScopes(page: AuthorizationPage): readonly Scope[] {
   return grantedScopes(page === "merchant" ? merchantApprovalScopes : buyerApprovalScopes);
+}
+
+export function grantedApprovalScopes(
+  page: AuthorizationPage,
+  requested: readonly string[],
+): readonly Scope[] {
+  const base = fixedApprovalScopes(page);
+  if (page !== "merchant" || !requested.includes(storefrontWrite)) {
+    return base;
+  }
+  return grantedScopes([...base, storefrontWrite]);
 }
 
 export function authorizationCreatesMerchant(): false {

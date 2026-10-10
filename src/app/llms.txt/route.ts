@@ -8,7 +8,7 @@ export async function GET(): Promise<Response> {
   const quote = store === null ? null : { displayName: store.displayName, summary: store.summary };
   return new Response(llmsText(publicBaseUrl(), quote), {
     headers: {
-      "content-type": "text/plain; charset=utf-8",
+      "content-type": "text/markdown; charset=utf-8",
       "cache-control": "no-store",
     },
   });

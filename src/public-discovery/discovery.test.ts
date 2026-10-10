@@ -57,6 +57,7 @@ describe("discovery files", () => {
         `${origin}/products`,
         `${origin}/skill.md`,
         `${origin}/merchant/skill.md`,
+        `${origin}/storefront/skill.md`,
         `${origin}/products/${first.id}`,
         `${origin}/products/${second.id}`,
       ]),
@@ -93,12 +94,19 @@ describe("discovery files", () => {
     const body = await response.text();
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toContain("text/plain");
+    expect(response.headers.get("content-type")).toContain("text/markdown");
+    expect(body.startsWith("# MercLink\n")).toBe(true);
+    expect(body).toContain("\n> ");
+    expect(body).toContain("\n## ");
+    expect(body).toContain("/index.md");
+    expect(body).toContain("/products.md");
+    expect(body).not.toContain("llms-full.txt");
     expect(body).toBe(llmsText());
     expect(body).toContain(`${origin}/`);
     expect(body).toContain(`${origin}/products`);
     expect(body).toContain(`${origin}/skill.md`);
     expect(body).toContain(`${origin}/merchant/skill.md`);
+    expect(body).toContain(`${origin}/storefront/skill.md`);
     expect(body).toContain(`${origin}/api/v1`);
     expect(body).not.toContain(hiddenTitle);
     expect(body).not.toContain("prd_llms");
@@ -134,12 +142,53 @@ describe("discovery files", () => {
     expect(body).toContain(`${origin}/products`);
     expect(body).toContain(`${origin}/skill.md`);
     expect(body).toContain(`${origin}/merchant/skill.md`);
+    expect(body).toContain(`${origin}/storefront/skill.md`);
     expect(body).toContain(`${origin}/api/v1`);
     expect(body).not.toContain(hiddenTitle);
     expect(body).not.toContain("prd_llms");
     expect(body).not.toContain("https://cdn.example/logo.png");
     expect(body).not.toContain("西湖区某某路 88 号");
+    expect(body).not.toContain("杭州市");
+    expect(body).not.toContain("https://shop.example");
     expect(body).not.toContain("/merchants");
+    const withoutHeading = body.replace(/^# .+\n\n> .+\n\n/, "");
+    expect(withoutHeading).not.toContain("南风商店");
+    expect(withoutHeading).not.toContain("一句已发布简介");
+  });
+
+  it("does not keep a withdrawn store name in llms.txt and omits markdown from the sitemap", async () => {
+    publicStore.register({
+      get: () =>
+        Promise.resolve({
+          displayName: "撤下的店",
+          summary: "不该留下的简介",
+          websiteUrl: null,
+          logoUrl: null,
+          areaServed: null,
+          address: "不该留下的地址",
+        }),
+    });
+    resetPublicStore();
+    const body = await (await llms()).text();
+    expect(body).not.toContain("撤下的店");
+    expect(body).not.toContain("不该留下的简介");
+    expect(body).not.toContain("不该留下的地址");
+
+    publicProducts.register({
+      list: () =>
+        Promise.resolve({ items: [product("prd_map", "地图商品")], nextCursor: "page-2" }),
+      get: () => Promise.resolve({ ok: false, error: "not_found", message: "没有找到。" }),
+    });
+    const entries = await sitemap();
+    expect(
+      entries.some((entry) =>
+        /\/index\.md$|\/products\.md$|\/products\/[^/]+\.md$/.test(entry.url),
+      ),
+    ).toBe(false);
+    expect(entries.some((entry) => entry.url.includes("cursor"))).toBe(false);
+    expect(entries.some((entry) => "lastmod" in entry)).toBe(false);
+    expect(entries.map((entry) => entry.url)).toContain(`${origin}/products/prd_map`);
+    expect(entries.map((entry) => entry.url)).not.toContain(`${origin}/products/prd_map.md`);
   });
 });
 

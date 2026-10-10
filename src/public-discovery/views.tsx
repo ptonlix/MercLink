@@ -1,49 +1,91 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- Public navigation must work without the Next client runtime. */
-import type { ReactNode } from "react";
-import type { PublicProduct } from "../shared/seams/public-products";
-import type { PublicStoreProfile } from "../shared/seams/public-store";
-import { BannerShelf, CopyText, PublicImage, UsageGuides, VariantChooser } from "./interactions";
+import { createElement, type ReactNode } from "react";
+import { slotHtml, type SlotContext, type SlotProduct } from "../domain/storefront/slots";
+import { minorUnits } from "../shared/money";
+import { BannerShelf, PublicImage, UsageGuides, VariantChooser } from "./interactions";
+
+type Facts = SlotContext | null;
+
+function httpUrl(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function Slot({
+  name,
+  product,
+  facts,
+}: {
+  name: string;
+  product?: SlotProduct;
+  facts: Facts;
+}): ReactNode {
+  if (facts === null) {
+    return createElement("merclink-slot", { name });
+  }
+  const html = slotHtml(name, facts, product ?? facts.product);
+  if (html === null || html.length === 0) {
+    return null;
+  }
+  if (!html.includes("<")) {
+    return html;
+  }
+  return <span dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+function ProductToken({
+  token,
+  product,
+  facts,
+}: {
+  token: "id" | "catalogId" | "priceMinor" | "availabilityRaw" | "currency";
+  product?: SlotProduct;
+  facts: Facts;
+}): ReactNode {
+  const current = product ?? facts?.product ?? null;
+  if (facts === null || current === null) {
+    return `{${token}}`;
+  }
+  if (token === "id") return current.id;
+  if (token === "catalogId") return current.catalogId ?? "";
+  if (token === "priceMinor") return String(current.priceMinor);
+  if (token === "availabilityRaw") return current.availability;
+  return current.currency ?? "CNY";
+}
 import {
-  isHttpUrl,
-  jsonLdScript,
-  type LandingModel,
-  type ProductListModel,
-  type VisibleProductModel,
-} from "./model";
-import { availabilityText, displayPrice } from "./presentation";
-import {
-  absoluteUrl,
   apiRootPath,
   buyerSkillPath,
   emptyProductsNote,
   merchantSkillPath,
   storeExplanation,
+  storefrontSkillPath,
   storeSlogan,
   viewAllProductsLabel,
 } from "./site";
-import styles from "./public.module.css";
 
-export function LandingView({ model }: { model: LandingModel }): ReactNode {
+export function LandingTemplate({ facts = null }: { facts?: Facts }): ReactNode {
   return (
-    <main className={styles.page}>
-      <JsonLd value={model.jsonLd} />
-      <div className={styles.column}>
-        {model.store === null ? null : <StoreHeader store={model.store} />}
-        <section className={styles.productSection} aria-label="已上架商品">
-          {model.products.length === 0 ? (
-            <>
-              <h2>已上架商品</h2>
-              <EmptyProducts />
-            </>
+    <main className="page">
+      <div className="column">
+        <StoreHeader facts={facts} />
+        <section className="productSection" aria-label="已上架商品">
+          <EmptyProductState facts={facts} />
+          {facts !== null && facts.products.length === 0 ? (
+            <h2>已上架商品</h2>
           ) : (
             <BannerShelf>
-              {model.products.map((product) => (
-                <ProductCard key={product.id} product={product} banner />
-              ))}
+              <ProductRepeat banner facts={facts} />
             </BannerShelf>
           )}
-          <div className={styles.more}>
-            <a className={styles.button} href="/products">
+          <div className="more">
+            <a className="button" href="/products">
               {viewAllProductsLabel}
             </a>
           </div>
@@ -55,86 +97,147 @@ export function LandingView({ model }: { model: LandingModel }): ReactNode {
   );
 }
 
-export function ProductListView({ model }: { model: ProductListModel }): ReactNode {
+export function ProductListTemplate({ facts = null }: { facts?: Facts }): ReactNode {
   return (
     <PublicShell>
-      <JsonLd value={model.jsonLd} />
-      <header className={styles.pageHeading}>
-        <h1>{model.title}</h1>
-        <p>{model.description}把感兴趣的商品交给你的 Agent，继续了解规格与购买方式。</p>
+      <header className="pageHeading">
+        <h1>已上架商品</h1>
+        <p>当前已上架商品列表。把感兴趣的商品交给你的 Agent，继续了解规格与购买方式。</p>
       </header>
-      {model.products.length === 0 ? (
-        <EmptyProducts />
-      ) : (
-        <ol className={styles.grid}>
-          {model.products.map((product) => (
-            <li key={product.id}>
-              <ProductCard product={product} />
-            </li>
-          ))}
-        </ol>
-      )}
-      {model.nextCursor === null ? null : (
-        <nav className={styles.pagination} aria-label="商品分页">
-          <a
-            className={styles.button}
-            href={`/products?cursor=${encodeURIComponent(model.nextCursor)}`}
-          >
-            下一页商品
-          </a>
-        </nav>
-      )}
-      <p className={styles.returnLink}>
+      <EmptyProductState facts={facts} />
+      <ol className="grid">
+        <ProductRepeat itemWrapper facts={facts} />
+      </ol>
+      <nav className="pagination" aria-label="商品分页">
+        <Slot name="products.next" facts={facts} />
+      </nav>
+      <p className="returnLink">
         <a href="/">返回店铺首页</a>
       </p>
     </PublicShell>
   );
 }
 
-export function ProductView({ model }: { model: VisibleProductModel }): ReactNode {
-  const product = model.product;
+export function ProductTemplate({ facts = null }: { facts?: Facts }): ReactNode {
   return (
     <PublicShell>
-      <JsonLd value={model.jsonLd} />
-      <a className={styles.returnLink} href="/products">
+      <a className="returnLink" href="/products">
         返回商品列表
       </a>
-      <article className={styles.detail}>
-        <header className={styles.detailHeading}>
-          <h1>{product.title}</h1>
+      <article className="detail">
+        <header className="detailHeading">
+          <h1>
+            <Slot name="product.name" facts={facts} />
+          </h1>
         </header>
-        <div className={styles.detailCover}>
-          <PublicImage key={product.cover} src={safeImage(product.cover)} title={product.title} />
+        <div className="detailCover">
+          {facts?.product ? (
+            <PublicImage src={httpUrl(facts.product.cover)} title={facts.product.name} />
+          ) : (
+            <Slot name="product.cover" facts={facts} />
+          )}
         </div>
-        <div className={styles.detailInfo}>
-          <p className={styles.offer}>
-            <span className={styles.mainPrice}>
-              {displayPrice(product.offer.price, product.offer.currency)}
+        <div className="detailInfo">
+          <p className="offer">
+            <span className="mainPrice">
+              <Slot name="product.price" facts={facts} />
             </span>
-            <span className={styles.status}>{availabilityText(product.offer.availability)}</span>
+            <span className="status">
+              <Slot name="product.availability" facts={facts} />
+            </span>
           </p>
-          <VariantChooser productId={product.id} variants={product.variants} />
-          <a className={styles.skillLink} href={buyerSkillPath}>
+          {facts?.product ? (
+            <VariantChooser
+              productId={facts.product.id}
+              variants={facts.product.variants.map((variant) => ({
+                id: variant.id ?? "",
+                price: minorUnits(variant.priceMinor),
+                currency: variant.currency ?? "CNY",
+                stock: variant.stock,
+                availability: variant.availability === "out_of_stock" ? "out_of_stock" : "in_stock",
+                optionValues: variant.optionValues,
+                sku: variant.sku ?? null,
+              }))}
+            />
+          ) : (
+            <>
+              <template data-merclink="product.variant">
+                <li>
+                  <strong>
+                    <Slot name="variant.options" facts={facts} />
+                  </strong>
+                  <span className="price">
+                    <Slot name="variant.price" facts={facts} />
+                  </span>
+                  <span>
+                    <Slot name="variant.stock" facts={facts} />
+                  </span>
+                  <span className="muted">
+                    <Slot name="variant.availability" facts={facts} />
+                  </span>
+                  <span className="identifier">
+                    <Slot name="variant.id" facts={facts} />
+                  </span>
+                </li>
+              </template>
+              <p className="muted">
+                <Slot name="product.stock" facts={facts} />
+              </p>
+            </>
+          )}
+          <a className="skillLink" href={buyerSkillPath}>
             查看买家 Skill
           </a>
         </div>
       </article>
-      <section className={styles.factsSection}>
+      <section className="factsSection">
         <div>
           <h2>公开字段</h2>
-          <FieldList fields={product.fields} />
-        </div>
-        <div>
+          {facts === null ? (
+            <template data-merclink="product.field">
+              <div>
+                <dt>
+                  <Slot name="field.key" facts={facts} />
+                </dt>
+                <dd>
+                  <Slot name="field.value" facts={facts} />
+                </dd>
+              </div>
+            </template>
+          ) : (
+            Object.entries(facts.product?.fields ?? {}).map(([key, value]) => (
+              <div key={key}>
+                <dt>{key}</dt>
+                <dd>
+                  {value === null
+                    ? "未填写"
+                    : value === true
+                      ? "是"
+                      : value === false
+                        ? "否"
+                        : String(value)}
+                </dd>
+              </div>
+            ))
+          )}
           <h2>商品信息</h2>
-          <dl className={styles.facts}>
+          <dl className="facts">
             <dt>商品 ID</dt>
-            <dd>{product.id}</dd>
+            <dd>
+              <ProductToken token="id" facts={facts} />
+            </dd>
             <dt>目录 ID</dt>
-            <dd>{product.catalogId}</dd>
+            <dd>
+              <ProductToken token="catalogId" facts={facts} />
+            </dd>
           </dl>
-          <details className={styles.structured}>
+          <details className="structured">
             <summary>查看结构化商品信息</summary>
-            <pre>{JSON.stringify(product, null, 2)}</pre>
+            <pre>
+              <ProductToken token="priceMinor" facts={facts} />{" "}
+              <ProductToken token="availabilityRaw" facts={facts} />{" "}
+              <ProductToken token="currency" facts={facts} />
+            </pre>
           </details>
         </div>
       </section>
@@ -144,10 +247,10 @@ export function ProductView({ model }: { model: VisibleProductModel }): ReactNod
 
 function PublicShell({ children }: { children: ReactNode }): ReactNode {
   return (
-    <main className={styles.page}>
-      <div className={styles.column}>
-        <nav className={styles.siteNav} aria-label="站点导航">
-          <a href="/" className={styles.wordmark}>
+    <main className="page">
+      <div className="column">
+        <nav className="siteNav" aria-label="站点导航">
+          <a href="/" className="wordmark">
             MercLink
           </a>
           <a href="/">店铺首页</a>
@@ -160,61 +263,137 @@ function PublicShell({ children }: { children: ReactNode }): ReactNode {
   );
 }
 
-function StoreHeader({ store }: { store: PublicStoreProfile }): ReactNode {
+function StoreHeader({ facts }: { facts: Facts }): ReactNode {
   return (
-    <header className={styles.storeHeader}>
+    <header className="storeHeader">
       <div>
-        <h1 className={styles.storeName}>{store.displayName}</h1>
-        <p className={styles.summary}>{store.summary}</p>
-        <div className={styles.storeMeta}>
-          {store.areaServed === null || store.areaServed.length === 0 ? null : (
-            <p>{store.areaServed}</p>
+        <h1 className="storeName">
+          <Slot name="store.display_name" facts={facts} />
+        </h1>
+        <p className="summary">
+          <Slot name="store.summary" facts={facts} />
+        </p>
+        <div className="storeMeta">
+          {facts === null ? (
+            <>
+              <p>
+                <Slot name="store.area" facts={facts} />
+              </p>
+              <p>
+                <Slot name="store.address" facts={facts} />
+              </p>
+              <p>
+                <Slot name="store.website" facts={facts} />
+              </p>
+            </>
+          ) : (
+            <>
+              {facts.store?.area ? <p>{facts.store.area}</p> : null}
+              {facts.store?.address ? <p>{facts.store.address}</p> : null}
+              {facts.store?.website ? <Slot name="store.website" facts={facts} /> : null}
+            </>
           )}
-          {store.address === null || store.address.length === 0 ? null : <p>{store.address}</p>}
-          {store.websiteUrl !== null && isHttpUrl(store.websiteUrl) ? (
-            <a href={store.websiteUrl}>{store.websiteUrl}</a>
-          ) : null}
         </div>
       </div>
-      {store.logoUrl !== null && isHttpUrl(store.logoUrl) ? (
-        <PublicImage key={store.logoUrl} src={store.logoUrl} title={store.displayName} logo />
-      ) : null}
+      {facts?.store?.logo ? (
+        <PublicImage src={httpUrl(facts.store.logo)} title={facts.store.displayName} logo />
+      ) : (
+        <Slot name="store.logo" facts={facts} />
+      )}
     </header>
   );
 }
 
-function ProductCard({
-  product,
+function ProductRepeat({
   banner = false,
+  details = false,
+  itemWrapper = false,
+  facts,
 }: {
-  product: PublicProduct;
   banner?: boolean;
+  details?: boolean;
+  itemWrapper?: boolean;
+  facts: Facts;
+}): ReactNode {
+  if (facts === null) {
+    const card = <ProductCard banner={banner} details={details} facts={facts} />;
+    return <template data-merclink="product">{itemWrapper ? <li>{card}</li> : card}</template>;
+  }
+  return facts.products.map((product) => {
+    const card = (
+      <ProductCard
+        key={product.id}
+        product={product}
+        banner={banner}
+        details={details}
+        facts={facts}
+      />
+    );
+    return itemWrapper ? <li key={product.id}>{card}</li> : card;
+  });
+}
+
+function EmptyProductState({ facts }: { facts: Facts }): ReactNode {
+  if (facts === null) {
+    return (
+      <template data-merclink="products.empty">
+        <EmptyProducts />
+      </template>
+    );
+  }
+  if (facts.products.length > 0 || facts.product !== null) {
+    return null;
+  }
+  return <EmptyProducts />;
+}
+
+function ProductCard({
+  banner = false,
+  details = false,
+  product,
+  facts,
+}: {
+  banner?: boolean;
+  details?: boolean;
+  product?: SlotProduct;
+  facts: Facts;
 }): ReactNode {
   return (
     <a
-      className={banner ? styles.banner : styles.card}
-      href={`/products/${encodeURIComponent(product.id)}`}
+      className={banner ? "banner" : "card"}
+      href={product ? `/products/${product.id}` : "/products/{id}"}
     >
-      <PublicImage key={product.cover} src={safeImage(product.cover)} title={product.title} />
-      <div className={styles.cardBody}>
-        <h3>{product.title}</h3>
-        <span className={styles.price}>
-          {displayPrice(product.offer.price, product.offer.currency)}
+      {product ? (
+        <PublicImage src={httpUrl(product.cover)} title={product.name} />
+      ) : (
+        <Slot name="product.cover" facts={facts} />
+      )}
+      <div className="cardBody">
+        <h3>
+          <Slot name="product.name" product={product} facts={facts} />
+        </h3>
+        <span className="price">
+          <Slot name="product.price" product={product} facts={facts} />
         </span>
-        <span className={styles.muted}>{availabilityText(product.offer.availability)}</span>
-        {banner ? <span className={styles.cardLink}>查看详情</span> : null}
+        <span className="muted">
+          <Slot name="product.availability" product={product} facts={facts} />
+        </span>
+        {banner ? <span className="cardLink">查看详情</span> : null}
+        {details ? (
+          <>
+            <Slot name="product.fields" product={product} facts={facts} />
+            <Slot name="product.variants" product={product} facts={facts} />
+            <Slot name="product.stock" product={product} facts={facts} />
+          </>
+        ) : null}
       </div>
     </a>
   );
 }
 
-function safeImage(cover: string | null): string | null {
-  return cover !== null && isHttpUrl(cover) ? cover : null;
-}
-
 function EmptyProducts(): ReactNode {
   return (
-    <div className={styles.empty}>
+    <div className="empty">
       <p>{emptyProductsNote}</p>
       <p>商品上架后会出现在这里。</p>
     </div>
@@ -222,25 +401,21 @@ function EmptyProducts(): ReactNode {
 }
 
 function PlatformUsageGuide(): ReactNode {
-  const buyerUrl = absoluteUrl(buyerSkillPath);
-  const merchantUrl = absoluteUrl(merchantSkillPath);
   return (
-    <section className={styles.usage} aria-labelledby="usage-title">
+    <section className="usage" aria-labelledby="usage-title">
       <h2 id="usage-title">如何使用 MercLink</h2>
-      <p className={styles.muted}>从一份 Skill 开始，让 Agent 帮你购买或上架商品。</p>
+      <p className="muted">从一份 Skill 开始，让 Agent 帮你购买或上架商品。</p>
       <UsageGuides
         buyer={
           <>
-            <h3 className={styles.guideHeading}>买家购买</h3>
-            <ol className={styles.steps}>
+            <h3 className="guideHeading">买家购买</h3>
+            <ol className="steps">
               <li>
                 <h4>把买家 Skill 交给 Agent</h4>
                 <p>复制文档地址给你的 Agent，告诉它按这份 Skill 使用店铺。</p>
-                <a className={styles.skillLink} href={buyerSkillPath}>
+                <a className="skillLink" href={buyerSkillPath}>
                   查看买家 Skill
                 </a>
-                <code className={styles.url}>{buyerUrl}</code>
-                <CopyText text={buyerUrl} label="复制买家 Skill 地址" />
               </li>
               <li>
                 <h4>告诉 Agent 购买需求</h4>
@@ -265,16 +440,17 @@ function PlatformUsageGuide(): ReactNode {
         }
         merchant={
           <>
-            <h3 className={styles.guideHeading}>店主上架</h3>
-            <ol className={styles.steps}>
+            <h3 className="guideHeading">店主上架</h3>
+            <ol className="steps">
               <li>
                 <h4>把商家 Skill 交给 Agent</h4>
                 <p>让 Agent 阅读商家 Skill，了解如何管理这家店的商品。</p>
-                <a className={styles.skillLink} href={merchantSkillPath}>
+                <a className="skillLink" href={merchantSkillPath}>
                   查看商家 Skill
                 </a>
-                <code className={styles.url}>{merchantUrl}</code>
-                <CopyText text={merchantUrl} label="复制商家 Skill 地址" />
+                <a className="skillLink" href={storefrontSkillPath}>
+                  查看店面 Skill
+                </a>
               </li>
               <li>
                 <h4>店主登录并批准</h4>
@@ -305,12 +481,31 @@ function PlatformUsageGuide(): ReactNode {
   );
 }
 
+export function OrderResultTemplate(): ReactNode {
+  return (
+    <main className="page">
+      <div className="column">
+        <header className="pageHeading">
+          <h1>订单</h1>
+          <p>
+            订单状态 <Slot name="order.status" facts={null} />
+          </p>
+        </header>
+        <template data-merclink="order.paid">
+          <p>支付已完成</p>
+        </template>
+        <p className="muted">打开付款链接不表示支付成功。</p>
+      </div>
+    </main>
+  );
+}
+
 function StoreFooter(): ReactNode {
   return (
-    <footer className={styles.footer}>
+    <footer className="footer">
       <div>
-        <p className={styles.slogan}>{storeSlogan}</p>
-        <p className={styles.muted}>{storeExplanation}</p>
+        <p className="slogan">{storeSlogan}</p>
+        <p className="muted">{storeExplanation}</p>
       </div>
       <nav aria-label="接口与发现文件">
         <a href={apiRootPath}>API 根地址</a>
@@ -318,35 +513,5 @@ function StoreFooter(): ReactNode {
         <a href="/sitemap.xml">sitemap.xml</a>
       </nav>
     </footer>
-  );
-}
-
-function FieldList({ fields }: { fields: PublicProduct["fields"] }): ReactNode {
-  const entries = Object.entries(fields);
-  return entries.length === 0 ? (
-    <p className={styles.muted}>没有公开字段。</p>
-  ) : (
-    <dl className={styles.facts}>
-      {entries.map(([key, value]) => (
-        <div key={key}>
-          <dt>{key}</dt>
-          <dd>
-            {value === null
-              ? "未填写"
-              : typeof value === "boolean"
-                ? value
-                  ? "是"
-                  : "否"
-                : String(value)}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function JsonLd({ value }: { value: unknown }): ReactNode {
-  return (
-    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(value) }} />
   );
 }

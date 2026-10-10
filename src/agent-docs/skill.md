@@ -8,7 +8,7 @@ Use this document for the buyer side of the store: query published products, com
 
 用户要找商品、看价格和库存、下单、付款或查询自己的订单时，使用本文档。
 
-不要用本文档改商品、建目录或发布店铺介绍。那是商家 Skill，地址是 `/merchant/skill.md`。未登录可以查询已上架商品。已下架、已删除或没有可售规格的商品，公开查询不返回。
+不要用本文档改商品、建目录或发布店铺介绍。那是商家 Skill，地址是 `/merchant/skill.md`。不要用本文档改店面页面。那是店面 Skill，地址是 `/storefront/skill.md`。未登录可以查询已上架商品。已下架、已删除或没有可售规格的商品，公开查询不返回。
 
 Do not ask the user for a password, SMS code, or API key. Use the device authorization grant. Do not use a public callback URL.
 

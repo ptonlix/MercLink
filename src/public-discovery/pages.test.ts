@@ -105,14 +105,16 @@ describe("public pages", () => {
     expect(visibleHtml(listHtml)).toContain("USD 2599.00");
     expect(offer).toEqual({
       "@type": "Offer",
-      price: product.offer.price,
+      price: "2599.00",
       priceCurrency: product.offer.currency,
-      availability: product.offer.availability,
+      availability: "https://schema.org/InStock",
+      sku: "SENTINEL-42",
     });
     expect(metadata.title).toBe(product.title);
-    expect(metadata.description).toContain(String(product.offer.price));
-    expect(metadata.description).toContain(product.offer.currency);
-    expect(metadata.description).toContain(product.offer.availability);
+    expect(metadata.description).toBe("哨兵短靴。USD 2599.00，有货");
+    expect(metadata.description).not.toContain("分");
+    expect(metadata.description).not.toContain("in_stock");
+    expect(metadata).not.toHaveProperty("seoDescription");
     expect(metadata.alternates?.canonical).toBe(`${origin}/products/${product.id}`);
     expect(listMetadata).toBeTypeOf("function");
     const listMeta = await listMetadata();
@@ -131,7 +133,8 @@ describe("public pages", () => {
 
     expect(html).not.toContain("</script><script>");
     const offer = productOffer(html);
-    expect(offer.price).toBe(product.offer.price);
+    expect(offer.price).toBe("2599.00");
+    expect(offer.availability).toBe("https://schema.org/InStock");
   });
 
   it("returns a noindex 404 when the seam does not return the product", async () => {
@@ -344,8 +347,12 @@ describe("public pages", () => {
     );
     expect((visible.match(/<ol/g) ?? []).length).toBe(2);
     expect((visible.match(/<li>/g) ?? []).length).toBe(8);
-    expect(visible).toContain(`${origin}/skill.md`);
-    expect(visible).toContain(`${origin}/merchant/skill.md`);
+    expect(visible).toContain('href="/skill.md"');
+    expect(visible).toContain('href="/merchant/skill.md"');
+    expect(visible).toContain('href="/storefront/skill.md"');
+    expect(visible).toContain("我是买家，想购买");
+    expect(visible).toContain("我是店主，想上架");
+    expect(visible).not.toContain(`${origin}/skill.md`);
     expect(visible).not.toContain("prd_demo");
   });
 
@@ -376,6 +383,10 @@ describe("public pages", () => {
   it("formats CNY minor units for people while preserving the structured offer", async () => {
     const product = publishedProduct();
     product.offer = { price: minorUnits(15900), currency: "CNY", availability: "in_stock" };
+    product.currency = "CNY";
+    const variant = product.variants[0];
+    if (variant === undefined) throw new Error("Fixture requires a variant");
+    product.variants = [{ ...variant, price: minorUnits(15900), currency: "CNY" }];
     registerProducts([product]);
     const list = visibleHtml(renderToStaticMarkup(await ProductsPage({})));
     const detail = renderToStaticMarkup(
@@ -383,7 +394,8 @@ describe("public pages", () => {
     );
     expect(list).toContain("¥159.00");
     expect(visibleHtml(detail)).toContain("¥159.00");
-    expect(productOffer(detail).price).toBe(15900);
+    expect(productOffer(detail).price).toBe("159.00");
+    expect(product.offer.price).toBe(15900);
   });
 
   it("uses the returned cursor for regular pagination", async () => {
@@ -463,31 +475,49 @@ function landingGraph(html: string): Record<string, unknown>[] {
 
 function productOffer(html: string): {
   "@type": "Offer";
-  price: number;
+  price: string;
   priceCurrency: string;
   availability: string;
+  sku?: string;
 } {
-  const block = jsonLdBlocks(html)[0];
-  if (!isRecord(block) || block["@type"] !== "Product" || !isRecord(block.offers)) {
+  const offers = productOffers(html);
+  const offer = offers[0];
+  if (offer === undefined) {
     throw new Error("product JSON-LD is missing Offer");
   }
-  const offer = block.offers;
-  if (offer["@type"] !== "Offer") {
-    throw new Error("product JSON-LD offer type mismatch");
+  return offer;
+}
+
+function productOffers(html: string): {
+  "@type": "Offer";
+  price: string;
+  priceCurrency: string;
+  availability: string;
+  sku?: string;
+}[] {
+  const block = jsonLdBlocks(html)[0];
+  if (!isRecord(block) || block["@type"] !== "Product" || !Array.isArray(block.offers)) {
+    throw new Error("product JSON-LD is missing Offer");
   }
-  if (
-    typeof offer.price !== "number" ||
-    typeof offer.priceCurrency !== "string" ||
-    typeof offer.availability !== "string"
-  ) {
-    throw new Error("product JSON-LD offer fields mismatch");
-  }
-  return {
-    "@type": "Offer",
-    price: offer.price,
-    priceCurrency: offer.priceCurrency,
-    availability: offer.availability,
-  };
+  return block.offers.map((offer) => {
+    if (!isRecord(offer) || offer["@type"] !== "Offer") {
+      throw new Error("product JSON-LD offer type mismatch");
+    }
+    if (
+      typeof offer.price !== "string" ||
+      typeof offer.priceCurrency !== "string" ||
+      typeof offer.availability !== "string"
+    ) {
+      throw new Error("product JSON-LD offer fields mismatch");
+    }
+    return {
+      "@type": "Offer",
+      price: offer.price,
+      priceCurrency: offer.priceCurrency,
+      availability: offer.availability,
+      ...(typeof offer.sku === "string" ? { sku: offer.sku } : {}),
+    };
+  });
 }
 
 function jsonLdBlocks(html: string): unknown[] {

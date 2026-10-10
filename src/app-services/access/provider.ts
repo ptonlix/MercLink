@@ -20,6 +20,7 @@ const providerScopes = [
   "product:read",
   "order:read",
   "order:write",
+  "storefront:write",
 ];
 
 export type AccountLookup = {

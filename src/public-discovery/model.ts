@@ -1,6 +1,13 @@
 import type { PublicListQuery, PublicProduct } from "../shared/seams/public-products";
 import { publicProducts } from "../shared/seams/public-products";
 import { publicStore, type PublicStoreProfile } from "../shared/seams/public-store";
+import { isPublicProductId } from "./negotiate";
+import {
+  availabilityText,
+  displayPrice,
+  majorUnitDecimal,
+  schemaAvailability,
+} from "./presentation";
 import {
   absoluteUrl,
   emptyProductsNote,
@@ -21,6 +28,7 @@ export type LandingModel = {
   title: string;
   description: string;
   canonicalUrl: string;
+  markdownPath: string;
   store: PublicStoreProfile | null;
   products: readonly PublicProduct[];
   nextCursor: string | null;
@@ -31,6 +39,9 @@ export type ProductListModel = {
   title: string;
   description: string;
   canonicalUrl: string;
+  markdownPath: string;
+  prevUrl: string | null;
+  nextUrl: string | null;
   products: readonly PublicProduct[];
   nextCursor: string | null;
   jsonLd: ItemListJsonLd;
@@ -41,6 +52,7 @@ export type VisibleProductModel = {
   title: string;
   description: string;
   canonicalUrl: string;
+  markdownPath: string;
   product: PublicProduct;
   jsonLd: ProductJsonLd;
 };
@@ -84,17 +96,32 @@ type ProductJsonLd = {
   "@type": "Product";
   name: string;
   image?: string;
-  offers: OfferJsonLd;
+  offers: readonly OfferJsonLd[];
 };
 
 type OfferJsonLd = {
   "@type": "Offer";
-  price: number;
+  price: string;
   priceCurrency: string;
-  availability: PublicProduct["offer"]["availability"];
+  availability: "https://schema.org/InStock" | "https://schema.org/OutOfStock";
+  sku?: string;
 };
 
-export function jsonLdScript(value: unknown): string {
+export type PageDiscovery = {
+  title: string;
+  description: string;
+  alternates: {
+    canonical: string;
+    types: { "text/markdown": string };
+  };
+  pagination?: {
+    previous?: string;
+    next?: string;
+  };
+  robots: { index: true; follow: true };
+};
+
+function jsonLdScript(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
@@ -120,6 +147,7 @@ export async function loadLanding(): Promise<LandingModel> {
     title,
     description,
     canonicalUrl: absoluteUrl("/", origin),
+    markdownPath: "/index.md",
     store,
     products: page.items,
     nextCursor: page.nextCursor,
@@ -131,17 +159,30 @@ export async function loadLanding(): Promise<LandingModel> {
 }
 
 export async function loadProductList(cursor?: string): Promise<ProductListModel> {
+  const requested = cursor !== undefined && cursor.length > 0 ? cursor : undefined;
   const query: PublicListQuery = { limit: listLimit };
-  if (cursor !== undefined && cursor.length > 0) {
-    query.cursor = cursor;
+  if (requested !== undefined) {
+    query.cursor = requested;
   }
   const page = await publicProducts.list(query);
   const origin = publicBaseUrl();
   const description = "当前已上架商品列表。";
+  const canonicalPath =
+    requested === undefined ? "/products" : `/products?cursor=${encodeURIComponent(requested)}`;
+  const markdownPath =
+    requested === undefined
+      ? "/products.md"
+      : `/products.md?cursor=${encodeURIComponent(requested)}`;
   return {
     title: "已上架商品",
     description,
-    canonicalUrl: absoluteUrl("/products", origin),
+    canonicalUrl: absoluteUrl(canonicalPath, origin),
+    markdownPath,
+    prevUrl: requested === undefined ? null : absoluteUrl("/products", origin),
+    nextUrl:
+      page.nextCursor === null
+        ? null
+        : absoluteUrl(`/products?cursor=${encodeURIComponent(page.nextCursor)}`, origin),
     products: page.items,
     nextCursor: page.nextCursor,
     jsonLd: {
@@ -152,15 +193,12 @@ export async function loadProductList(cursor?: string): Promise<ProductListModel
 }
 
 export async function loadProduct(id: string): Promise<ProductModel> {
+  if (!isPublicProductId(id)) {
+    return hiddenProduct();
+  }
   const result = await publicProducts.get(id);
   if (!result.ok) {
-    return {
-      kind: "hidden",
-      status: 404,
-      indexable: false,
-      title: "没有找到商品",
-      description: emptyProductsNote,
-    };
+    return hiddenProduct();
   }
   const product = result.product;
   const origin = publicBaseUrl();
@@ -170,8 +208,46 @@ export async function loadProduct(id: string): Promise<ProductModel> {
     title: product.title,
     description,
     canonicalUrl: absoluteUrl(`/products/${product.id}`, origin),
+    markdownPath: `/products/${product.id}.md`,
     product,
     jsonLd: productJsonLd(product),
+  };
+}
+
+function hiddenProduct(): HiddenProductModel {
+  return {
+    kind: "hidden",
+    status: 404,
+    indexable: false,
+    title: "没有找到商品",
+    description: emptyProductsNote,
+  };
+}
+
+export function pageDiscovery(input: {
+  title: string;
+  description: string;
+  canonicalUrl: string;
+  markdownPath: string;
+  prevUrl?: string | null;
+  nextUrl?: string | null;
+}): PageDiscovery {
+  const pagination: { previous?: string; next?: string } = {};
+  if (input.prevUrl) {
+    pagination.previous = input.prevUrl;
+  }
+  if (input.nextUrl) {
+    pagination.next = input.nextUrl;
+  }
+  return {
+    title: input.title,
+    description: input.description,
+    alternates: {
+      canonical: input.canonicalUrl,
+      types: { "text/markdown": absoluteUrl(input.markdownPath) },
+    },
+    ...(input.prevUrl || input.nextUrl ? { pagination } : {}),
+    robots: { index: true, follow: true },
   };
 }
 
@@ -229,7 +305,8 @@ function onlineStore(store: PublicStoreProfile, origin: string): JsonLdNode {
 }
 
 function productDescription(product: PublicProduct): string {
-  return `${product.title}。价格 ${String(product.offer.price)} 分，货币 ${product.offer.currency}，可售状态 ${product.offer.availability}。`;
+  const text = `${product.title}。${displayPrice(product.offer.price, product.offer.currency)}，${availabilityText(product.offer.availability)}`;
+  return truncateChars(text, metaDescriptionLimit);
 }
 
 function itemList(products: readonly PublicProduct[], origin: string): ItemListJsonLd {
@@ -246,16 +323,22 @@ function itemList(products: readonly PublicProduct[], origin: string): ItemListJ
 }
 
 function productJsonLd(product: PublicProduct): ProductJsonLd {
+  const sources =
+    product.variants.length > 0
+      ? product.variants
+      : [
+          {
+            price: product.offer.price,
+            currency: product.offer.currency,
+            availability: product.offer.availability,
+            sku: null,
+          },
+        ];
   const jsonLd: ProductJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.title,
-    offers: {
-      "@type": "Offer",
-      price: product.offer.price,
-      priceCurrency: product.offer.currency,
-      availability: product.offer.availability,
-    },
+    offers: sources.map(offerJsonLd),
   };
   if (product.cover !== null && isHttpUrl(product.cover)) {
     jsonLd.image = product.cover;
@@ -263,7 +346,72 @@ function productJsonLd(product: PublicProduct): ProductJsonLd {
   return jsonLd;
 }
 
-export function isHttpUrl(value: string): boolean {
+function offerJsonLd(variant: {
+  price: number;
+  currency: string;
+  availability: PublicProduct["offer"]["availability"];
+  sku: string | null;
+}): OfferJsonLd {
+  const offer: OfferJsonLd = {
+    "@type": "Offer",
+    price: majorUnitDecimal(variant.price),
+    priceCurrency: variant.currency,
+    availability: schemaAvailability(variant.availability),
+  };
+  if (variant.sku !== null && variant.sku.length > 0) {
+    offer.sku = variant.sku;
+  }
+  return offer;
+}
+
+export function serverFactJsonLd(input: {
+  declaresStore: boolean;
+  declaresProduct: boolean;
+  store: PublicStoreProfile | null;
+  products: readonly PublicProduct[];
+  product: PublicProduct | null;
+  origin?: string;
+}): unknown {
+  const origin = input.origin ?? publicBaseUrl();
+  const nodes: JsonLdNode[] = [];
+  if (input.declaresStore && input.store !== null) {
+    nodes.push(onlineStore(input.store, origin));
+  }
+  if (input.declaresProduct) {
+    if (input.product !== null) {
+      nodes.push(productNode(input.product));
+    } else {
+      nodes.push(itemList(input.products, origin));
+    }
+  }
+  if (nodes.length === 0) {
+    return null;
+  }
+  const only = nodes[0];
+  if (nodes.length === 1 && only !== undefined) {
+    return { "@context": "https://schema.org", ...only };
+  }
+  return {
+    "@context": "https://schema.org",
+    "@graph": nodes,
+  };
+}
+
+function productNode(product: PublicProduct): JsonLdNode {
+  const document = productJsonLd(product);
+  return {
+    "@type": document["@type"],
+    name: document.name,
+    offers: document.offers,
+    ...(document.image === undefined ? {} : { image: document.image }),
+  };
+}
+
+export function jsonLdElement(value: unknown): string {
+  return `<script type="application/ld+json">${jsonLdScript(value)}</script>`;
+}
+
+function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
     return url.protocol === "https:" || url.protocol === "http:";

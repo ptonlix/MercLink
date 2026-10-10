@@ -39,4 +39,31 @@ describe("discovery", () => {
     expect(body.data).not.toHaveProperty("list");
     expect(body.data).not.toHaveProperty("total");
   });
+
+  it("points discovery at markdown facts without a product catalog", async () => {
+    const llms = await client.request("/llms.txt");
+    expect(llms.status).toBe(200);
+    expect(llms.headers.get("content-type")).toContain("text/markdown");
+    const directory = await llms.text();
+    expect(directory).toContain("/index.md");
+    expect(directory).toContain("/storefront/skill.md");
+    expect(directory).not.toContain("llms-full.txt");
+    expect(directory).not.toContain("prd_");
+
+    const indexMd = await client.request("/index.md");
+    expect(indexMd.status).toBe(200);
+    expect(indexMd.headers.get("content-type")).toContain("text/markdown");
+    expect(indexMd.headers.get("content-type")).not.toContain("application/json");
+    expect(canonicalPathname(indexMd.headers.get("link"))).toBe("/");
+
+    const negotiated = await client.request("/", { headers: { accept: "text/markdown" } });
+    expect(negotiated.status).toBe(200);
+    expect(negotiated.headers.get("content-type")).toContain("text/markdown");
+    expect(negotiated.headers.get("content-type")).not.toContain("application/json");
+  });
 });
+
+function canonicalPathname(link: string | null): string {
+  const target = /<([^>]+)>;\s*rel="canonical"/.exec(link ?? "")?.[1];
+  return target === undefined ? "" : new URL(target).pathname;
+}
