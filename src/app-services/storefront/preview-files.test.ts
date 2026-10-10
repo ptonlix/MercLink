@@ -6,6 +6,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import { renderDocument, type SlotContext } from "../../domain/storefront/slots";
+import { previewProxyTarget } from "../../../storefront/preview.mjs";
 
 const previewScript = path.join(process.cwd(), "storefront", "preview.mjs");
 const children: { kill: (signal?: NodeJS.Signals) => boolean }[] = [];
@@ -16,6 +17,35 @@ afterEach(async () => {
     child.kill("SIGTERM");
   }
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
+
+describe("preview proxy target", () => {
+  const origin = "http://127.0.0.1:3000";
+
+  it("keeps a reserved path on the configured origin", () => {
+    expect(previewProxyTarget("/api/v1/products?limit=20", origin)?.href).toBe(
+      "http://127.0.0.1:3000/api/v1/products?limit=20",
+    );
+  });
+
+  it("does not follow a request that names another host", () => {
+    expect(previewProxyTarget("http://169.254.169.254/latest/meta-data/", origin)).toBeNull();
+    expect(previewProxyTarget("//evil.example/api/v1", origin)?.href).toBe(
+      "http://127.0.0.1:3000/api/v1",
+    );
+    expect(previewProxyTarget("http://127.0.0.1:3000@evil.example/media/img", origin)?.href).toBe(
+      "http://127.0.0.1:3000/media/img",
+    );
+    expect(previewProxyTarget("\\\\evil.example\\api", origin)?.href).toBe(
+      "http://127.0.0.1:3000/api",
+    );
+  });
+
+  it("rejects a non-http origin and a path outside the reserved set", () => {
+    expect(previewProxyTarget("/api/v1", "file:///tmp")).toBeNull();
+    expect(previewProxyTarget("/api/v1", "http://user:pass@127.0.0.1:3000")).toBeNull();
+    expect(previewProxyTarget("/products/prd_1", origin)).toBeNull();
+  });
 });
 
 describe("storefront preview files", () => {

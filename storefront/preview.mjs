@@ -19,7 +19,52 @@ export function shouldProxy(pathname) {
   if (reservedExact.has(pathname)) {
     return true;
   }
-  return reservedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  return reservedPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
+function configuredOrigin(origin) {
+  let base;
+  try {
+    base = new URL(origin);
+  } catch {
+    return null;
+  }
+  if (base.protocol !== "http:" && base.protocol !== "https:") {
+    return null;
+  }
+  if (base.username !== "" || base.password !== "") {
+    return null;
+  }
+  return base;
+}
+
+// Request URL may name another host. Only its path and query may be reused, and only on the configured origin.
+export function previewProxyTarget(requestUrl, origin) {
+  const base = configuredOrigin(origin);
+  if (base === null) {
+    return null;
+  }
+  let incoming;
+  try {
+    incoming = new URL(requestUrl, base);
+  } catch {
+    return null;
+  }
+  if (blocked(incoming.pathname) || !shouldProxy(incoming.pathname)) {
+    return null;
+  }
+  const target = new URL(`${incoming.pathname}${incoming.search}`, base);
+  if (
+    target.origin !== base.origin ||
+    target.username !== "" ||
+    target.password !== "" ||
+    target.pathname !== incoming.pathname
+  ) {
+    return null;
+  }
+  return target;
 }
 
 export function normalizePreviewPath(pathname) {
@@ -195,7 +240,12 @@ export async function loadPreviewFacts(origin, requestUrl, authorization) {
   }
   let orderStatus = null;
   const orderId = requestUrl.searchParams.get("order_id");
-  if (orderId !== null && orderId.length > 0 && authorization !== null && authorization.length > 0) {
+  if (
+    orderId !== null &&
+    orderId.length > 0 &&
+    authorization !== null &&
+    authorization.length > 0
+  ) {
     const order = await readJson(new URL(`/api/v1/orders/${encodeURIComponent(orderId)}`, origin), {
       authorization,
     });
@@ -241,10 +291,15 @@ async function sendPreviewFile(response, file, requestUrl, origin, authorization
   response.end(renderPreviewDocument(html, facts.context));
 }
 
-const invokedDirectly = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+const invokedDirectly =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (invokedDirectly) {
   const origin = process.env.STOREFRONT_ORIGIN ?? "http://127.0.0.1:3000";
+  if (configuredOrigin(origin) === null) {
+    process.stderr.write("STOREFRONT_ORIGIN must be an http(s) URL without credentials.\n");
+    process.exit(1);
+  }
   const root = path.resolve(process.argv[2] ?? "static");
   const port = Number(process.env.PORT ?? "4173");
   const server = createServer((request, response) => {
@@ -256,8 +311,10 @@ if (invokedDirectly) {
       response.end("bad request");
       return;
     }
-    if (shouldProxy(url.pathname)) {
-      const target = new URL(`${url.pathname}${url.search}`, origin);
+    const target = previewProxyTarget(request.url ?? "/", origin);
+    if (target !== null) {
+      // Host is pinned to STOREFRONT_ORIGIN; request.url only selects a reserved path.
+      // codeql[js/request-forgery]
       fetch(target, { method: request.method, redirect: "manual" })
         .then(async (upstream) => {
           response.writeHead(upstream.status, Object.fromEntries(upstream.headers));
@@ -278,12 +335,14 @@ if (invokedDirectly) {
           response.end("not found");
           return;
         }
-        sendPreviewFile(response, file, url, origin, request.headers.authorization ?? null).catch(() => {
-          if (!response.headersSent) {
-            response.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
-            response.end("preview facts unavailable");
-          }
-        });
+        sendPreviewFile(response, file, url, origin, request.headers.authorization ?? null).catch(
+          () => {
+            if (!response.headersSent) {
+              response.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
+              response.end("preview facts unavailable");
+            }
+          },
+        );
       })
       .catch(() => {
         if (!response.headersSent) {
@@ -292,5 +351,5 @@ if (invokedDirectly) {
         }
       });
   });
-  server.listen(port);
+  server.listen(port, "127.0.0.1");
 }

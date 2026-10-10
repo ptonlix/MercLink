@@ -4,7 +4,7 @@
 
 首页、商品列表、商品页、授权外壳和支付结果页都由服务端当前组件生成，不要在这个目录里另写一份。
 
-本地预览：`STOREFRONT_ORIGIN=http://127.0.0.1:3000 node preview.mjs`
+本地预览：`STOREFRONT_ORIGIN=http://127.0.0.1:3000 node preview.mjs`。预览只监听 127.0.0.1，代理只访问这个源站的保留路径。
 
 预览会向 `STOREFRONT_ORIGIN` 读取已发布店铺和已上架商品，并填入事实槽位。这不是激活。源站公开接口不可用时返回 502。`/products` 读取 `products/index.html`，找不到返回 404，不退出进程。
 
