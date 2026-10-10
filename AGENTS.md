@@ -69,6 +69,8 @@ openspec/changes/<YYYY-MM-DD>-<短名>/
 - 新迁移只追加 SQL 文件，不改已经应用过的迁移。表结构以 PRD 第 11 节和现有 migration 为准。
 - 测试用 Vitest。领域规则直接测纯函数。外部支付宝、短信、验证码和对象存储用端口假实现，不在单元测试里打真实厂商。需要数据库的测试走现有 harness，不另起一套。
 - 页面不要求单元测试。改了 Skill、下单、支付、授权或字段变更，要补或更新对应测试。
+- 新功能合入前必须检查冒烟。`tests/smoke/coverage.test.ts` 要求 `src/app/**/route.ts` 导出的 GET、POST、PUT、PATCH、DELETE 都登记在 `tests/smoke/manifest.ts`；漏登记或多登记都算失败。这份清单只给冒烟用，不是第二份路由表，Skill 仍只对 `src/shared/api-routes.ts`。
+- 改了已有冒烟锁住的路径、受众、响应形状或旅程，必须同时改 `tests/smoke` 里的断言。新增公开发现、鉴权门或会改变已启动进程行为的能力，要补一条短冒烟，不要只靠单元测试。领域规则、压缩包和字符引用仍留在单元测试，不要为了覆盖去改 `merclink_smoke` 的公开页。
 - 注释只解释非显而易见的约束。不要复述代码在做什么。
 
 ## 完成前检查
@@ -89,13 +91,22 @@ pnpm run check
 
 它包含格式、lint、类型、测试、依赖方向和 Knip。编辑器没有报错不能代替这条命令。
 
+改了路由、公开发现、鉴权、下单、支付或店面时，还要让冒烟全部通过。设置 `SMOKE_BASE_URL`、`SMOKE_DATABASE_URL` 和 `SMOKE_DEV_STUBS=1` 后运行：
+
+```bash
+pnpm run test:smoke
+```
+
+库名必须是 `merclink_smoke`。不要把连接串写进代码、测试或这份规范。没有这个进程时，至少跑 `pnpm exec vitest run --config vitest.smoke.config.ts tests/smoke/coverage.test.ts`，并写明完整冒烟没跑。不要把没跑的冒烟说成通过。
+
 不要主动提交或推送。用户要求提交时，说明用一句祈使句，重点写为什么，而不是罗列文件。
 
 ## 不要做
 
 - 不要把业务 if 堆进 `src/app/**/route.ts`。
 - 不要让领域层为了省事直接查数据库或调用支付宝 SDK。
-- 不要新增第二份路由表、第二份商品读取逻辑或第二套限流存储。
+- 不要新增第二份路由表、第二份商品读取逻辑或第二套限流存储。冒烟清单不是路由表。
+- 不要在冒烟里上传并激活店面，也不要把领域规则测试搬进 `tests/smoke` 去覆盖公开页。
 - 不要实现 PRD 明确不做的能力：购物车、优惠券、运费、推荐、退款、商家自助注册、其他电商平台。
 - 不要在 Agent 内置页里收集支付宝密码，也不要把支付成功建立在同步回跳上。
 
