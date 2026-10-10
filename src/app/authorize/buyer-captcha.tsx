@@ -28,9 +28,24 @@ type CaptchaWindow = Window & {
 };
 
 export function BuyerCaptcha(props: { prefix: string; sceneId: string }): ReactNode {
+  useBuyerCaptcha(props.prefix, props.sceneId);
+  return (
+    <div className="captcha" data-captcha-region="cn" data-captcha-prefix={props.prefix}>
+      <div id="captcha-element" />
+      <input id="captchaVerifyParam" type="hidden" name="captchaVerifyParam" defaultValue="" />
+    </div>
+  );
+}
+
+export function BuyerCaptchaBinder(props: { prefix: string; sceneId: string }): ReactNode {
+  useBuyerCaptcha(props.prefix, props.sceneId);
+  return null;
+}
+
+function useBuyerCaptcha(prefix: string, sceneId: string): void {
   useEffect(() => {
     const target = window as CaptchaWindow;
-    target.AliyunCaptchaConfig = buyerCaptchaConfig(props.prefix);
+    target.AliyunCaptchaConfig = buyerCaptchaConfig(prefix);
     let cancelled = false;
 
     function init(): void {
@@ -38,7 +53,7 @@ export function BuyerCaptcha(props: { prefix: string; sceneId: string }): ReactN
         return;
       }
       target.initAliyunCaptcha({
-        SceneId: props.sceneId,
+        SceneId: sceneId,
         mode: "embed",
         element: "#captcha-element",
         button: "#captcha-send",
@@ -91,12 +106,5 @@ export function BuyerCaptcha(props: { prefix: string; sceneId: string }): ReactN
     return () => {
       cancelled = true;
     };
-  }, [props.prefix, props.sceneId]);
-
-  return (
-    <div className="captcha" data-captcha-region="cn" data-captcha-prefix={props.prefix}>
-      <div id="captcha-element" />
-      <input id="captchaVerifyParam" type="hidden" name="captchaVerifyParam" defaultValue="" />
-    </div>
-  );
+  }, [prefix, sceneId]);
 }

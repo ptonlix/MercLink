@@ -1,5 +1,13 @@
 import type { Sql } from "../../db/client";
 import { shouldCreateSuperAdmin } from "../../domain/identity/accounts";
+
+export {
+  adminLanding,
+  adminLoginDestination,
+  adminLoginFailurePath,
+  adminPasswordResultPath,
+  safeAdminNext,
+} from "../../domain/identity/accounts";
 import { passwordIsHashed, nextPasswordAccepted } from "../../domain/identity/password";
 import { normalizePhone } from "../../domain/identity/phone";
 import { createPublicId } from "../../shared/id";

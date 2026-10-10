@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { loadProduct, pageDiscovery } from "../../../public-discovery/model";
+import { slotProductFromPublic } from "../../../public-discovery/documents";
+import { jsonLdElement, loadProduct, pageDiscovery } from "../../../public-discovery/model";
 import { isPublicProductId } from "../../../public-discovery/negotiate";
 import { publicBaseUrl } from "../../../public-discovery/site";
-import { ProductView } from "../../../public-discovery/views";
+import { ProductTemplate } from "../../../public-discovery/views";
 
 export const dynamic = "force-dynamic";
 
@@ -42,8 +43,24 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
   }
   const model = await loadProduct(id);
   if (model.kind === "hidden") {
-    // Unpublished, deleted, and unknown ids are not indexable. Next turns this into 404 + noindex.
     notFound();
   }
-  return <ProductView model={model} />;
+  return (
+    <>
+      <span dangerouslySetInnerHTML={{ __html: jsonLdElement(model.jsonLd) }} />
+      <link rel="canonical" href={model.canonicalUrl} />
+      <link rel="alternate" type="text/markdown" href={model.markdownPath} />
+      <link rel="describedby" href="/llms.txt" />
+      <ProductTemplate
+        facts={{
+          store: null,
+          products: [],
+          product: slotProductFromPublic(model.product),
+          orderStatus: null,
+          nextCursor: null,
+          origin: publicBaseUrl(),
+        }}
+      />
+    </>
+  );
 }

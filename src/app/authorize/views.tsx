@@ -1,12 +1,32 @@
-import type { ReactNode } from "react";
-import { BuyerCaptcha } from "./buyer-captcha";
+import { createElement, type ReactNode } from "react";
+import { BuyerCaptcha, BuyerCaptchaBinder } from "./buyer-captcha";
+
+function authorizeSlot(name: string): ReactNode {
+  return createElement("merclink-slot", { name });
+}
+
+function authorizeNotice(template: boolean, notice: string | null): ReactNode {
+  if (template) {
+    return authorizeSlot("authorize.notice");
+  }
+  if (notice === null) {
+    return null;
+  }
+  return (
+    <p className="notice" role="alert" aria-live="polite">
+      {notice}
+    </p>
+  );
+}
 
 export function MerchantAuthorizeView(props: {
   notice: string | null;
   mustChangePassword: boolean;
   account?: { name: string; phone: string } | null;
+  template?: boolean;
 }): ReactNode {
   const account = props.account ?? null;
+  const template = props.template === true;
   return (
     <main className="ml-auth">
       <p className="kicker">MercLink</p>
@@ -14,11 +34,7 @@ export function MerchantAuthorizeView(props: {
         {account === null ? "店主登录" : props.mustChangePassword ? "修改初始密码" : "批准 Agent"}
       </h1>
       <p className="lede">用启动时的店主账号登录并批准 Agent。手机号和密码与管理页相同。</p>
-      {props.notice === null ? null : (
-        <p className="notice" role="alert" aria-live="polite">
-          {props.notice}
-        </p>
-      )}
+      {authorizeNotice(template, props.notice)}
       {account === null ? (
         <form action="/authorize/merchant/submit" method="post" className="stack">
           <label>
@@ -33,9 +49,16 @@ export function MerchantAuthorizeView(props: {
         </form>
       ) : (
         <>
-          <p>
-            当前登录 {account.name} {account.phone}
-          </p>
+          {template ? (
+            <p>
+              当前登录 {authorizeSlot("authorize.account.name")}{" "}
+              {authorizeSlot("authorize.account.phone")}
+            </p>
+          ) : (
+            <p>
+              当前登录 {account.name} {account.phone}
+            </p>
+          )}
           {props.mustChangePassword ? (
             <>
               <p className="hint">先修改初始密码，完成后才能批准 Agent。</p>
@@ -95,20 +118,20 @@ export function BuyerAuthorizeView(props: {
   captchaSceneId: string;
   devStubs?: boolean;
   captchaToken?: string;
+  template?: boolean;
 }): ReactNode {
   const devStubs = props.devStubs === true;
+  const template = props.template === true;
   return (
     <main className="ml-auth">
       <p className="kicker">MercLink</p>
       <h1>{buyerHeading(props.step, props.mode)}</h1>
       <p className="lede">
-        {buyerLede(props.step, props.mode, props.phone, props.pendingApproval === true)}
+        {template
+          ? buyerLedeTemplate(props.step, props.mode, props.pendingApproval === true)
+          : buyerLede(props.step, props.mode, props.phone, props.pendingApproval === true)}
       </p>
-      {props.notice === null ? null : (
-        <p className="notice" role="alert" aria-live="polite">
-          {props.notice}
-        </p>
-      )}
+      {authorizeNotice(template, props.notice)}
       <ol className="auth-steps" aria-label="登录进度">
         {["验证手机号", "核验短信", "登录账号", "确认授权"].map((label, index) => (
           <li
@@ -142,7 +165,9 @@ export function BuyerAuthorizeView(props: {
             手机号
             <input name="phone" inputMode="numeric" autoComplete="username" required />
           </label>
-          {devStubs ? (
+          {template ? (
+            authorizeSlot("authorize.captcha")
+          ) : devStubs ? (
             <input type="hidden" name="captchaVerifyParam" value={props.captchaToken ?? ""} />
           ) : (
             <BuyerCaptcha prefix={props.captchaPrefix} sceneId={props.captchaSceneId} />
@@ -160,7 +185,7 @@ export function BuyerAuthorizeView(props: {
       {props.step === "code" ? (
         <form action="/authorize/buyer/submit" method="post" className="stack">
           <input type="hidden" name="intent" value="check" />
-          <input type="hidden" name="phone" value={props.phone} />
+          <input type="hidden" name="phone" value={template ? "" : props.phone} />
           <label>
             短信验证码
             <input name="code" inputMode="numeric" autoComplete="one-time-code" required />
@@ -178,7 +203,7 @@ export function BuyerAuthorizeView(props: {
             name="intent"
             value={props.mode === "register" ? "register" : "password"}
           />
-          <input type="hidden" name="phone" value={props.phone} />
+          <input type="hidden" name="phone" value={template ? "" : props.phone} />
           <label>
             密码
             <input
@@ -218,6 +243,31 @@ function buyerHeading(step: BuyerAuthorizeStep, mode: "login" | "register"): str
   return "买家登录";
 }
 
+function buyerLedeTemplate(
+  step: BuyerAuthorizeStep,
+  mode: "login" | "register",
+  pendingApproval: boolean,
+): ReactNode {
+  const phone = authorizeSlot("authorize.phone");
+  if (step === "approve") {
+    return pendingApproval ? (
+      <>当前登录 {phone}。确认后，买家 Agent 可以为你下单并查询自己的订单。</>
+    ) : (
+      <>当前登录 {phone}。当前没有待批准的授权请求。请从 Agent 重新发起授权后再批准。</>
+    );
+  }
+  if (step === "code") {
+    return <>验证码将核验 {phone}。未注册过的手机号会在下一步创建账号。</>;
+  }
+  if (step === "password" && mode === "register") {
+    return <>首次登录会为 {phone} 创建账号。邮箱不是登录标识。</>;
+  }
+  if (step === "password") {
+    return <>{phone} 已注册。输入密码后即可批准。</>;
+  }
+  return "未注册过的手机号，首次登录即注册。邮箱不是登录标识。";
+}
+
 function buyerLede(
   step: BuyerAuthorizeStep,
   mode: "login" | "register",
@@ -240,6 +290,22 @@ function buyerLede(
     return `${phone} 已注册。输入密码后即可批准。`;
   }
   return "未注册过的手机号，首次登录即注册。邮箱不是登录标识。";
+}
+
+export function AuthorizeAppearance(props: {
+  html: string;
+  injectCaptcha: boolean;
+  captchaPrefix: string;
+  captchaSceneId: string;
+}): ReactNode {
+  return (
+    <>
+      <div dangerouslySetInnerHTML={{ __html: props.html }} />
+      {props.injectCaptcha ? (
+        <BuyerCaptchaBinder prefix={props.captchaPrefix} sceneId={props.captchaSceneId} />
+      ) : null}
+    </>
+  );
 }
 
 export function AccountKeyView(props: {
@@ -283,11 +349,15 @@ export function AccountKeyView(props: {
   );
 }
 
-export function AdminView(props: { notice: string | null }): ReactNode {
+export function AdminView(props: {
+  notice: string | null;
+  next?: string | null;
+  voluntary?: boolean;
+}): ReactNode {
   return (
     <main className="ml-auth">
       <p className="kicker">管理</p>
-      <h1>修改店主密码</h1>
+      <h1>{props.voluntary === true ? "修改店主密码" : "修改初始密码"}</h1>
       <p className="lede">
         这一套部署只有一家店。这个账号就是店主，用同一手机号和密码到商家授权页批准
         Agent。默认目录已经建好。
@@ -299,6 +369,10 @@ export function AdminView(props: { notice: string | null }): ReactNode {
       )}
       <form action="/admin/submit" method="post" className="stack">
         <input type="hidden" name="intent" value="password" />
+        {props.voluntary === true ? <input type="hidden" name="change" value="1" /> : null}
+        {props.next == null || props.next === "" ? null : (
+          <input type="hidden" name="next" value={props.next} />
+        )}
         <label>
           当前密码
           <input name="currentPassword" type="password" autoComplete="current-password" required />
@@ -313,12 +387,36 @@ export function AdminView(props: { notice: string | null }): ReactNode {
   );
 }
 
-export function AdminLoginView({ notice }: { notice: string | null }): ReactNode {
+export function AdminSettledView(props: { notice: string | null }): ReactNode {
+  return (
+    <main className="ml-auth">
+      <p className="kicker">管理</p>
+      <h1>已登录</h1>
+      <p className="lede">店主密码已经修改，这里不再要求改密。</p>
+      {props.notice === null ? null : (
+        <p className="notice" role="alert" aria-live="polite">
+          {props.notice}
+        </p>
+      )}
+      <p>
+        <a href="/admin?change=1">仍要修改密码</a>
+      </p>
+    </main>
+  );
+}
+
+export function AdminLoginView({
+  notice,
+  next,
+}: {
+  notice: string | null;
+  next?: string | null;
+}): ReactNode {
   return (
     <main className="ml-auth">
       <p className="kicker">MercLink</p>
       <h1>店主登录</h1>
-      <p className="lede">登录后可以修改店主密码。管理商品请把商家 Skill 交给 Agent。</p>
+      <p className="lede">用店主手机号登录。只有尚未修改初始密码时，才会进入改密页。</p>
       {notice === null ? null : (
         <p className="notice" role="alert">
           {notice}
@@ -326,6 +424,7 @@ export function AdminLoginView({ notice }: { notice: string | null }): ReactNode
       )}
       <form action="/admin/submit" method="post" className="stack">
         <input type="hidden" name="intent" value="login" />
+        {next == null || next === "" ? null : <input type="hidden" name="next" value={next} />}
         <label>
           手机号
           <input name="phone" inputMode="numeric" autoComplete="username" required />

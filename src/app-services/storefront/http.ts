@@ -8,6 +8,7 @@ import {
   type StorefrontResult,
 } from "../../domain/storefront/result";
 import { activateRelease, createRelease, downloadSource, rollbackRelease } from "./release";
+import { readStorefrontReset, requestStorefrontReset } from "./reset";
 
 const confirmBody = z.object({ confirm: z.literal(true) }).strict();
 
@@ -70,6 +71,46 @@ export async function postStorefrontActivate(
     return failureResponse(activated, request);
   }
   return apiSuccess({ id: activated.value.id, active: true }, { request });
+}
+
+export async function postStorefrontReset(request: Request): Promise<Response> {
+  const gate = await storefrontGate(request);
+  if (!gate.ok) {
+    return gate.response;
+  }
+  const created = await requestStorefrontReset(gate.merchantId);
+  if (!created.ok) {
+    return failureResponse(created, request);
+  }
+  return apiSuccess(
+    {
+      id: created.value.id,
+      status: created.value.status,
+      approval_url: created.value.approvalUrl,
+      executed: false,
+    },
+    { request },
+  );
+}
+
+export async function getStorefrontReset(request: Request, id: string): Promise<Response> {
+  const gate = await storefrontGate(request);
+  if (!gate.ok) {
+    return gate.response;
+  }
+  const found = await readStorefrontReset(id);
+  if (!found.ok) {
+    return failureResponse(found, request);
+  }
+  return apiSuccess(
+    {
+      id: found.value.id,
+      status: found.value.status,
+      approval_url: found.value.approvalUrl,
+      executed: found.value.status === "executed",
+    },
+    { request },
+  );
 }
 
 export async function postStorefrontRollback(request: Request): Promise<Response> {

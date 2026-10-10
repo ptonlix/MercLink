@@ -2,7 +2,12 @@ import type { PublicListQuery, PublicProduct } from "../shared/seams/public-prod
 import { publicProducts } from "../shared/seams/public-products";
 import { publicStore, type PublicStoreProfile } from "../shared/seams/public-store";
 import { isPublicProductId } from "./negotiate";
-import { availabilityText, displayPrice, majorUnitDecimal, schemaAvailability } from "./presentation";
+import {
+  availabilityText,
+  displayPrice,
+  majorUnitDecimal,
+  schemaAvailability,
+} from "./presentation";
 import {
   absoluteUrl,
   emptyProductsNote,
@@ -116,7 +121,7 @@ export type PageDiscovery = {
   robots: { index: true; follow: true };
 };
 
-export function jsonLdScript(value: unknown): string {
+function jsonLdScript(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
@@ -366,7 +371,7 @@ export function serverFactJsonLd(input: {
   products: readonly PublicProduct[];
   product: PublicProduct | null;
   origin?: string;
-}): unknown | null {
+}): unknown {
   const origin = input.origin ?? publicBaseUrl();
   const nodes: JsonLdNode[] = [];
   if (input.declaresStore && input.store !== null) {
@@ -406,7 +411,7 @@ export function jsonLdElement(value: unknown): string {
   return `<script type="application/ld+json">${jsonLdScript(value)}</script>`;
 }
 
-export function isHttpUrl(value: string): boolean {
+function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
     return url.protocol === "https:" || url.protocol === "http:";

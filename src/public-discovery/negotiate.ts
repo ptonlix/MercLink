@@ -6,7 +6,7 @@ export function isPublicProductId(id: string): boolean {
   return id.length > 0 && !id.includes(".") && !id.includes("/") && !id.includes("\\");
 }
 
-export function acceptsMarkdown(accept: string | null): boolean {
+function acceptsMarkdown(accept: string | null): boolean {
   if (accept === null || accept.trim().length === 0) {
     return false;
   }
@@ -117,11 +117,7 @@ export function describedByLlms(origin = publicBaseUrl()): string {
   return `<${absoluteUrl("/llms.txt", origin)}>; rel="describedby"`;
 }
 
-export function relationLink(
-  rel: "next" | "prev",
-  path: string,
-  origin = publicBaseUrl(),
-): string {
+export function relationLink(rel: "next" | "prev", path: string, origin = publicBaseUrl()): string {
   return `<${absoluteUrl(path, origin)}>; rel="${rel}"`;
 }
 

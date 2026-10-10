@@ -2,9 +2,14 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  adminLanding,
+  adminLoginDestination,
+  adminLoginFailurePath,
+  adminPasswordResultPath,
   merchantCanApproveAgent,
   merchantCanAuthenticate,
   provisionedMerchant,
+  safeAdminNext,
   shouldCreateStoreMerchant,
   shouldCreateSuperAdmin,
   unknownMerchantMessage,
@@ -70,6 +75,42 @@ describe("admin and merchant accounts", () => {
     expect(unknownMerchantMessage).toBe("请使用店主手机号登录。");
     expect(shouldCreateStoreMerchant(0)).toBe(true);
     expect(shouldCreateStoreMerchant(1)).toBe(false);
+  });
+
+  it("does not reopen the password page after the password changed", () => {
+    const next = "/admin/storefront-resets/srr_ocpUAFTCVrJBMijKiAUrWQ";
+    expect(safeAdminNext(next)).toBe(next);
+    expect(safeAdminNext("https://evil.example/admin/x")).toBeNull();
+    expect(safeAdminNext("//evil.example/admin/x")).toBeNull();
+    expect(safeAdminNext("/admin/../secret")).toBeNull();
+    expect(adminLoginDestination({ mustChangePassword: false, requestedNext: next })).toBe(next);
+    expect(adminLoginDestination({ mustChangePassword: false, requestedNext: "" })).toBe("/admin");
+    expect(adminLoginDestination({ mustChangePassword: true, requestedNext: next })).toBe(
+      `/admin?next=${encodeURIComponent(next)}`,
+    );
+    expect(
+      adminLanding({
+        mustChangePassword: false,
+        requestedNext: "",
+        changeRequested: false,
+      }),
+    ).toBe("settled");
+    expect(
+      adminLanding({
+        mustChangePassword: false,
+        requestedNext: next,
+        changeRequested: true,
+      }),
+    ).toBe("password");
+    expect(adminLoginFailurePath("手机号或密码不正确。", next)).toContain("next=");
+    expect(
+      adminPasswordResultPath({
+        ok: true,
+        message: "",
+        requestedNext: next,
+        changeRequested: true,
+      }),
+    ).toBe(next);
   });
 
   it("does not keep a second-store provision, disable, or password-copy path", async () => {

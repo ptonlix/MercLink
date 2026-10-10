@@ -1,5 +1,12 @@
 import type { Sql } from "../../db/client";
-import type { FileRow, PointerRow, ReleaseRow, StorefrontStore } from "./store";
+import type { FileRow, PointerRow, ReleaseRow, ResetRequestRow, StorefrontStore } from "./store";
+
+class ResetNotMarked extends Error {
+  constructor() {
+    super("reset request was not pending");
+    this.name = "ResetNotMarked";
+  }
+}
 
 type ReleaseRecord = {
   id: string;
@@ -99,6 +106,80 @@ export function createSqlStore(sql: Sql): StorefrontStore {
         WHERE release_id = ${releaseId}
       `;
       return rows.map(fileFrom);
+    },
+    async insertResetRequest(request) {
+      await sql`
+        INSERT INTO storefront_reset_requests (id, merchant_id, status, created_at, decided_at)
+        VALUES (
+          ${request.id},
+          ${request.merchantId},
+          ${request.status},
+          ${request.createdAt},
+          ${request.decidedAt}
+        )
+      `;
+    },
+    async getResetRequest(id) {
+      const rows = await sql<
+        {
+          id: string;
+          merchant_id: string;
+          status: ResetRequestRow["status"];
+          created_at: Date;
+          decided_at: Date | null;
+        }[]
+      >`
+        SELECT id, merchant_id, status, created_at, decided_at
+        FROM storefront_reset_requests
+        WHERE id = ${id}
+      `;
+      const row = rows[0];
+      if (row === undefined) {
+        return null;
+      }
+      return {
+        id: row.id,
+        merchantId: row.merchant_id,
+        status: row.status,
+        createdAt: row.created_at,
+        decidedAt: row.decided_at,
+      };
+    },
+    async listObjectKeys() {
+      const rows = await sql<{ key: string }[]>`
+        SELECT source_key AS key FROM storefront_releases
+        UNION
+        SELECT object_key AS key FROM storefront_files
+      `;
+      return rows.map((row) => row.key);
+    },
+    async commitResetExecution(id, decidedAt) {
+      try {
+        await sql.begin(async (tx) => {
+          await tx`
+            UPDATE storefront_pointer
+            SET active_release_id = NULL, previous_release_id = NULL, updated_at = now()
+            WHERE id = 'current'
+          `;
+          await tx`DELETE FROM storefront_files`;
+          await tx`DELETE FROM storefront_releases`;
+          const updated = await tx`
+            UPDATE storefront_reset_requests
+            SET status = 'executed', decided_at = ${decidedAt}
+            WHERE id = ${id} AND status = 'pending'
+          `;
+          // A missed mark must not leave the pointer cleared or the rows deleted.
+          if (updated.count !== 1) {
+            throw new ResetNotMarked();
+          }
+        });
+        return true;
+      } catch (error) {
+        if (error instanceof ResetNotMarked) {
+          return false;
+        }
+        throw error;
+      }
     },
     async findFile(releaseId, path) {
       const rows = await sql<FileRecord[]>`

@@ -1,4 +1,7 @@
 import {
+  adminLoginDestination,
+  adminLoginFailurePath,
+  adminPasswordResultPath,
   authenticateAdmin,
   changeAdminPassword,
   ensureSuperAdmin,
@@ -32,13 +35,14 @@ export async function POST(request: Request): Promise<Response> {
       ? null
       : readSession(token, runtime.env.OAUTH_SIGNING_SECRET, runtime.clock.now());
 
+  const requestedNext = formValue(form, "next");
   if (intent === "login") {
     const result = await authenticateAdmin(runtime.sql, {
       phone: formValue(form, "phone"),
       password: formValue(form, "password"),
     });
     if (!result.ok) {
-      return redirectTo(`/admin?notice=${encodeURIComponent(result.message)}`);
+      return redirectTo(adminLoginFailurePath(result.message, requestedNext));
     }
     const signed = signSession(
       {
@@ -48,7 +52,13 @@ export async function POST(request: Request): Promise<Response> {
       },
       runtime.env.OAUTH_SIGNING_SECRET,
     );
-    return redirectTo("/admin", { name: adminCookie, value: signed, path: "/admin" });
+    return redirectTo(
+      adminLoginDestination({
+        mustChangePassword: result.admin.mustChangePassword,
+        requestedNext,
+      }),
+      { name: adminCookie, value: signed, path: "/admin" },
+    );
   }
 
   if (session === null || session.kind !== "admin") {
@@ -62,7 +72,12 @@ export async function POST(request: Request): Promise<Response> {
       nextPassword: formValue(form, "nextPassword"),
     });
     return redirectTo(
-      `/admin?notice=${encodeURIComponent(result.ok ? "密码已修改。" : result.message)}`,
+      adminPasswordResultPath({
+        ok: result.ok,
+        message: result.ok ? "" : result.message,
+        requestedNext,
+        changeRequested: formValue(form, "change") === "1",
+      }),
     );
   }
   return redirectTo("/admin");

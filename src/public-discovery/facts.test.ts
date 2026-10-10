@@ -16,11 +16,7 @@ import {
   type PublicProduct,
 } from "../shared/seams/public-products";
 import { resetPublicStore } from "../shared/seams/public-store";
-import {
-  landingMarkdownResponse,
-  listMarkdownResponse,
-  productMarkdownResponse,
-} from "./markdown";
+import { landingMarkdownResponse, listMarkdownResponse, productMarkdownResponse } from "./markdown";
 import { loadProduct } from "./model";
 import { markdownRewritePath } from "./negotiate";
 import { majorUnitDecimal } from "./presentation";
@@ -130,7 +126,9 @@ describe("public fact discovery", () => {
     const html = renderToStaticMarkup(
       await ProductsPage({ searchParams: Promise.resolve({ cursor: "page-2" }) }),
     );
-    expect(html).toContain('rel="canonical" href="https://merclink.example/products?cursor=page-2"');
+    expect(html).toContain(
+      'rel="canonical" href="https://merclink.example/products?cursor=page-2"',
+    );
     expect(html).toContain('rel="prev"');
     expect(html).toContain('rel="next"');
     expect(html).not.toContain('rel="prev" href="https://merclink.example/products?cursor=page-2"');
@@ -190,11 +188,15 @@ describe("public fact discovery", () => {
     expect(await landingDirect.text()).toBe(await landingAccept.text());
 
     const suffixRewrite = await proxy(new NextRequest(`${origin}/products/prd_md.md`));
-    expect(suffixRewrite.headers.get("x-middleware-rewrite")).toContain("/markdown/products/prd_md");
+    expect(suffixRewrite.headers.get("x-middleware-rewrite")).toContain(
+      "/markdown/products/prd_md",
+    );
     const acceptRewrite = await proxy(
       new NextRequest(`${origin}/products/prd_md`, { headers: { accept: "text/markdown" } }),
     );
-    expect(acceptRewrite.headers.get("x-middleware-rewrite")).toContain("/markdown/products/prd_md");
+    expect(acceptRewrite.headers.get("x-middleware-rewrite")).toContain(
+      "/markdown/products/prd_md",
+    );
     const listRewrite = await proxy(new NextRequest(`${origin}/products.md`));
     expect(listRewrite.headers.get("x-middleware-rewrite")).toContain("/markdown/list");
     expect(listRewrite.headers.get("x-middleware-rewrite")).not.toContain("prd_");
@@ -228,7 +230,9 @@ describe("public fact discovery", () => {
 
     const entries = await sitemap();
     expect(
-      entries.some((entry) => /\/index\.md$|\/products\.md$|\/products\/[^/]+\.md$/.test(entry.url)),
+      entries.some((entry) =>
+        /\/index\.md$|\/products\.md$|\/products\/[^/]+\.md$/.test(entry.url),
+      ),
     ).toBe(false);
   });
 });

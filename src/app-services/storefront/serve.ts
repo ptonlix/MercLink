@@ -73,46 +73,6 @@ export async function shouldRewriteToRelease(pathname: string): Promise<boolean>
   return (await releaseGate()) !== "builtin";
 }
 
-export async function storefrontAuthorizeTarget(
-  kind: "buyer" | "merchant",
-): Promise<string | null> {
-  const runtime = storefrontRuntime();
-  if (runtime === undefined) {
-    return null;
-  }
-  const pointer = await runtime.store.readPointer();
-  if (pointer.activeId === null) {
-    return null;
-  }
-  const release = await runtime.store.getRelease(pointer.activeId);
-  if (release === null) {
-    return null;
-  }
-  const declared = kind === "buyer" ? release.authorizeBuyer : release.authorizeMerchant;
-  if (declared === null) {
-    return null;
-  }
-  const file = await runtime.store.findFile(pointer.activeId, declared);
-  if (file === null) {
-    return null;
-  }
-  return `/${declared}`;
-}
-
-export function authorizeLocation(
-  target: string,
-  params: Readonly<Record<string, string | string[] | undefined>>,
-): string {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (typeof value === "string" && value.length > 0) {
-      query.set(key, value);
-    }
-  }
-  const suffix = query.size === 0 ? "" : `?${query.toString()}`;
-  return `${target}${suffix}`;
-}
-
 export async function serveStorefront(
   pathname: string,
   requestUrl: string,
@@ -298,6 +258,7 @@ async function loadFacts(request: Request, onlyProduct?: PublicProduct): Promise
       product: onlyProduct === undefined ? null : slotProduct(onlyProduct),
       orderStatus,
       nextCursor: page.nextCursor,
+      origin: url.origin,
     },
     store,
     products: onlyProduct === undefined ? page.items : [],
@@ -341,10 +302,14 @@ function slotProduct(product: PublicProduct): SlotProduct {
   const stocks = product.variants.map((variant) => variant.stock).filter((stock) => stock !== null);
   return {
     id: product.id,
+    catalogId: product.catalogId,
     name: product.title,
     cover: product.cover,
     fields: product.fields,
     variants: product.variants.map((variant) => ({
+      id: variant.id,
+      sku: variant.sku,
+      currency: variant.currency,
       optionValues: variant.optionValues,
       stock: variant.stock,
       availability: variant.availability,
@@ -353,6 +318,7 @@ function slotProduct(product: PublicProduct): SlotProduct {
     stock: stocks.length === 0 ? null : Math.min(...stocks),
     availability: product.offer.availability,
     priceMinor: product.offer.price,
+    currency: product.offer.currency,
   };
 }
 

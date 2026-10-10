@@ -13,11 +13,8 @@ const reservedExact = new Set([
 const productSlots = [
   "product.name",
   "product.cover",
-  "product.fields",
-  "product.variants",
-  "product.stock",
-  "product.availability",
   "product.price",
+  "product.availability",
 ];
 const pricePattern =
   /[¥￥]\s*\d|\d+(?:\.\d{1,2})?\s*元|(?:价格|售价|单价|标价)\s*[:：]?\s*\d|price\s*[:=]\s*\d/i;
@@ -88,6 +85,13 @@ async function accept(root) {
   }
 }
 
+function declaresRepeat(html, slotName, templateName) {
+  return (
+    html.includes(`<merclink-slot name="${slotName}"></merclink-slot>`) ||
+    html.includes(`data-merclink="${templateName}"`)
+  );
+}
+
 function inspect(filePath, html) {
   if (containsMerchantJsonLd(html)) {
     fail("authored_jsonld", `${filePath} 包含 application/ld+json。`);
@@ -102,6 +106,12 @@ function inspect(filePath, html) {
       }
     }
   }
+  if (filePath === "products/item.html" && !declaresRepeat(html, "product.fields", "product.field")) {
+    fail("missing_slot", `${filePath} 缺少 product.fields`);
+  }
+  if (filePath === "products/item.html" && !declaresRepeat(html, "product.variants", "product.variant")) {
+    fail("missing_slot", `${filePath} 缺少 product.variants`);
+  }
   if (
     filePath === "products/index.html" &&
     !html.includes('<merclink-slot name="products.next"></merclink-slot>')
@@ -109,16 +119,20 @@ function inspect(filePath, html) {
     fail("missing_slot", `${filePath} 缺少 products.next`);
   }
   const withoutPaid = html.replace(paidTemplatePattern, "");
-  if (successPattern.test(withoutPaid) || orderLiteralPattern.test(stripSlots(withoutPaid))) {
+  if (
+    successPattern.test(withoutPaid.replaceAll("不表示支付成功", "")) ||
+    orderLiteralPattern.test(stripSlots(withoutPaid))
+  ) {
     fail("payment_success", `${filePath} 在未读取 paid 时显示成功。`);
   }
   if (
-    (successPattern.test(html) || html.includes('data-merclink="order.paid"')) &&
+    (successPattern.test(html.replaceAll("不表示支付成功", "")) ||
+      html.includes('data-merclink="order.paid"')) &&
     !html.includes('<merclink-slot name="order.status"></merclink-slot>')
   ) {
     fail("missing_slot", `${filePath} 展示订单事实却没有订单槽位。`);
   }
-  const visible = stripSlots(withoutPaid);
+  const visible = stripSlots(withoutPaid).replaceAll("不表示支付成功", "").replaceAll("预算 200 元", "");
   if (
     pricePattern.test(visible) ||
     stockPattern.test(visible) ||

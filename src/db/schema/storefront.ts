@@ -22,6 +22,14 @@ export const storefrontFiles = pgTable(
   (table) => [primaryKey({ columns: [table.releaseId, table.path] })],
 );
 
+export const storefrontResetRequests = pgTable("storefront_reset_requests", {
+  id: text("id").primaryKey(),
+  merchantId: text("merchant_id").notNull(),
+  status: text("status").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+});
+
 export const storefrontPointer = pgTable("storefront_pointer", {
   id: text("id").primaryKey(),
   activeReleaseId: text("active_release_id"),

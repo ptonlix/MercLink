@@ -1,12 +1,19 @@
 import type { PublicProduct } from "../shared/seams/public-products";
-import { loadLanding, loadProduct, loadProductList, type LandingModel, type ProductListModel, type VisibleProductModel } from "./model";
+import {
+  loadLanding,
+  loadProduct,
+  loadProductList,
+  type LandingModel,
+  type ProductListModel,
+  type VisibleProductModel,
+} from "./model";
 import { canonicalLink, isPublicProductId } from "./negotiate";
 import { availabilityText, displayPrice, optionText, variantStock } from "./presentation";
 import { emptyProductsNote } from "./site";
 
-export const hiddenProductMarkdownBody = "没有找到商品。\n";
+const hiddenProductMarkdownBody = "没有找到商品。\n";
 
-export function renderLandingMarkdown(model: LandingModel): string {
+function renderLandingMarkdown(model: LandingModel): string {
   const lines = [`# ${oneLine(model.title)}`, "", model.description, ""];
   appendStoreFacts(lines, model.store);
   lines.push("## 已上架商品", "");
@@ -14,7 +21,7 @@ export function renderLandingMarkdown(model: LandingModel): string {
   return lines.join("\n");
 }
 
-export function renderListMarkdown(model: ProductListModel): string {
+function renderListMarkdown(model: ProductListModel): string {
   const lines = [`# ${model.title}`, "", model.description, ""];
   appendProducts(lines, model.products);
   if (model.nextCursor !== null) {
@@ -23,7 +30,7 @@ export function renderListMarkdown(model: ProductListModel): string {
   return lines.join("\n");
 }
 
-export function renderProductMarkdown(model: VisibleProductModel): string {
+function renderProductMarkdown(model: VisibleProductModel): string {
   const product = model.product;
   const lines = [
     `# ${oneLine(product.title)}`,
@@ -41,7 +48,14 @@ export function renderProductMarkdown(model: VisibleProductModel): string {
     lines.push("没有公开字段。", "");
   } else {
     for (const [key, value] of fields) {
-      const shown = value === null ? "未填写" : typeof value === "boolean" ? (value ? "是" : "否") : String(value);
+      const shown =
+        value === null
+          ? "未填写"
+          : typeof value === "boolean"
+            ? value
+              ? "是"
+              : "否"
+            : String(value);
       lines.push(`- ${key}: ${shown}`);
     }
     lines.push("");

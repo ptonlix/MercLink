@@ -90,6 +90,8 @@ export const apiRoutes = [
     audiences: storefront,
   },
   { method: "POST", path: "/api/v1/storefront/rollback", audiences: storefront },
+  { method: "POST", path: "/api/v1/storefront/reset", audiences: storefront },
+  { method: "GET", path: "/api/v1/storefront/reset/{id}", audiences: storefront },
 ] as const satisfies readonly ApiRoute[];
 
 export function routesFor(audience: ApiAudience): readonly ApiRoute[] {

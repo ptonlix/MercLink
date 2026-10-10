@@ -1,15 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import {
-  authorizeLocation,
-  storefrontAuthorizeTarget,
-} from "../../../app-services/storefront/serve";
+import { loadAuthorizeAppearance } from "../../../app-services/storefront/authorize";
 import { findBuyerById, safeBuyerPhone } from "../../../app-services/identity/buyers";
 import { appRuntime } from "../../../app-services/identity/runtime";
 import { accountCookie, readSession } from "../../../app-services/identity/session";
 import { devStubsEnabled } from "../../../shared/dev-stubs";
-import { BuyerAuthorizeView, type BuyerAuthorizeStep } from "../views";
+import { buyerCaptchaMarkup } from "../captcha-markup";
+import { AuthorizeAppearance, BuyerAuthorizeView, type BuyerAuthorizeStep } from "../views";
 import "../authorize.css";
 
 export const dynamic = "force-dynamic";
@@ -21,10 +18,6 @@ export default async function BuyerAuthorizePage({
   searchParams: Promise<{ notice?: string; mode?: string; step?: string; phone?: string }>;
 }): Promise<ReactNode> {
   const params = await searchParams;
-  const target = await storefrontAuthorizeTarget("buyer");
-  if (target !== null) {
-    redirect(authorizeLocation(target, params));
-  }
   const runtime = appRuntime();
   const { cookies } = await import("next/headers");
   const jar = await cookies();
@@ -39,17 +32,42 @@ export default async function BuyerAuthorizePage({
       : null;
   const queryPhone = safeBuyerPhone(params.phone);
   const phone = buyer === null ? queryPhone : buyer.phone;
+  const step = buyer === null ? requestedStep(params.step, queryPhone) : "approve";
+  const mode = params.mode === "login" ? "login" : "register";
+  const devStubs = devStubsEnabled(process.env);
+  const captchaToken = randomUUID();
+  const appearance = await loadAuthorizeAppearance({
+    kind: "buyer",
+    step,
+    notice: params.notice ?? null,
+    phone,
+    mode,
+    pendingApproval: jar.get("_interaction") !== undefined,
+    devStubs,
+    captchaToken,
+    captchaMarkup: buyerCaptchaMarkup(runtime.env.ALIYUN_CAPTCHA_PREFIX),
+  });
+  if (appearance !== null) {
+    return (
+      <AuthorizeAppearance
+        html={appearance.html}
+        injectCaptcha={appearance.injectCaptcha}
+        captchaPrefix={runtime.env.ALIYUN_CAPTCHA_PREFIX}
+        captchaSceneId={runtime.env.ALIYUN_CAPTCHA_SCENE_ID}
+      />
+    );
+  }
   return (
     <BuyerAuthorizeView
       notice={params.notice ?? null}
-      step={buyer === null ? requestedStep(params.step, queryPhone) : "approve"}
-      mode={params.mode === "login" ? "login" : "register"}
+      step={step}
+      mode={mode}
       phone={phone}
       pendingApproval={jar.get("_interaction") !== undefined}
       captchaPrefix={runtime.env.ALIYUN_CAPTCHA_PREFIX}
       captchaSceneId={runtime.env.ALIYUN_CAPTCHA_SCENE_ID}
-      devStubs={devStubsEnabled(process.env)}
-      captchaToken={randomUUID()}
+      devStubs={devStubs}
+      captchaToken={captchaToken}
     />
   );
 }

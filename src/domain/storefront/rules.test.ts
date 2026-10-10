@@ -158,6 +158,32 @@ describe("storefront rules", () => {
     expect(first).not.toContain("cursor=");
     expect(second).toContain('href="/products?cursor=page-2"');
     expect(majorUnitPrice(800)).toBe("¥8.00");
+    const shaped = renderDocument(
+      `<template data-merclink="product.field"><span><merclink-slot name="field.key"></merclink-slot>:<merclink-slot name="field.value"></merclink-slot></span></template><template data-merclink="product.variant"><i><merclink-slot name="variant.id"></merclink-slot></i></template>`,
+      {
+        store: null,
+        products: [],
+        product: {
+          ...slotProduct(800, "新介绍"),
+          fields: { origin: "合浦" },
+          variants: [
+            {
+              id: "var_1",
+              optionValues: {},
+              stock: 1,
+              availability: "in_stock",
+              priceMinor: 800,
+            },
+          ],
+        },
+        orderStatus: null,
+        nextCursor: null,
+      },
+    );
+    expect(shaped).toContain("origin:合浦");
+    expect(shaped).toContain("var_1");
+    expect(shaped).not.toContain("<dl");
+    expect(shaped).not.toContain("规格 ID");
   });
 
   it("rejects encoded JSON-LD types and strips unclosed scripts without touching prose", () => {

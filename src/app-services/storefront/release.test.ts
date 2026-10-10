@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, cp, writeFile, rm, readFile } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { crc32, deflateRawSync } from "node:zlib";
@@ -30,14 +30,10 @@ import {
   postStorefrontRollback,
 } from "./http";
 import { bindStorefrontRuntime, resetStorefrontRuntime } from "./runtime";
-import {
-  serveStorefront,
-  shouldRewriteToRelease,
-  storefrontAuthorizeTarget,
-  visibleSitemapEntries,
-} from "./serve";
+import { loadAuthorizeAppearance } from "./authorize";
+import { serveStorefront, shouldRewriteToRelease, visibleSitemapEntries } from "./serve";
 import { readStorefrontOrderStatus } from "./order-status";
-import { packShippedSource } from "./source";
+import { generatedStarterEntries, packShippedSource } from "./source";
 import { createMemoryStore } from "./store";
 import { unzip, zipStore } from "./zip";
 
@@ -387,9 +383,9 @@ describe("storefront release", () => {
     const release = store.releases[0];
     if (release !== undefined) {
       release.authorizeBuyer = "account/missing.html";
-      expect(await storefrontAuthorizeTarget("buyer")).toBeNull();
+      expect(await loadAuthorizeAppearance({ kind: "buyer", step: "phone" })).toBeNull();
       release.authorizeBuyer = "pay/result.html";
-      expect(await storefrontAuthorizeTarget("buyer")).toBe("/pay/result.html");
+      expect(await loadAuthorizeAppearance({ kind: "buyer", step: "phone" })).toBeNull();
       release.authorizeBuyer = null;
     }
     store.files.splice(
@@ -406,7 +402,7 @@ describe("storefront release", () => {
     ]);
     expect(listed.map((entry) => entry.url)).not.toContain(`${origin}/products/prd_1`);
     expect(listed.map((entry) => entry.url)).toContain(`${origin}/`);
-    expect(await storefrontAuthorizeTarget("buyer")).toBeNull();
+    expect(await loadAuthorizeAppearance({ kind: "buyer", step: "phone" })).toBeNull();
   });
 
   it("strips merchant JSON-LD, injects server facts, and rejects activation", async () => {
@@ -658,7 +654,8 @@ describe("storefront release", () => {
 
 describe("storefront acceptance command", () => {
   it("fails reserved paths, alipay passwords, unpaid success, and hardcoded or slotless facts", async () => {
-    const good = await runAccept(path.join(process.cwd(), "storefront/static"));
+    const good = await runAccept(await starterDirectory());
+    expect(good.stderr).toBe("");
     expect(good.code).toBe(0);
     const shipped = unzip(await packShippedSource());
     expect(shipped.ok).toBe(true);
@@ -830,9 +827,19 @@ describe("storefront pointer and upload guards", () => {
   });
 });
 
-async function mutated(file: string, body: string): Promise<string> {
+async function starterDirectory(): Promise<string> {
   const directory = await mkdtemp(path.join(tmpdir(), "storefront-"));
-  await cp(path.join(process.cwd(), "storefront/static"), directory, { recursive: true });
+  for (const entry of generatedStarterEntries()) {
+    const relative = entry.name.replace(/^static\//, "");
+    const target = path.join(directory, relative);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, entry.bytes);
+  }
+  return directory;
+}
+
+async function mutated(file: string, body: string): Promise<string> {
+  const directory = await starterDirectory();
   const target = path.join(directory, file);
   const { mkdir } = await import("node:fs/promises");
   await mkdir(path.dirname(target), { recursive: true });

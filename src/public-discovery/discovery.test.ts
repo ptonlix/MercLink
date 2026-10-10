@@ -175,13 +175,16 @@ describe("discovery files", () => {
     expect(body).not.toContain("不该留下的地址");
 
     publicProducts.register({
-      list: () => Promise.resolve({ items: [product("prd_map", "地图商品")], nextCursor: "page-2" }),
+      list: () =>
+        Promise.resolve({ items: [product("prd_map", "地图商品")], nextCursor: "page-2" }),
       get: () => Promise.resolve({ ok: false, error: "not_found", message: "没有找到。" }),
     });
     const entries = await sitemap();
-    expect(entries.some((entry) => /\/index\.md$|\/products\.md$|\/products\/[^/]+\.md$/.test(entry.url))).toBe(
-      false,
-    );
+    expect(
+      entries.some((entry) =>
+        /\/index\.md$|\/products\.md$|\/products\/[^/]+\.md$/.test(entry.url),
+      ),
+    ).toBe(false);
     expect(entries.some((entry) => entry.url.includes("cursor"))).toBe(false);
     expect(entries.some((entry) => "lastmod" in entry)).toBe(false);
     expect(entries.map((entry) => entry.url)).toContain(`${origin}/products/prd_map`);

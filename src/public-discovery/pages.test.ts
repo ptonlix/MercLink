@@ -347,8 +347,12 @@ describe("public pages", () => {
     );
     expect((visible.match(/<ol/g) ?? []).length).toBe(2);
     expect((visible.match(/<li>/g) ?? []).length).toBe(8);
-    expect(visible).toContain(`${origin}/skill.md`);
-    expect(visible).toContain(`${origin}/merchant/skill.md`);
+    expect(visible).toContain('href="/skill.md"');
+    expect(visible).toContain('href="/merchant/skill.md"');
+    expect(visible).toContain('href="/storefront/skill.md"');
+    expect(visible).toContain("我是买家，想购买");
+    expect(visible).toContain("我是店主，想上架");
+    expect(visible).not.toContain(`${origin}/skill.md`);
     expect(visible).not.toContain("prd_demo");
   });
 

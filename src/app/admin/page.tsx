@@ -1,8 +1,14 @@
 import type { ReactNode } from "react";
-import { ensureSuperAdmin, findAdmin } from "../../app-services/identity/admin";
+import { redirect } from "next/navigation";
+import {
+  adminLanding,
+  ensureSuperAdmin,
+  findAdmin,
+  safeAdminNext,
+} from "../../app-services/identity/admin";
 import { appRuntime } from "../../app-services/identity/runtime";
 import { readSession, adminCookie } from "../../app-services/identity/session";
-import { AdminLoginView, AdminView } from "../authorize/views";
+import { AdminLoginView, AdminSettledView, AdminView } from "../authorize/views";
 import "./admin.css";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +17,7 @@ export const metadata = { robots: { index: false, follow: false }, title: "ÁÆ°Áê
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ notice?: string }>;
+  searchParams: Promise<{ notice?: string; next?: string; change?: string }>;
 }): Promise<ReactNode> {
   const params = await searchParams;
   const runtime = appRuntime();
@@ -25,10 +31,24 @@ export default async function AdminPage({
       ? null
       : readSession(header, runtime.env.OAUTH_SIGNING_SECRET, runtime.clock.now());
   const admin = session?.kind === "admin" ? await findAdmin(runtime.sql) : null;
+  const next = safeAdminNext(params.next ?? "");
   if (admin === null || session === null || session.kind !== "admin") {
-    return <AdminLoginView notice={params.notice ?? null} />;
+    return <AdminLoginView notice={params.notice ?? null} next={next} />;
   }
-  return <AdminView notice={params.notice ?? null} />;
+  const landing = adminLanding({
+    mustChangePassword: admin.mustChangePassword,
+    requestedNext: params.next ?? "",
+    changeRequested: params.change === "1",
+  });
+  if (typeof landing === "object") {
+    redirect(landing.returnTo);
+  }
+  if (landing === "settled") {
+    return <AdminSettledView notice={params.notice ?? null} />;
+  }
+  return (
+    <AdminView notice={params.notice ?? null} next={next} voluntary={!admin.mustChangePassword} />
+  );
 }
 
 async function headerCookie(): Promise<string | undefined> {
