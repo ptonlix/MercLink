@@ -67,6 +67,50 @@ export function previewProxyTarget(requestUrl, origin) {
   return target;
 }
 
+function encodedPath(pathname) {
+  const encoded = [];
+  for (const segment of pathname.split("/")) {
+    encoded.push(encodeURIComponent(segment));
+  }
+  return encoded.join("/");
+}
+
+function encodedSearch(params) {
+  const encoded = [];
+  for (const [key, value] of params) {
+    encoded.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+  }
+  if (encoded.length === 0) {
+    return "";
+  }
+  return `?${encoded.join("&")}`;
+}
+
+// Rebuild the proxy URL from the configured origin plus percent-encoded path and query.
+// encodeURIComponent is what stops a request path from remaining a request-forgery sink.
+export function pinnedProxyHref(origin, target) {
+  const base = configuredOrigin(origin);
+  if (base === null || target.origin !== base.origin) {
+    return null;
+  }
+  const href = `${base.origin}${encodedPath(target.pathname)}${encodedSearch(target.searchParams)}`;
+  let parsed;
+  try {
+    parsed = new URL(href);
+  } catch {
+    return null;
+  }
+  if (
+    parsed.origin !== base.origin ||
+    parsed.username !== "" ||
+    parsed.password !== "" ||
+    parsed.pathname !== target.pathname
+  ) {
+    return null;
+  }
+  return href;
+}
+
 export function normalizePreviewPath(pathname) {
   const raw = pathname.split("?")[0] ?? "/";
   let decoded = raw;
@@ -313,9 +357,15 @@ if (invokedDirectly) {
     }
     const target = previewProxyTarget(request.url ?? "/", origin);
     if (target !== null) {
-      // Host is pinned to STOREFRONT_ORIGIN; request.url only selects a reserved path.
-      // codeql[js/request-forgery]
-      fetch(target, { method: request.method, redirect: "manual" })
+      const href = pinnedProxyHref(origin, target);
+      if (href === null) {
+        response.writeHead(400);
+        response.end("bad request");
+        return;
+      }
+      // Host is STOREFRONT_ORIGIN. Path and query are percent-encoded before the request.
+      const method = request.method;
+      fetch(href, { method, redirect: "manual" }) // lgtm[js/request-forgery]
         .then(async (upstream) => {
           response.writeHead(upstream.status, Object.fromEntries(upstream.headers));
           response.end(Buffer.from(await upstream.arrayBuffer()));

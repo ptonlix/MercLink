@@ -6,7 +6,6 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import { renderDocument, type SlotContext } from "../../domain/storefront/slots";
-import { previewProxyTarget } from "../../../storefront/preview.mjs";
 
 const previewScript = path.join(process.cwd(), "storefront", "preview.mjs");
 const children: { kill: (signal?: NodeJS.Signals) => boolean }[] = [];
@@ -22,29 +21,37 @@ afterEach(async () => {
 describe("preview proxy target", () => {
   const origin = "http://127.0.0.1:3000";
 
-  it("keeps a reserved path on the configured origin", () => {
-    expect(previewProxyTarget("/api/v1/products?limit=20", origin)?.href).toBe(
-      "http://127.0.0.1:3000/api/v1/products?limit=20",
-    );
+  it("keeps a reserved path on the configured origin", async () => {
+    await expect(proxyTarget("/api/v1/products?limit=20", origin)).resolves.toEqual({
+      href: "http://127.0.0.1:3000/api/v1/products?limit=20",
+      pinned: "http://127.0.0.1:3000/api/v1/products?limit=20",
+    });
   });
 
-  it("does not follow a request that names another host", () => {
-    expect(previewProxyTarget("http://169.254.169.254/latest/meta-data/", origin)).toBeNull();
-    expect(previewProxyTarget("//evil.example/api/v1", origin)?.href).toBe(
-      "http://127.0.0.1:3000/api/v1",
-    );
-    expect(previewProxyTarget("http://127.0.0.1:3000@evil.example/media/img", origin)?.href).toBe(
-      "http://127.0.0.1:3000/media/img",
-    );
-    expect(previewProxyTarget("\\\\evil.example\\api", origin)?.href).toBe(
-      "http://127.0.0.1:3000/api",
-    );
+  it("does not follow a request that names another host", async () => {
+    await expect(
+      proxyTarget("http://169.254.169.254/latest/meta-data/", origin),
+    ).resolves.toBeNull();
+    await expect(proxyTarget("//evil.example/api/v1", origin)).resolves.toEqual({
+      href: "http://127.0.0.1:3000/api/v1",
+      pinned: "http://127.0.0.1:3000/api/v1",
+    });
+    await expect(
+      proxyTarget("http://127.0.0.1:3000@evil.example/media/img", origin),
+    ).resolves.toEqual({
+      href: "http://127.0.0.1:3000/media/img",
+      pinned: "http://127.0.0.1:3000/media/img",
+    });
+    await expect(proxyTarget("\\\\evil.example\\api", origin)).resolves.toEqual({
+      href: "http://127.0.0.1:3000/api",
+      pinned: "http://127.0.0.1:3000/api",
+    });
   });
 
-  it("rejects a non-http origin and a path outside the reserved set", () => {
-    expect(previewProxyTarget("/api/v1", "file:///tmp")).toBeNull();
-    expect(previewProxyTarget("/api/v1", "http://user:pass@127.0.0.1:3000")).toBeNull();
-    expect(previewProxyTarget("/products/prd_1", origin)).toBeNull();
+  it("rejects a non-http origin and a path outside the reserved set", async () => {
+    await expect(proxyTarget("/api/v1", "file:///tmp")).resolves.toBeNull();
+    await expect(proxyTarget("/api/v1", "http://user:pass@127.0.0.1:3000")).resolves.toBeNull();
+    await expect(proxyTarget("/products/prd_1", origin)).resolves.toBeNull();
   });
 });
 
@@ -191,6 +198,9 @@ describe("storefront preview files", () => {
     });
     children.push(child);
     await waitForOk(port);
+    const proxied = await textResponse(port, "/api/v1/products?limit=20");
+    expect(proxied.status).toBe(200);
+    expect(proxied.body).toContain("吊坠");
     const home = await textResponse(port, "/");
     expect(home.status).toBe(200);
     expect(home.body).toContain("北海南珠");
@@ -249,6 +259,31 @@ process.stdout.write(renderPreviewDocument(${JSON.stringify(html)}, ${JSON.strin
 });
 
 const execFileAsync = promisify(execFile);
+
+async function proxyTarget(
+  requestUrl: string,
+  origin: string,
+): Promise<{ href: string; pinned: string | null } | null> {
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `import { pinnedProxyHref, previewProxyTarget } from './storefront/preview.mjs';
+const target = previewProxyTarget(${JSON.stringify(requestUrl)}, ${JSON.stringify(origin)});
+process.stdout.write(
+  target === null
+    ? "null"
+    : JSON.stringify({ href: target.href, pinned: pinnedProxyHref(${JSON.stringify(origin)}, target) }),
+);`,
+    ],
+    { cwd: process.cwd() },
+  );
+  if (stdout === "null") {
+    return null;
+  }
+  return JSON.parse(stdout) as { href: string; pinned: string | null };
+}
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
