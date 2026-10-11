@@ -341,6 +341,9 @@ describe("skill paths match the route table", () => {
     expect(merchant).toContain("本文档不讲页面上传、激活或回滚");
     expect(merchant).not.toContain("/api/v1/storefront/");
     expect(buyer).not.toContain("/api/v1/storefront/");
+    expect(buyer).toContain("只有缝提供显示名时");
+    expect(buyer).toContain("含义：");
+    expect(buyer).toContain("不要把显示名当成字段键");
 
     const storefrontOmitted = "/api/v1/storefront/source";
     const storefrontWithoutPath = storefront.split(storefrontOmitted).join("REMOVED");

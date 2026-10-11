@@ -1,6 +1,6 @@
 import { minorUnits } from "../../shared/money";
 import type { PublicProduct, PublicProductPage } from "../../shared/seams/public-products";
-import { publicFields } from "../../domain/catalog/attributes";
+import { publicFieldLabels, publicFields } from "../../domain/catalog/attributes";
 import {
   encodeCursor,
   likePattern,
@@ -268,6 +268,7 @@ async function toPublic(db: Db, row: PublicQueryRow): Promise<PublicProduct | un
       availability: offer.availability,
     },
     fields: publicFields(fields, readFields(row.fields)),
+    fieldLabels: publicFieldLabels(fields, readFields(row.fields)),
     variants: sellable.map((variant) => ({
       id: variant.id,
       price: minorUnits(variant.price),

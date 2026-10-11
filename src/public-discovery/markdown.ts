@@ -39,6 +39,9 @@ function renderProductMarkdown(model: VisibleProductModel): string {
     "",
     `商品 ID：${product.id}`,
     `目录 ID：${product.catalogId}`,
+    `价格整数分：${String(product.offer.price)}`,
+    `可售状态：${product.offer.availability}`,
+    `货币：${product.offer.currency}`,
     "",
     "## 公开字段",
     "",
@@ -56,7 +59,11 @@ function renderProductMarkdown(model: VisibleProductModel): string {
               ? "是"
               : "否"
             : String(value);
-      lines.push(`- ${key}: ${shown}`);
+      lines.push(`- ${key}: ${oneLine(shown)}`);
+      const label = product.fieldLabels?.[key];
+      if (label !== undefined && label.length > 0) {
+        lines.push(`  - 含义：${oneLine(label)}`);
+      }
     }
     lines.push("");
   }
@@ -67,7 +74,7 @@ function renderProductMarkdown(model: VisibleProductModel): string {
     for (const variant of product.variants) {
       const sku = variant.sku === null || variant.sku.length === 0 ? "" : `，SKU ${variant.sku}`;
       lines.push(
-        `- ${optionText(variant.optionValues)}${sku}，${displayPrice(variant.price, variant.currency)}，${availabilityText(variant.availability)}，${variantStock(variant)}`,
+        `- ${optionText(variant.optionValues)}${sku}，${displayPrice(variant.price, variant.currency)}，${availabilityText(variant.availability)}，${variantStock(variant)}，规格 ID：${variant.id}`,
       );
     }
     lines.push("");

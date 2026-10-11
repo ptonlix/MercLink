@@ -211,7 +211,12 @@ describe("public fact discovery", () => {
     const body = await (await productMarkdownResponse(product.id)).text();
     expect(body).toContain("¥8.00");
     expect(body).toContain("缺货");
-    expect(body).not.toContain("800");
+    expect(body).toContain("价格整数分：800");
+    expect(body).toContain("可售状态：out_of_stock");
+    expect(body).toContain("货币：CNY");
+    expect(body).toContain(`商品 ID：${product.id}`);
+    expect(body).toContain(`目录 ID：${product.catalogId}`);
+    expect(body).toContain("规格 ID：var_eight");
     expect(body).not.toContain("订单");
     expect(body).not.toContain("Bearer");
     expect(body).not.toContain("paid");
@@ -226,6 +231,18 @@ describe("public fact discovery", () => {
     expect(hidden.headers.get("x-robots-tag")).toContain("noindex");
     expect(hiddenBody).not.toContain("¥");
     expect(hiddenBody).not.toContain("800");
+    const labeled = pricedProduct("prd_labeled", "有产地");
+    labeled.fields = { origin: "北海合浦", note: "无" };
+    labeled.fieldLabels = { origin: "产地" };
+    register([labeled]);
+    const labeledBody = await (
+      await productMarkdownResponse("prd_labeled")
+    ).text();
+    expect(labeledBody).toContain("- origin: 北海合浦");
+    expect(labeledBody).toContain("  - 含义：产地");
+    expect(labeledBody).toContain("- note: 无");
+    expect(labeledBody).not.toContain("含义：无");
+
     expect(existsSync("src/app/llms-full.txt")).toBe(false);
 
     const entries = await sitemap();

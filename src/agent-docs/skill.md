@@ -26,7 +26,7 @@ Do not ask the user for a password, SMS code, or API key. Use the device authori
 
 ## 主流程
 
-1. 未登录调用 `GET /api/v1/products` 找到已上架商品。需要字段含义时，再读 `GET /api/v1/catalogs/{id}/schema`。
+1. 未登录调用 `GET /api/v1/products` 找到已上架商品。`/products/{id}.md` 与商品页是同一份事实：公开字段仍用键。只有缝提供显示名时，下一行才用 `含义：` 注明；没有显示名不是缺键。筛选和写入仍用键，不要把显示名当成字段键。字段定义仍读 `GET /api/v1/catalogs/{id}/schema`。
 2. 用 `GET /api/v1/products/{id}` 确认可售规格。有多条规格时，让用户选定一条，记下 `variants[].id`。
 3. 需要下单时，用设备码让用户在浏览器注册或批准。Agent 不收集验证码或密码。
 4. 第一次下单就带上正确的 `payment_channel`。手机付款人，包括能做 HTTPS 跳转的 Agent 内置页，传 `mobile`。电脑付款人可以不传，缺省渠道是电脑收银台。买家不选择支付实现。支付实现由服务端启动配置固定。`payment_channel` 只选择电脑或手机。
@@ -77,7 +77,7 @@ GET /api/v1/orders/{id}
 
 `GET /api/v1/products` 查询已上架商品，不需要登录。可用 `q`、`limit`、`cursor`、`catalog_id`，以及最低价、最高价。最低价和最高价也是整数分。自定义字段过滤必须同时带 `catalog_id`，例如 `field.weight_g.lte=500`。没有目录 id 的字段过滤会被拒绝。字段不存在时 `code` 是 `40001`（`unknown_field`）。已停用字段的 `code` 是 `40002`（`field_retired`），不是 `unknown_field`。
 
-`GET /api/v1/products/{id}` 返回该商品的公开字段和可售规格。规格 ID 在 `data.variants[].id`，规格选项在 `option_values`。
+`GET /api/v1/products/{id}` 返回该商品的公开字段和可售规格。`fields` 仍是键和值，不含显示名。规格 ID 在 `data.variants[].id`，规格选项在 `option_values`。商品 Markdown 保留这些键。只有缝提供显示名时，下一行才注明含义。显示名不是字段键。商品 ID、目录 ID、价格整数分和原始可售状态写在 `/products/{id}.md`，不单独写在给人看的商品页上。CNY 价格仍是 `¥`；其他货币的主币价格仍带货币代码。下单和筛选仍用键和整数分，不要把主币价格当成整数分。
 
 `GET /api/v1/catalogs/{id}/schema` 读取目录当前公开字段定义。买家和商家都可以调用。用它解释筛选字段，不要用它修改字段。
 

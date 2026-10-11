@@ -80,6 +80,7 @@ export type SlotProduct = {
   catalogId?: string;
   cover: string | null;
   fields: Readonly<Record<string, string | number | boolean | null>>;
+  fieldLabels?: Readonly<Record<string, string>>;
   variants: readonly SlotVariant[];
   stock: number | null;
   availability: string;
@@ -493,7 +494,9 @@ function productSlotValue(name: string, product: SlotProduct, html = ""): string
     case "product.cover":
       return imageHtml(product.cover, product.name, "cover");
     case "product.fields":
-      return html.includes('data-merclink="product.field"') ? "" : fieldList(product.fields);
+      return html.includes('data-merclink="product.field"')
+        ? ""
+        : fieldList(product.fields, product.fieldLabels);
     case "product.variants":
       return html.includes('data-merclink="product.variant"') ? "" : variantList(product.variants);
     case "product.stock":
@@ -592,7 +595,10 @@ function stripSlots(html: string): string {
   return html.replace(slotPattern, "");
 }
 
-function fieldList(fields: SlotProduct["fields"]): string {
+function fieldList(
+  fields: SlotProduct["fields"],
+  labels: SlotProduct["fieldLabels"] = {},
+): string {
   const entries = Object.entries(fields);
   if (entries.length === 0) {
     return '<p class="muted">没有公开字段。</p>';
@@ -606,7 +612,9 @@ function fieldList(fields: SlotProduct["fields"]): string {
             ? "是"
             : "否"
           : String(value);
-    return `<div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(text)}</dd></div>`;
+    const heading = labels?.[key];
+    const title = heading !== undefined && heading.length > 0 ? heading : key;
+    return `<div><dt>${escapeHtml(title)}</dt><dd>${escapeHtml(text)}</dd></div>`;
   });
   return `<dl class="facts">${rows.join("")}</dl>`;
 }
@@ -627,11 +635,7 @@ function variantList(variants: readonly SlotVariant[]): string {
       variant.sku === null || variant.sku === undefined || variant.sku.length === 0
         ? ""
         : `<span class="muted">SKU：${escapeHtml(variant.sku)}</span>`;
-    const id =
-      variant.id === undefined
-        ? ""
-        : `<span class="identifier">规格 ID：${escapeHtml(variant.id)}</span>`;
-    return `<li><strong>${escapeHtml(options.length === 0 ? "默认规格" : options)}</strong><span class="price">${escapeHtml(price)}</span><span>${escapeHtml(`${stock} · ${availabilityLabel(variant.availability)}`)}</span>${sku}${id}</li>`;
+    return `<li><strong>${escapeHtml(options.length === 0 ? "默认规格" : options)}</strong><span class="price">${escapeHtml(price)}</span><span>${escapeHtml(`${stock} · ${availabilityLabel(variant.availability)}`)}</span>${sku}</li>`;
   });
   return items.length === 0 ? "" : `<ul class="variants">${items.join("")}</ul>`;
 }

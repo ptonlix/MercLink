@@ -10,6 +10,7 @@ export function slotProductFromPublic(product: PublicProduct): SlotProduct {
     name: product.title,
     cover: product.cover,
     fields: product.fields,
+    fieldLabels: product.fieldLabels,
     variants: product.variants.map((variant) => ({
       id: variant.id,
       sku: variant.sku,
