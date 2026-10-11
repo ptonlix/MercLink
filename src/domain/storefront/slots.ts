@@ -8,6 +8,14 @@ const storeSlotNames = [
   "store.website",
   "store.area",
   "store.address",
+  "store.contact_phone",
+  "store.contact_label",
+  "store.contact_qr",
+  "store.license_name",
+  "store.license_credit_code",
+  "store.license_legal_person",
+  "store.license_address",
+  "store.license_image",
 ] as const;
 
 const productSlotNames = [
@@ -49,7 +57,8 @@ const stockPattern = /库存\s*[:：]?\s*\d|stock\s*[:=]\s*\d/i;
 
 const successPattern = /支付成功|付款成功|payment\s+success/i;
 
-const storeLiteralPattern = /(?:展示名|店铺简介|店名|服务区域|店铺地址|店铺标识)\s*[:：]\s*[^\s<]/;
+const storeLiteralPattern =
+  /(?:展示名|店铺简介|店名|服务区域|店铺地址|店铺标识|统一社会信用代码|法人姓名|注册地址|客服电话|客服二维码)\s*[:：]\s*[^\s<]/;
 
 const orderLiteralPattern = /订单状态\s*[:：]\s*(?:paid|pending|closed)|status\s*[:=]\s*["']?paid/i;
 
@@ -85,6 +94,14 @@ export type SlotStore = {
   website: string | null;
   area: string | null;
   address: string | null;
+  contactPhone: string | null;
+  contactLabel: string | null;
+  contactQr: string | null;
+  licenseName: string | null;
+  licenseCreditCode: string | null;
+  licenseLegalPerson: string | null;
+  licenseAddress: string | null;
+  licenseImage: string | null;
 };
 
 export type SlotContext = {
@@ -510,6 +527,22 @@ function storeSlotValue(name: string, store: SlotStore | null): string | null {
       return escapeHtml(store.area ?? "");
     case "store.address":
       return escapeHtml(store.address ?? "");
+    case "store.contact_phone":
+      return escapeHtml(store.contactPhone ?? "");
+    case "store.contact_label":
+      return escapeHtml(store.contactLabel ?? "");
+    case "store.contact_qr":
+      return plainImageHtml(store.contactQr, "客服二维码");
+    case "store.license_name":
+      return escapeHtml(store.licenseName ?? "");
+    case "store.license_credit_code":
+      return escapeHtml(store.licenseCreditCode ?? "");
+    case "store.license_legal_person":
+      return escapeHtml(store.licenseLegalPerson ?? "");
+    case "store.license_address":
+      return escapeHtml(store.licenseAddress ?? "");
+    case "store.license_image":
+      return plainImageHtml(store.licenseImage, "营业执照");
     default:
       return null;
   }
@@ -601,6 +634,13 @@ function variantList(variants: readonly SlotVariant[]): string {
     return `<li><strong>${escapeHtml(options.length === 0 ? "默认规格" : options)}</strong><span class="price">${escapeHtml(price)}</span><span>${escapeHtml(`${stock} · ${availabilityLabel(variant.availability)}`)}</span>${sku}${id}</li>`;
   });
   return items.length === 0 ? "" : `<ul class="variants">${items.join("")}</ul>`;
+}
+
+function plainImageHtml(url: string | null, alt: string): string {
+  if (url === null || !isHttpUrl(url)) {
+    return "";
+  }
+  return `<img src="${escapeHtml(url)}" alt="${escapeHtml(alt)}">`;
 }
 
 function imageHtml(url: string | null, alt: string, frame: "cover" | "logo" = "cover"): string {

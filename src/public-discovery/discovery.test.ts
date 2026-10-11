@@ -131,6 +131,14 @@ describe("discovery files", () => {
           logoUrl: "https://cdn.example/logo.png",
           areaServed: "杭州市",
           address: "西湖区某某路 88 号",
+          license: {
+            name: "示例企业",
+            creditCode: "91310000MA1FL0000N",
+            legalPerson: "例某",
+            registeredAddress: "示例市注册路 1 号",
+            imageUrl: "https://cdn.example/license.png",
+          },
+          contact: { phone: "010-00000000", label: "客服", qrUrl: null },
         }),
     });
 
@@ -151,6 +159,10 @@ describe("discovery files", () => {
     expect(body).not.toContain("杭州市");
     expect(body).not.toContain("https://shop.example");
     expect(body).not.toContain("/merchants");
+    expect(body).not.toContain("91310000MA1FL0000N");
+    expect(body).not.toContain("例某");
+    expect(body).not.toContain("010-00000000");
+    expect(body).not.toContain("商家自行填写，本系统未核验。");
     const withoutHeading = body.replace(/^# .+\n\n> .+\n\n/, "");
     expect(withoutHeading).not.toContain("南风商店");
     expect(withoutHeading).not.toContain("一句已发布简介");
@@ -166,6 +178,8 @@ describe("discovery files", () => {
           logoUrl: null,
           areaServed: null,
           address: "不该留下的地址",
+          license: null,
+          contact: null,
         }),
     });
     resetPublicStore();

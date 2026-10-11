@@ -18,6 +18,8 @@ describe("merchant profile validation", () => {
         logoUrl: null,
         areaServed: null,
         address: null,
+        license: null,
+        contact: null,
         published: false,
       },
     });
@@ -93,6 +95,8 @@ describe("merchant profile validation", () => {
       "logo_url",
       "area_served",
       "address",
+      "license",
+      "contact",
       "published",
     ]);
     expect(scopes).not.toContain("profile:write");
@@ -115,10 +119,162 @@ describe("merchant profile validation", () => {
 
   it("does not publish the admin-provisioned account name from the migration", async () => {
     const migration = await readFile("src/db/migrations/011_merchant_profiles.sql", "utf8");
+    const added = await readFile("src/db/migrations/016_merchant_profile_facts.sql", "utf8");
     const provisioning = await readFile("src/app-services/identity/merchants.ts", "utf8");
+    const source = await readFile("src/domain/identity/profile.ts", "utf8");
     expect(migration).toContain("CREATE TABLE merchant_profiles");
     expect(migration).not.toMatch(/INSERT INTO merchant_profiles/i);
+    expect(migration).not.toContain("license_name");
+    expect(migration).not.toContain("contact_phone");
+    expect(added).toContain("license_name");
+    expect(added).toContain("contact_phone");
+    expect(added).toContain("CREATE TABLE merchant_profile_images");
+    expect(added).not.toMatch(/INSERT INTO/i);
+    expect(added).not.toMatch(/UPDATE merchant_profiles/i);
     expect(provisioning).not.toContain("merchant_profiles");
+    expect(source).not.toMatch(/from ["'][^"']*\/(db|adapters|app|catalog)\//);
+    expect(source).not.toMatch(/\b(postgres|drizzle|alipay|aliyun)\b/i);
+  });
+
+  it("accepts a complete license and rejects a partial or bad credit code", () => {
+    const images = {
+      appBaseUrl: "https://merclink.example",
+      owned: [{ id: "img_license", purpose: "license" as const }],
+    };
+    expect(
+      parseProfileBody(
+        draftBody({
+          license: {
+            name: "示例企业",
+            credit_code: "91310000MA1FL0000N",
+            legal_person: "例某",
+            registered_address: "示例市示例路 1 号",
+            image_url: "https://merclink.example/media/img_license",
+          },
+          address: "经营地址与注册地址不同",
+        }),
+        secrets,
+        images,
+      ),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        address: "经营地址与注册地址不同",
+        license: {
+          name: "示例企业",
+          creditCode: "91310000MA1FL0000N",
+          legalPerson: "例某",
+          registeredAddress: "示例市示例路 1 号",
+          imageUrl: "https://merclink.example/media/img_license",
+        },
+      },
+    });
+    const partial = licenseBody();
+    delete partial.legal_person;
+    expect(parseProfileBody(draftBody({ license: partial }), secrets, images)).toMatchObject({
+      ok: false,
+      error: "validation_error",
+    });
+    expect(
+      parseProfileBody(
+        draftBody({
+          license: { ...licenseBody(), credit_code: "91310000MA1FL0000M" },
+        }),
+        secrets,
+        images,
+      ),
+    ).toMatchObject({ ok: false, error: "validation_error" });
+    expect(
+      parseProfileBody(
+        draftBody({
+          license: { ...licenseBody(), credit_code: "99999999999999999E" },
+        }),
+        secrets,
+        images,
+      ),
+    ).toMatchObject({
+      ok: true,
+      value: { license: { creditCode: "99999999999999999E" } },
+    });
+  });
+
+  it("rejects an identity number, the login phone, and an image that is not an owned license", () => {
+    const images = {
+      appBaseUrl: "https://merclink.example",
+      owned: [
+        { id: "img_license", purpose: "license" as const },
+        { id: "img_qr", purpose: "contact_qr" as const },
+      ],
+    };
+    expect(
+      parseProfileBody(
+        draftBody({
+          license: { ...licenseBody(), legal_person: "张三11010119900307777X" },
+        }),
+        secrets,
+        images,
+      ),
+    ).toMatchObject({ ok: false, error: "validation_error" });
+    expect(
+      parseProfileBody(
+        draftBody({
+          contact: { phone: "13800138000", label: null, qr_url: null },
+        }),
+        secrets,
+        images,
+      ),
+    ).toMatchObject({ ok: false, error: "validation_error" });
+    expect(
+      parseProfileBody(
+        draftBody({
+          license: {
+            ...licenseBody(),
+            image_url: "https://img.example/license.png",
+          },
+        }),
+        secrets,
+        images,
+      ),
+    ).toMatchObject({ ok: false, error: "validation_error" });
+    expect(
+      parseProfileBody(
+        draftBody({
+          license: {
+            ...licenseBody(),
+            image_url: "https://merclink.example/media/img_catalog",
+          },
+        }),
+        secrets,
+        images,
+      ),
+    ).toMatchObject({ ok: false, error: "not_found" });
+    expect(
+      parseProfileBody(
+        draftBody({
+          license: {
+            ...licenseBody(),
+            image_url: "https://merclink.example/media/img_qr",
+          },
+        }),
+        secrets,
+        images,
+      ),
+    ).toMatchObject({ ok: false, error: "not_found" });
+    expect(parseProfileBody(sevenFieldBody(), secrets, images)).toMatchObject({
+      ok: false,
+      error: "validation_error",
+    });
+    expect(
+      parseProfileBody(
+        draftBody({
+          published: true,
+          license: null,
+          contact: null,
+        }),
+        secrets,
+        images,
+      ).ok,
+    ).toBe(true);
   });
 });
 
@@ -130,7 +286,26 @@ function draftBody(overrides: Record<string, unknown> = {}): Record<string, unkn
     logo_url: null,
     area_served: null,
     address: null,
+    license: null,
+    contact: null,
     published: false,
     ...overrides,
   };
+}
+
+function licenseBody(): Record<string, string> {
+  return {
+    name: "示例企业",
+    credit_code: "91310000MA1FL0000N",
+    legal_person: "例某",
+    registered_address: "示例市示例路 1 号",
+    image_url: "https://merclink.example/media/img_license",
+  };
+}
+
+function sevenFieldBody(): Record<string, unknown> {
+  const body = draftBody();
+  delete body.license;
+  delete body.contact;
+  return body;
 }

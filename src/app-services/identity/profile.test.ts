@@ -230,6 +230,8 @@ describe("merchant profile http", () => {
         logo_url: null,
         area_served: null,
         address: null,
+        license: null,
+        contact: null,
       },
     });
 
@@ -271,6 +273,130 @@ describe("merchant profile http", () => {
   it("is not a public merchant directory", () => {
     expect(existsSync("src/app/merchants")).toBe(false);
     expect(existsSync("src/app/merchants/[id]/page.tsx")).toBe(false);
+  });
+
+  it("keeps registered address separate and does not require license to publish", async () => {
+    const previousBase = process.env.APP_BASE_URL;
+    process.env.APP_BASE_URL = "https://merclink.example";
+    try {
+      const memory = memoryStore();
+      memory.images.set("mch_a", [{ id: "img_license", purpose: "license" }]);
+      memory.merchants.set("mch_a", merchant({ phone: "13800138000" }));
+      useStore(memory.store);
+      asMerchant("mch_a", ["product:write"]);
+
+      const published = await putProfileRoute(
+        authed(
+          "PUT",
+          draftBody({
+            display_name: "南风商店",
+            summary: "已发布简介",
+            address: "西湖区某某路 88 号",
+            published: true,
+          }),
+        ),
+      );
+      expect(published.status).toBe(200);
+      const writesAfterPublish = memory.writes;
+      const partial = await putProfileRoute(
+        authed(
+          "PUT",
+          draftBody({
+            license: {
+              name: "示例企业",
+              credit_code: "91310000MA1FL0000M",
+              legal_person: "例某",
+              registered_address: "示例市示例路 1 号",
+              image_url: "https://merclink.example/media/img_license",
+            },
+            published: true,
+          }),
+        ),
+      );
+      expect(partial.status).toBe(400);
+      await expect(partial.json()).resolves.toMatchObject({ code: 40000, data: null });
+      const omitted = await putProfileRoute(authed("PUT", sevenFieldBody()));
+      expect(omitted.status).toBe(400);
+      expect(memory.writes).toBe(writesAfterPublish);
+
+      const saved = await putProfileRoute(
+        authed(
+          "PUT",
+          draftBody({
+            display_name: "南风商店",
+            summary: "已发布简介",
+            address: "西湖区某某路 88 号",
+            license: {
+              name: "示例企业",
+              credit_code: "91310000MA1FL0000N",
+              legal_person: "例某",
+              registered_address: "示例市示例路 1 号",
+              image_url: "https://merclink.example/media/img_license",
+            },
+            published: true,
+          }),
+        ),
+      );
+      expect(saved.status).toBe(200);
+      await expect(merchantProfileRoute(authed("GET")).then(responseJson)).resolves.toMatchObject({
+        address: "西湖区某某路 88 号",
+        license: {
+          registered_address: "示例市示例路 1 号",
+          credit_code: "91310000MA1FL0000N",
+        },
+        contact: null,
+        published: true,
+      });
+      const visible = await publicStoreRoute();
+      const visibleText = await visible.text();
+      expect(JSON.parse(visibleText)).toMatchObject({
+        code: 200,
+        data: {
+          address: "西湖区某某路 88 号",
+          license: { name: "示例企业", registered_address: "示例市示例路 1 号" },
+          contact: null,
+        },
+      });
+      expect(visibleText).not.toContain("13800138000");
+    } finally {
+      restoreBaseUrl(previousBase);
+    }
+  });
+
+  it("does not echo a draft license on the public seam", async () => {
+    const previousBase = process.env.APP_BASE_URL;
+    process.env.APP_BASE_URL = "https://merclink.example";
+    try {
+      const memory = memoryStore();
+      memory.images.set("mch_a", [{ id: "img_license", purpose: "license" }]);
+      memory.merchants.set("mch_a", merchant({ phone: "13800138000" }));
+      useStore(memory.store);
+      asMerchant("mch_a", ["product:write"]);
+      const saved = await putProfileRoute(
+        authed(
+          "PUT",
+          draftBody({
+            license: {
+              name: "草稿执照企业",
+              credit_code: "91310000MA1FL0000N",
+              legal_person: "例某",
+              registered_address: "示例市示例路 1 号",
+              image_url: "https://merclink.example/media/img_license",
+            },
+            published: false,
+          }),
+        ),
+      );
+      expect(saved.status).toBe(200);
+      const hidden = await publicStoreRoute();
+      expect(hidden.status).toBe(404);
+      const hiddenText = await hidden.text();
+      expect(hiddenText).not.toContain("草稿执照企业");
+      expect(hiddenText).not.toContain("img_license");
+      expect(hiddenText).not.toContain("91310000MA1FL0000N");
+    } finally {
+      restoreBaseUrl(previousBase);
+    }
   });
 });
 
@@ -326,9 +452,18 @@ function draftBody(overrides: Record<string, unknown> = {}): Record<string, unkn
     logo_url: null,
     area_served: null,
     address: null,
+    license: null,
+    contact: null,
     published: false,
     ...overrides,
   };
+}
+
+function sevenFieldBody(): Record<string, unknown> {
+  const body = draftBody();
+  delete body.license;
+  delete body.contact;
+  return body;
 }
 
 function emptyDraft(): Record<string, unknown> {
@@ -339,9 +474,19 @@ function emptyDraft(): Record<string, unknown> {
     logo_url: null,
     area_served: null,
     address: null,
+    license: null,
+    contact: null,
     published: false,
     updated_at: null,
   };
+}
+
+function restoreBaseUrl(previous: string | undefined): void {
+  if (previous === undefined) {
+    delete process.env.APP_BASE_URL;
+    return;
+  }
+  process.env.APP_BASE_URL = previous;
 }
 
 function merchant(input: { phone: string; email?: string | null }): MemoryMerchant {
@@ -357,9 +502,11 @@ function merchant(input: { phone: string; email?: string | null }): MemoryMercha
 function memoryStore(): {
   store: MerchantProfileStore;
   merchants: Map<string, MemoryMerchant>;
+  images: Map<string, { id: string; purpose: "license" | "contact_qr" }[]>;
   writes: number;
 } {
   const merchants = new Map<string, MemoryMerchant>();
+  const images = new Map<string, { id: string; purpose: "license" | "contact_qr" }[]>();
   const state = { writes: 0 };
   const store: MerchantProfileStore = {
     readOwn(merchantId) {
@@ -397,7 +544,12 @@ function memoryStore(): {
         logoUrl: top.logoUrl,
         areaServed: top.areaServed,
         address: top.address,
+        license: top.license,
+        contact: top.contact,
       });
+    },
+    ownedImages(merchantId) {
+      return Promise.resolve(images.get(merchantId) ?? []);
     },
     secrets(merchantId) {
       const current = merchants.get(merchantId);
@@ -410,6 +562,7 @@ function memoryStore(): {
   return {
     store,
     merchants,
+    images,
     get writes() {
       return state.writes;
     },

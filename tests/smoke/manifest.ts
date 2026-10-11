@@ -52,6 +52,7 @@ export const smokeManifest = [
     bodyKind: "envelope",
   },
   { method: "GET", path: "/api/v1/merchant/profile", audience: "bearer", bodyKind: "envelope" },
+  { method: "POST", path: "/api/v1/merchant/profile/images", audience: "bearer", bodyKind: "envelope" },
   { method: "PUT", path: "/api/v1/merchant/profile", audience: "bearer", bodyKind: "envelope" },
   { method: "GET", path: "/api/v1/orders/{id}", audience: "bearer", bodyKind: "envelope" },
   { method: "POST", path: "/api/v1/orders", audience: "bearer", bodyKind: "envelope" },

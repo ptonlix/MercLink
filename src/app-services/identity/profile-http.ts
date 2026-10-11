@@ -56,7 +56,10 @@ export async function getMerchantProfile(request: Request): Promise<Response> {
   return apiSuccess(merchantProfileJson(row), { request });
 }
 
-export async function putMerchantProfile(request: Request): Promise<Response> {
+export async function putMerchantProfile(
+  request: Request,
+  appBaseUrl = process.env.APP_BASE_URL?.trim() ?? "",
+): Promise<Response> {
   const auth = await authenticate(request);
   if (!auth.ok) {
     return auth.response;
@@ -80,7 +83,10 @@ export async function putMerchantProfile(request: Request): Promise<Response> {
   if (secrets === null) {
     return apiFailure("forbidden", "需要商家权限。", { request });
   }
-  const parsed = parseProfileBody(parsedBody.value, secrets);
+  const parsed = parseProfileBody(parsedBody.value, secrets, {
+    appBaseUrl,
+    owned: await store.ownedImages(merchantId),
+  });
   if (!parsed.ok) {
     return apiFailure(parsed.error, parsed.message, { request });
   }
@@ -117,6 +123,8 @@ function merchantProfileJson(row: StoredProfile | null): {
   logo_url: string | null;
   area_served: string | null;
   address: string | null;
+  license: ReturnType<typeof licenseJson>;
+  contact: ReturnType<typeof contactJson>;
   published: boolean;
   updated_at: string | null;
 } {
@@ -128,6 +136,8 @@ function merchantProfileJson(row: StoredProfile | null): {
       logo_url: null,
       area_served: null,
       address: null,
+      license: null,
+      contact: null,
       published: false,
       updated_at: null,
     };
@@ -139,6 +149,8 @@ function merchantProfileJson(row: StoredProfile | null): {
     logo_url: row.logoUrl,
     area_served: row.areaServed,
     address: row.address,
+    license: licenseJson(row.license),
+    contact: contactJson(row.contact),
     published: row.published,
     updated_at: row.updatedAt.toISOString(),
   };
@@ -151,6 +163,8 @@ function publicStoreJson(store: PublicStoreProfile): {
   logo_url: string | null;
   area_served: string | null;
   address: string | null;
+  license: ReturnType<typeof licenseJson>;
+  contact: ReturnType<typeof contactJson>;
 } {
   return {
     display_name: store.displayName,
@@ -159,6 +173,42 @@ function publicStoreJson(store: PublicStoreProfile): {
     logo_url: store.logoUrl,
     area_served: store.areaServed,
     address: store.address,
+    license: licenseJson(store.license),
+    contact: contactJson(store.contact),
+  };
+}
+
+function licenseJson(license: ProfileDraft["license"]): {
+  name: string;
+  credit_code: string;
+  legal_person: string;
+  registered_address: string;
+  image_url: string;
+} | null {
+  if (license === null) {
+    return null;
+  }
+  return {
+    name: license.name,
+    credit_code: license.creditCode,
+    legal_person: license.legalPerson,
+    registered_address: license.registeredAddress,
+    image_url: license.imageUrl,
+  };
+}
+
+function contactJson(contact: ProfileDraft["contact"]): {
+  phone: string | null;
+  label: string | null;
+  qr_url: string | null;
+} | null {
+  if (contact === null) {
+    return null;
+  }
+  return {
+    phone: contact.phone,
+    label: contact.label,
+    qr_url: contact.qrUrl,
   };
 }
 
@@ -170,8 +220,30 @@ function sameProfile(stored: StoredProfile, next: ProfileDraft): boolean {
     stored.logoUrl === next.logoUrl &&
     stored.areaServed === next.areaServed &&
     stored.address === next.address &&
+    sameLicense(stored.license, next.license) &&
+    sameContact(stored.contact, next.contact) &&
     stored.published === next.published
   );
+}
+
+function sameLicense(left: ProfileDraft["license"], right: ProfileDraft["license"]): boolean {
+  if (left === null || right === null) {
+    return left === right;
+  }
+  return (
+    left.name === right.name &&
+    left.creditCode === right.creditCode &&
+    left.legalPerson === right.legalPerson &&
+    left.registeredAddress === right.registeredAddress &&
+    left.imageUrl === right.imageUrl
+  );
+}
+
+function sameContact(left: ProfileDraft["contact"], right: ProfileDraft["contact"]): boolean {
+  if (left === null || right === null) {
+    return left === right;
+  }
+  return left.phone === right.phone && left.label === right.label && left.qrUrl === right.qrUrl;
 }
 
 function isJsonContentType(request: Request): boolean {

@@ -125,6 +125,7 @@ describe("storefront rules", () => {
           website: null,
           area: null,
           address: null,
+          ...emptyStoreFacts(),
         },
         products: [],
         product,
@@ -142,6 +143,7 @@ describe("storefront rules", () => {
           website: null,
           area: null,
           address: null,
+          ...emptyStoreFacts(),
         },
         products: [],
         product: slotProduct(800, "新介绍"),
@@ -273,10 +275,111 @@ describe("storefront rules", () => {
       previousId: null,
     });
   });
+
+  it("keeps old storefronts activatable and rejects hardcoded license or contact facts", () => {
+    expect(
+      inspectDocument(
+        "index.html",
+        '<h1><merclink-slot name="store.display_name"></merclink-slot></h1>',
+      ).ok,
+    ).toBe(true);
+    expect(
+      inspectDocument("index.html", "<p>统一社会信用代码：91310000MA1FL0000N</p>"),
+    ).toMatchObject({ ok: false, error: "validation_error" });
+    expect(inspectDocument("index.html", "<p>客服电话：010-00000000</p>")).toMatchObject({
+      ok: false,
+      error: "validation_error",
+    });
+    const oldHtml = '<p><merclink-slot name="store.display_name"></merclink-slot></p>';
+    const rendered = renderDocument(oldHtml, {
+      store: {
+        displayName: "店",
+        summary: "简介",
+        logo: null,
+        website: null,
+        area: null,
+        address: null,
+        ...emptyStoreFacts(),
+        licenseCreditCode: "91310000MA1FL0000N",
+        contactPhone: "010-00000000",
+      },
+      products: [],
+      product: null,
+      orderStatus: null,
+      nextCursor: null,
+    });
+    expect(rendered).toContain("店");
+    expect(rendered).not.toContain("91310000MA1FL0000N");
+    expect(rendered).not.toContain("010-00000000");
+    const filled = renderDocument(
+      '<p><merclink-slot name="store.license_credit_code"></merclink-slot></p><p><merclink-slot name="store.contact_phone"></merclink-slot></p>',
+      {
+        store: {
+          displayName: "店",
+          summary: "简介",
+          logo: null,
+          website: null,
+          area: null,
+          address: null,
+          ...emptyStoreFacts(),
+          licenseCreditCode: "91310000MA1FL0000N",
+          contactPhone: "010-00000000",
+        },
+        products: [],
+        product: null,
+        orderStatus: null,
+        nextCursor: null,
+      },
+    );
+    expect(filled).toContain("91310000MA1FL0000N");
+    expect(filled).toContain("010-00000000");
+    const emptySlot = renderDocument(
+      '<p><merclink-slot name="store.license_name"></merclink-slot></p>',
+      {
+        store: {
+          displayName: "店",
+          summary: "简介",
+          logo: null,
+          website: null,
+          area: null,
+          address: null,
+          ...emptyStoreFacts(),
+        },
+        products: [],
+        product: null,
+        orderStatus: null,
+        nextCursor: null,
+      },
+    );
+    expect(emptySlot).not.toContain("merclink-slot");
+    expect(emptySlot).not.toContain("91310000MA1FL0000N");
+  });
 });
 
 function text(value: string): Uint8Array {
   return new TextEncoder().encode(value);
+}
+
+function emptyStoreFacts(): {
+  contactPhone: null;
+  contactLabel: null;
+  contactQr: null;
+  licenseName: null;
+  licenseCreditCode: null;
+  licenseLegalPerson: null;
+  licenseAddress: null;
+  licenseImage: null;
+} {
+  return {
+    contactPhone: null,
+    contactLabel: null,
+    contactQr: null,
+    licenseName: null,
+    licenseCreditCode: null,
+    licenseLegalPerson: null,
+    licenseAddress: null,
+    licenseImage: null,
+  };
 }
 
 function slotProduct(priceMinor: number, name: string): SlotProduct {

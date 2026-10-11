@@ -79,9 +79,26 @@ export const merchantProfiles = pgTable("merchant_profiles", {
   logoUrl: text("logo_url"),
   areaServed: text("area_served"),
   address: text("address"),
+  licenseName: text("license_name"),
+  licenseCreditCode: text("license_credit_code"),
+  licenseLegalPerson: text("license_legal_person"),
+  licenseRegisteredAddress: text("license_registered_address"),
+  licenseImageUrl: text("license_image_url"),
+  contactPhone: text("contact_phone"),
+  contactLabel: text("contact_label"),
+  contactQrUrl: text("contact_qr_url"),
   published: boolean("published").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const merchantProfileImages = pgTable("merchant_profile_images", {
+  id: text("id").primaryKey(),
+  merchantId: text("merchant_id").notNull(),
+  purpose: text("purpose").notNull(),
+  contentType: text("content_type").notNull(),
+  byteSize: integer("byte_size").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const apiKeys = pgTable("api_keys", {

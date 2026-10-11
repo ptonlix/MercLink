@@ -5,6 +5,14 @@ const storeSlotNames = new Set([
   "store.website",
   "store.area",
   "store.address",
+  "store.contact_phone",
+  "store.contact_label",
+  "store.contact_qr",
+  "store.license_name",
+  "store.license_credit_code",
+  "store.license_legal_person",
+  "store.license_address",
+  "store.license_image",
 ]);
 
 const productTemplatePattern = /<template\s+data-merclink="product">([\s\S]*?)<\/template>/g;
@@ -144,9 +152,32 @@ function storeSlotValue(name, store) {
       return escapeHtml(store.area ?? "");
     case "store.address":
       return escapeHtml(store.address ?? "");
+    case "store.contact_phone":
+      return escapeHtml(store.contactPhone ?? "");
+    case "store.contact_label":
+      return escapeHtml(store.contactLabel ?? "");
+    case "store.contact_qr":
+      return plainImageHtml(store.contactQr, "客服二维码");
+    case "store.license_name":
+      return escapeHtml(store.licenseName ?? "");
+    case "store.license_credit_code":
+      return escapeHtml(store.licenseCreditCode ?? "");
+    case "store.license_legal_person":
+      return escapeHtml(store.licenseLegalPerson ?? "");
+    case "store.license_address":
+      return escapeHtml(store.licenseAddress ?? "");
+    case "store.license_image":
+      return plainImageHtml(store.licenseImage, "营业执照");
     default:
       return null;
   }
+}
+
+function plainImageHtml(url, alt) {
+  if (url === null || url === undefined || !isHttpUrl(url)) {
+    return "";
+  }
+  return `<img src="${escapeHtml(url)}" alt="${escapeHtml(alt)}">`;
 }
 
 function nextSlotValue(name, nextCursor) {

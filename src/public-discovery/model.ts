@@ -301,6 +301,20 @@ function onlineStore(store: PublicStoreProfile, origin: string): JsonLdNode {
       streetAddress: store.address,
     };
   }
+  if (
+    store.contact?.phone !== null &&
+    store.contact?.phone !== undefined &&
+    store.contact.phone.length > 0
+  ) {
+    node.telephone = store.contact.phone;
+  }
+  if (store.license !== null) {
+    node.identifier = [
+      { "@type": "PropertyValue", name: "统一社会信用代码", value: store.license.creditCode },
+      { "@type": "PropertyValue", name: "法人姓名", value: store.license.legalPerson },
+      { "@type": "PropertyValue", name: "注册地址", value: store.license.registeredAddress },
+    ];
+  }
   return node;
 }
 

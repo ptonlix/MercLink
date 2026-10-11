@@ -240,7 +240,19 @@ export function mapPreviewStore(raw) {
     website: typeof raw.website_url === "string" ? raw.website_url : null,
     area: typeof raw.area_served === "string" ? raw.area_served : null,
     address: typeof raw.address === "string" ? raw.address : null,
+    contactPhone: nullableText(raw.contact?.phone),
+    contactLabel: nullableText(raw.contact?.label),
+    contactQr: nullableText(raw.contact?.qr_url),
+    licenseName: nullableText(raw.license?.name),
+    licenseCreditCode: nullableText(raw.license?.credit_code),
+    licenseLegalPerson: nullableText(raw.license?.legal_person),
+    licenseAddress: nullableText(raw.license?.registered_address),
+    licenseImage: nullableText(raw.license?.image_url),
   };
+}
+
+function nullableText(value) {
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 async function readJson(url, headers) {

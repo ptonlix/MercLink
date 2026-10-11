@@ -27,6 +27,7 @@ import {
   publicImageResponse,
   readPublicImage,
   uploadCatalogImage,
+  uploadProfileImage,
 } from "./images";
 import { mediaRuntime } from "./media-runtime";
 import { getPublicProduct, listMerchantProducts, listPublicProducts } from "./query";
@@ -309,6 +310,27 @@ export async function postCatalogImage(request: Request, catalogId: string): Pro
       url: image.url,
       content_type: image.contentType,
       byte_size: image.byteSize,
+    }),
+    201,
+    request,
+  );
+}
+
+export async function postProfileImage(request: Request): Promise<Response> {
+  const gate = await merchantGate(request, "product:write");
+  if (!gate.ok) {
+    return gate.response;
+  }
+  const sql = ensureCatalogRegistered();
+  const uploaded = await uploadProfileImage(sql, gate.merchantId, request);
+  return imageResponse(
+    uploaded,
+    (image) => ({
+      id: image.id,
+      url: image.url,
+      content_type: image.contentType,
+      byte_size: image.byteSize,
+      purpose: image.purpose,
     }),
     201,
     request,

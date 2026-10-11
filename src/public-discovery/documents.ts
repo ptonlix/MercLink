@@ -37,5 +37,13 @@ export function slotStoreFromPublic(store: PublicStoreProfile | null): SlotConte
     website: store.websiteUrl,
     area: store.areaServed,
     address: store.address,
+    contactPhone: store.contact?.phone ?? null,
+    contactLabel: store.contact?.label ?? null,
+    contactQr: store.contact?.qrUrl ?? null,
+    licenseName: store.license?.name ?? null,
+    licenseCreditCode: store.license?.creditCode ?? null,
+    licenseLegalPerson: store.license?.legalPerson ?? null,
+    licenseAddress: store.license?.registeredAddress ?? null,
+    licenseImage: store.license?.imageUrl ?? null,
   };
 }
