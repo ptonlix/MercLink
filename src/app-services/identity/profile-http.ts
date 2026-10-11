@@ -56,7 +56,10 @@ export async function getMerchantProfile(request: Request): Promise<Response> {
   return apiSuccess(merchantProfileJson(row), { request });
 }
 
-export async function putMerchantProfile(request: Request): Promise<Response> {
+export async function putMerchantProfile(
+  request: Request,
+  appBaseUrl = process.env.APP_BASE_URL?.trim() ?? "",
+): Promise<Response> {
   const auth = await authenticate(request);
   if (!auth.ok) {
     return auth.response;
@@ -81,7 +84,7 @@ export async function putMerchantProfile(request: Request): Promise<Response> {
     return apiFailure("forbidden", "需要商家权限。", { request });
   }
   const parsed = parseProfileBody(parsedBody.value, secrets, {
-    appBaseUrl: process.env.APP_BASE_URL?.trim() ?? "",
+    appBaseUrl,
     owned: await store.ownedImages(merchantId),
   });
   if (!parsed.ok) {

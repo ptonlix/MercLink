@@ -412,11 +412,13 @@ describe("product images", () => {
       const catalog = await mustCatalog(sql, "mch_a");
       asMerchant("mch_a");
       const profileUpload = await profileImageRoute(profileUploadRequest(png, "license"));
+      expect(profileUpload.status).toBe(201);
       const profileImage = ((await profileUpload.json()) as { data: { id: string; url: string } })
         .data;
       const catalogUpload = await uploadRoute(uploadRequest(catalog.id, png), {
         params: Promise.resolve({ id: catalog.id }),
       });
+      expect(catalogUpload.status).toBe(201);
       const catalogImage = ((await catalogUpload.json()) as { data: { url: string } }).data;
       const product = await createProduct(sql, "mch_a", catalog.id, {
         title: "短靴",
@@ -439,6 +441,8 @@ describe("product images", () => {
       `;
       expect(storedCover[0]?.cover ?? null).toBeNull();
 
+      // Issued media URLs follow the bound runtime, even if APP_BASE_URL later disagrees.
+      process.env.APP_BASE_URL = "https://other.example";
       const license = await putProfileRoute(
         profileJson({
           license: {
