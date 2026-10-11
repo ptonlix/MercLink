@@ -235,9 +235,7 @@ describe("public fact discovery", () => {
     labeled.fields = { origin: "北海合浦", note: "无" };
     labeled.fieldLabels = { origin: "产地" };
     register([labeled]);
-    const labeledBody = await (
-      await productMarkdownResponse("prd_labeled")
-    ).text();
+    const labeledBody = await (await productMarkdownResponse("prd_labeled")).text();
     expect(labeledBody).toContain("- origin: 北海合浦");
     expect(labeledBody).toContain("  - 含义：产地");
     expect(labeledBody).toContain("- note: 无");

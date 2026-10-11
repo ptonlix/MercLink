@@ -595,10 +595,7 @@ function stripSlots(html: string): string {
   return html.replace(slotPattern, "");
 }
 
-function fieldList(
-  fields: SlotProduct["fields"],
-  labels: SlotProduct["fieldLabels"] = {},
-): string {
+function fieldList(fields: SlotProduct["fields"], labels: SlotProduct["fieldLabels"] = {}): string {
   const entries = Object.entries(fields);
   if (entries.length === 0) {
     return '<p class="muted">没有公开字段。</p>';
@@ -612,7 +609,7 @@ function fieldList(
             ? "是"
             : "否"
           : String(value);
-    const heading = labels?.[key];
+    const heading = labels[key];
     const title = heading !== undefined && heading.length > 0 ? heading : key;
     return `<div><dt>${escapeHtml(title)}</dt><dd>${escapeHtml(text)}</dd></div>`;
   });
