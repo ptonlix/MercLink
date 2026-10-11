@@ -1,3 +1,17 @@
+export type PublicLicense = {
+  name: string;
+  creditCode: string;
+  legalPerson: string;
+  registeredAddress: string;
+  imageUrl: string;
+};
+
+export type PublicContact = {
+  phone: string | null;
+  label: string | null;
+  qrUrl: string | null;
+};
+
 export type PublicStoreProfile = {
   displayName: string;
   summary: string;
@@ -5,6 +19,8 @@ export type PublicStoreProfile = {
   logoUrl: string | null;
   areaServed: string | null;
   address: string | null;
+  license: PublicLicense | null;
+  contact: PublicContact | null;
 };
 
 export type PublicStoreImpl = {

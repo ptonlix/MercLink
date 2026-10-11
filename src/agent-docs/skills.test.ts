@@ -194,6 +194,8 @@ describe("merchant profile skill", () => {
           logoUrl: null,
           areaServed: null,
           address: null,
+          license: null,
+          contact: null,
         }),
     });
     try {
@@ -208,13 +210,25 @@ describe("merchant profile skill", () => {
         "logo_url",
         "area_served",
         "address",
+        "license",
+        "contact",
         "published",
       ]) {
         expect(body).toContain(field);
       }
+      expect(body).toContain('"license": null');
+      expect(body).toContain('"contact": null');
+      expect(body).toContain("POST /api/v1/merchant/profile/images");
+      expect(body).toContain("`license` 或 `contact_qr`");
+      expect(body).toContain("得到用户对这四项的明确同意后，才能上传");
+      expect(body).toContain("可以跳过");
+      expect(body).toContain("不要用目录图片接口");
       expect(body).toContain("只有 `published` 为 `true`");
       expect(body).toContain("改为 `false` 后，落地页立即不再显示");
-      expect(body).toContain("不要把登录手机号、密码、短信验证码或 API Key 提交为公开资料");
+      expect(body).toContain(
+        "不要把登录手机号、密码、短信验证码、API Key 或身份证号提交为公开资料",
+      );
+      expect(body).not.toContain("91310000MA1FL0000N");
       expect(body).not.toContain(storedSummary);
       expect(body).not.toContain("https://stored.example/profile");
       expect(body).not.toMatch(/Bearer\s+[A-Za-z0-9\-._]{12,}/);
@@ -246,6 +260,11 @@ describe("storefront skill", () => {
     expect(body).toContain("`payment_channel`");
     expect(body).toContain("不得改用 User-Agent 猜测渠道");
     expect(body).toContain("会随后端变化的事实必须用槽位");
+    expect(body).toContain("store.license_credit_code");
+    expect(body).toContain("store.contact_qr");
+    expect(body).toContain("可以不声明");
+    expect(body).toContain("没有对应槽位，就不能发布");
+    expect(body).not.toContain("91310000MA1FL0000N");
     expect(body).toContain("不得把当时的值写死在 HTML 里");
     expect(body).toContain("只有槽位值为 `paid` 时，页面才能显示支付成功");
     expect(body).toContain("`order_id` 不是公开查询");
@@ -312,6 +331,12 @@ describe("skill paths match the route table", () => {
     const storefront = await readFile(storefrontFile, "utf8");
     expect(unlistedApiPaths(storefront, listed)).toEqual([]);
     expect(missingAssignedPaths(storefront, routesFor("storefront"))).toEqual([]);
+    const guide = await readFile("docs/FRONTEND_API_GUIDE.md", "utf8");
+    const prd = await readFile("docs/PRD.md", "utf8");
+    expect(guide).toContain("/api/v1/merchant/profile/images");
+    expect(guide).toContain("store.license_credit_code");
+    expect(guide).toContain("store.contact_qr");
+    expect(prd).toContain("执照和客服是推荐事实，不是开通或上架条件。");
     expect(merchant).toContain("/storefront/skill.md");
     expect(merchant).toContain("本文档不讲页面上传、激活或回滚");
     expect(merchant).not.toContain("/api/v1/storefront/");

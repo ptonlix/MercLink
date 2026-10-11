@@ -9,7 +9,7 @@ import {
 } from "./model";
 import { canonicalLink, isPublicProductId } from "./negotiate";
 import { availabilityText, displayPrice, optionText, variantStock } from "./presentation";
-import { emptyProductsNote } from "./site";
+import { emptyProductsNote, unverifiedProfileNotice } from "./site";
 
 const hiddenProductMarkdownBody = "没有找到商品。\n";
 
@@ -136,7 +136,35 @@ function appendStoreFacts(lines: string[], store: LandingModel["store"]): void {
   if (store.logoUrl !== null && store.logoUrl.length > 0) {
     lines.push(`- 标识：${store.logoUrl}`);
   }
+  appendRecommendedFacts(lines, store);
   lines.push("");
+}
+
+function appendRecommendedFacts(lines: string[], store: NonNullable<LandingModel["store"]>): void {
+  const contact = store.contact;
+  const license = store.license;
+  if (contact === null && license === null) {
+    return;
+  }
+  if (contact !== null) {
+    if (contact.phone !== null && contact.phone.length > 0) {
+      lines.push(`- 客服电话：${oneLine(contact.phone)}`);
+    }
+    if (contact.label !== null && contact.label.length > 0) {
+      lines.push(`- 客服说明：${oneLine(contact.label)}`);
+    }
+    if (contact.qrUrl !== null && contact.qrUrl.length > 0) {
+      lines.push(`- 客服二维码：${oneLine(contact.qrUrl)}`);
+    }
+  }
+  if (license !== null) {
+    lines.push(`- 企业名称：${oneLine(license.name)}`);
+    lines.push(`- 统一社会信用代码：${oneLine(license.creditCode)}`);
+    lines.push(`- 法人姓名：${oneLine(license.legalPerson)}`);
+    lines.push(`- 注册地址：${oneLine(license.registeredAddress)}`);
+    lines.push(`- 营业执照：${oneLine(license.imageUrl)}`);
+  }
+  lines.push(unverifiedProfileNotice);
 }
 
 function appendProducts(lines: string[], products: readonly PublicProduct[]): void {

@@ -6,6 +6,8 @@ export const storeExplanation = "帮中小商家做自己的店，并让各种 A
 
 export const emptyProductsNote = "没有可展示的商品。";
 
+export const unverifiedProfileNotice = "商家自行填写，本系统未核验。";
+
 export const viewAllProductsLabel = "查看更多";
 
 export const siteName = "MercLink";

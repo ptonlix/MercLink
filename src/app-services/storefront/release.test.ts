@@ -265,6 +265,8 @@ describe("storefront release", () => {
           logoUrl: null,
           areaServed: null,
           address: null,
+          license: null,
+          contact: null,
         }),
     });
     let price = 159900;
@@ -289,6 +291,8 @@ describe("storefront release", () => {
           logoUrl: null,
           areaServed: null,
           address: null,
+          license: null,
+          contact: null,
         }),
     });
     const after = await serveStorefront("/products/prd_1", `${origin}/products/prd_1`);
@@ -597,6 +601,8 @@ describe("storefront release", () => {
           logoUrl: null,
           areaServed: null,
           address: null,
+          license: null,
+          contact: null,
         }),
     });
     storage.objects.set(

@@ -20,7 +20,8 @@ const pricePattern =
   /[¥￥]\s*\d|\d+(?:\.\d{1,2})?\s*元|(?:价格|售价|单价|标价)\s*[:：]?\s*\d|price\s*[:=]\s*\d/i;
 const stockPattern = /库存\s*[:：]?\s*\d|stock\s*[:=]\s*\d/i;
 const successPattern = /支付成功|付款成功|payment\s+success/i;
-const storeLiteralPattern = /(?:展示名|店铺简介|店名|服务区域|店铺地址|店铺标识)\s*[:：]\s*[^\s<]/;
+const storeLiteralPattern =
+  /(?:展示名|店铺简介|店名|服务区域|店铺地址|店铺标识|统一社会信用代码|法人姓名|注册地址|客服电话|客服二维码)\s*[:：]\s*[^\s<]/;
 const orderLiteralPattern = /订单状态\s*[:：]\s*(?:paid|pending|closed)|status\s*[:=]\s*["']?paid/i;
 const passwordPattern = /支付宝密码|支付密码|alipay\s+password/i;
 const jsonLdMimeType = "application/ld+json";

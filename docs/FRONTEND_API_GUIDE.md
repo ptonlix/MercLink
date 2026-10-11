@@ -4,7 +4,7 @@
 
 ## 1. 先按页面看能力
 
-当前前端和后端在同一个 Next.js 进程中，本地地址为 `http://127.0.0.1:3000`。业务路径注册表共 **28 个“方法 + 路径”**，此外还有 OAuth、登录表单、API Key、图片读取等辅助路由。
+当前前端和后端在同一个 Next.js 进程中，本地地址为 `http://127.0.0.1:3000`。业务路径注册表共 **38 个“方法 + 路径”**，此外还有 OAuth、登录表单、API Key、图片读取等辅助路由。
 
 | 页面或操作             | 对接能力                                          | 当前条件                                 |
 | ---------------------- | ------------------------------------------------- | ---------------------------------------- |
@@ -68,7 +68,7 @@ PRD 当前把日常商品管理定位为“商家 Agent 通过 API 完成”。`
 
 | 方法 | 路径                           | 用途与返回 `data`                                                                                                 |
 | ---- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| GET  | `/api/v1/store`                | 已发布店铺介绍：`display_name`、`summary`、`website_url`、`logo_url`、`area_served`、`address`；后四项可为 `null` |
+| GET  | `/api/v1/store`                | 已发布店铺介绍：`display_name`、`summary`、`website_url`、`logo_url`、`area_served`、`address`、`license`、`contact`；后四项以及 `license`、`contact` 可为 `null` |
 | GET  | `/api/v1/products`             | 已上架商品列表：`{items: PublicProduct[], next_cursor}`                                                           |
 | GET  | `/api/v1/products/{id}`        | 单个 `PublicProduct`；下架、删除或没有上架规格时返回 404                                                          |
 | GET  | `/api/v1/catalogs/{id}/schema` | `{catalog_id, currency, schema_revision, system_fields, fields}`；用于字段标签和动态表单                          |
@@ -216,7 +216,7 @@ Schema 的 `fields` 项结构为 `{id, key, label, type, required, choices, stat
 | GET  | `/api/v1/merchant/profile` | 商家身份；当前没有额外 scope 检查 | 读自己的完整介绍草稿，未设置时返回空草稿 |
 | PUT  | `/api/v1/merchant/profile` | `product:write`                   | 整体保存；用 `published` 发布或撤回      |
 
-PUT 必须提交下面全部七个字段，无值的可选字段用 `null`，不能省略，也不能增加字段：
+PUT 必须提交下面全部九个字段，无值的可选字段用 `null`，不能省略，也不能增加字段：
 
 ```json
 {
@@ -226,11 +226,25 @@ PUT 必须提交下面全部七个字段，无值的可选字段用 `null`，不
   "logo_url": null,
   "area_served": "成都",
   "address": null,
+  "license": null,
+  "contact": null,
   "published": true
 }
 ```
 
-发布时展示名和简介不能为空，分别最多 40 / 300 字符；服务区域最多 40，地址最多 120，URL 必须是最多 200 字符的 http(s) 地址。内容要求纯文本，不能带 HTML/Markdown 或泄露账号登录手机号、账号邮箱。返回七个字段加 `updated_at`。没有单独发布路由；撤回后公开 store 接口返回 404。
+发布时展示名和简介不能为空，分别最多 40 / 300 字符；服务区域最多 40，地址最多 120，URL 必须是最多 200 字符的 http(s) 地址。内容要求纯文本，不能带 HTML/Markdown 或泄露账号登录手机号、账号邮箱。返回九个字段加 `updated_at`。没有单独发布路由；撤回后公开 store 接口返回 404。
+
+`license` 和 `contact` 是推荐事实，不是发布介绍或上架商品的条件。未保存时公开接口仍返回这两个键，值是 `null`。非空 `license` 正好包含 `name`、`credit_code`、`legal_person`、`registered_address`、`image_url`。非空 `contact` 正好包含 `phone`、`label`、`qr_url`。注册地址不写入经营地址。执照和客服二维码只能引用本店、对应用途的资料图片地址。
+
+资料图片上传：
+
+| 方法 | 路径                               | 权限            | 用途                                      |
+| ---- | ---------------------------------- | --------------- | ----------------------------------------- |
+| POST | `/api/v1/merchant/profile/images`  | `product:write` | 上传执照或客服二维码，不发布店铺介绍      |
+
+请求是 `multipart/form-data`，文件字段名 `file`，文本字段 `purpose` 只能是 `license` 或 `contact_qr`。成功返回 `{id, url, content_type, byte_size, purpose}`。它和目录图片上传共用同一商家每 60 秒 30 次的窗口。返回的 `url` 不能当作商品封面，目录图片地址也不能当作执照或二维码。公开读取仍是 `GET /media/{id}`。
+
+店面若展示这些事实，使用槽位 `store.contact_phone`、`store.contact_label`、`store.contact_qr`、`store.license_name`、`store.license_credit_code`、`store.license_legal_person`、`store.license_address`、`store.license_image`。旧店面可以不声明这些槽位。
 
 ## 6. 登录与授权：两种凭据分别接入
 

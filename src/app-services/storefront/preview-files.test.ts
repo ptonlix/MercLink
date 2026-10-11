@@ -224,6 +224,14 @@ describe("storefront preview files", () => {
         website: "https://example.test",
         area: "全国",
         address: null,
+        contactPhone: null,
+        contactLabel: null,
+        contactQr: null,
+        licenseName: null,
+        licenseCreditCode: null,
+        licenseLegalPerson: null,
+        licenseAddress: null,
+        licenseImage: null,
       },
       products: [
         {

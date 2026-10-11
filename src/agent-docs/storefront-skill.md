@@ -71,6 +71,14 @@ Local preview fills fact slots from the source deployment before activation. It 
 - `<merclink-slot name="store.website"></merclink-slot>`
 - `<merclink-slot name="store.area"></merclink-slot>`
 - `<merclink-slot name="store.address"></merclink-slot>`
+- `<merclink-slot name="store.contact_phone"></merclink-slot>`
+- `<merclink-slot name="store.contact_label"></merclink-slot>`
+- `<merclink-slot name="store.contact_qr"></merclink-slot>`
+- `<merclink-slot name="store.license_name"></merclink-slot>`
+- `<merclink-slot name="store.license_credit_code"></merclink-slot>`
+- `<merclink-slot name="store.license_legal_person"></merclink-slot>`
+- `<merclink-slot name="store.license_address"></merclink-slot>`
+- `<merclink-slot name="store.license_image"></merclink-slot>`
 - `<merclink-slot name="product.name"></merclink-slot>`
 - `<merclink-slot name="product.cover"></merclink-slot>`
 - `<merclink-slot name="product.fields"></merclink-slot>`
@@ -85,7 +93,7 @@ Local preview fills fact slots from the source deployment before activation. It 
 
 支付成功文案只能放在 `<template data-merclink="order.paid">` 里，并且页面必须有订单状态槽位。服务端只有读到状态 `paid` 才放入这段文案。
 
-店铺槽位来自已发布的店铺资料：展示名、简介、标识、网站、区域、地址。商品槽位来自当前已上架商品：名称、封面、公开字段、规格值、库存、可售状态、主币单位价格。商品列表和 `/products/{id}` 必须使用这些商品槽位。`order_id` 不是公开查询。只有与 `GET /api/v1/orders/{id}` 相同的买家 Authorization，且订单属于该买家时，服务端才填 `order.status`。匿名、其他买家或没有 `order:read` 时槽位为空，也不展开支付成功文案。不得把支付成功建立在回跳上。只有槽位值为 `paid` 时，页面才能显示支付成功。
+店铺槽位来自已发布的店铺资料：展示名、简介、标识、网站、区域、地址，以及可选的客服电话、客服说明、客服二维码、企业名称、统一社会信用代码、法人姓名、注册地址和执照图片。`store.contact_phone`、`store.contact_label`、`store.contact_qr`、`store.license_name`、`store.license_credit_code`、`store.license_legal_person`、`store.license_address`、`store.license_image` 可以不声明；没有这些槽位的发布仍可激活。没有对应事实时槽位为空。一旦页面在这些标签后写出可见的具体值，却没有对应槽位，就不能发布。商品槽位来自当前已上架商品：名称、封面、公开字段、规格值、库存、可售状态、主币单位价格。商品列表和 `/products/{id}` 必须使用这些商品槽位。`order_id` 不是公开查询。只有与 `GET /api/v1/orders/{id}` 相同的买家 Authorization，且订单属于该买家时，服务端才填 `order.status`。匿名、其他买家或没有 `order:read` 时槽位为空，也不展开支付成功文案。不得把支付成功建立在回跳上。只有槽位值为 `paid` 时，页面才能显示支付成功。
 
 没有这些事实的营销页可以是静态版式。一旦展示上述任一事实，就必须用对应槽位。写死价格、库存、店铺资料或「支付成功」，该页面不得发布。
 

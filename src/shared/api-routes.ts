@@ -76,6 +76,7 @@ export const apiRoutes = [
   // Profile writes reuse product:write. Do not add a profile scope.
   { method: "GET", path: "/api/v1/merchant/profile", audiences: merchant },
   { method: "PUT", path: "/api/v1/merchant/profile", audiences: merchant },
+  { method: "POST", path: "/api/v1/merchant/profile/images", audiences: merchant },
   // Public read. Listed so the merchant skill documents the same path.
   { method: "GET", path: "/api/v1/store", audiences: merchant },
   { method: "POST", path: "/api/v1/payments/alipay/notify", audiences: [] },

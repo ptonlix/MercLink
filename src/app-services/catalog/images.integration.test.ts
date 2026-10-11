@@ -6,6 +6,12 @@ import { afterAll, describe, expect, it } from "vitest";
 import { POST as uploadRoute } from "../../app/api/v1/catalogs/[id]/images/route";
 import { PATCH as patchProductRoute } from "../../app/api/v1/catalogs/[id]/products/[product_id]/route";
 import { PATCH as patchVariantRoute } from "../../app/api/v1/catalogs/[id]/variants/[variant_id]/route";
+import { POST as profileImageRoute } from "../../app/api/v1/merchant/profile/images/route";
+import {
+  GET as merchantProfileRoute,
+  PUT as putProfileRoute,
+} from "../../app/api/v1/merchant/profile/route";
+import { GET as publicStoreRoute } from "../../app/api/v1/store/route";
 import { GET as mediaRoute } from "../../app/media/[id]/route";
 import { runMigrations } from "../../db/migrate";
 import { buyerActor, merchantActor } from "../../shared/actor";
@@ -14,7 +20,8 @@ import { createClockRateLimit } from "../../adapters/redis/clock-rate-limit";
 import { systemClock, type Clock } from "../../ports/clock";
 import type { ObjectStoragePort } from "../../ports/object-storage";
 import type { RateLimitPort } from "../../ports/rate-limit";
-import { imageUploadLimit, imageUploadWindowMs } from "../../domain/catalog/images";
+import { imageUploadLimit, imageUploadWindowMs, maxImageBytes } from "../../domain/catalog/images";
+import { registerMerchantProfile, resetMerchantProfileStore } from "../identity/profile-http";
 import { createCatalog } from "./catalogs";
 import { bindCatalogSql } from "./http";
 import { createProduct } from "./products";
@@ -33,7 +40,9 @@ describe("product images", () => {
   afterAll(() => {
     resetAuthenticator();
     resetMediaRuntime();
+    resetMerchantProfileStore();
     bindCatalogSql(undefined);
+    delete process.env.APP_BASE_URL;
   });
 
   it("migrates product_images with a catalog foreign key and no deleted_at", async () => {
@@ -284,6 +293,191 @@ describe("product images", () => {
       expect(variantBody.variants[0]?.cover).toBe(image.url);
     });
   });
+
+  it("uploads a profile image without publishing and rejects buyers, svg, and oversized files", async () => {
+    await withImageDb(async (sql) => {
+      const storage = memoryStorage();
+      bind(sql, storage.port, createClockRateLimit({ now: () => new Date(1_000) }));
+      registerMerchantProfile(sql);
+      process.env.APP_BASE_URL = origin;
+      asMerchant("mch_a");
+
+      const created = await profileImageRoute(profileUploadRequest(png, "license"));
+      expect(created.status).toBe(201);
+      const body = (
+        (await created.json()) as {
+          data: {
+            id: string;
+            url: string;
+            content_type: string;
+            byte_size: number;
+            purpose: string;
+          };
+        }
+      ).data;
+      expect(body.id.startsWith("img_")).toBe(true);
+      expect(body.id).not.toContain("secret");
+      expect(body.url).toBe(`${origin}/media/${body.id}`);
+      expect(body.content_type).toBe("image/png");
+      expect(body.purpose).toBe("license");
+      expect(storage.puts).toEqual([body.id]);
+      const catalogRows = await sql<{ count: string }[]>`
+        SELECT count(*)::text AS count FROM product_images
+      `;
+      expect(catalogRows[0]?.count).toBe("0");
+      const profileRows = await sql<{ published: boolean }[]>`
+        SELECT published FROM merchant_profiles
+      `;
+      expect(profileRows).toEqual([]);
+      const hidden = await publicStoreRoute();
+      expect(hidden.status).toBe(404);
+
+      asBuyer();
+      const forbidden = await profileImageRoute(profileUploadRequest(png, "contact_qr"));
+      expect(forbidden.status).toBe(403);
+      await expect(forbidden.json()).resolves.toMatchObject({ code: 40300, data: null });
+      expect(storage.puts).toEqual([body.id]);
+
+      asMerchant("mch_a");
+      const svgUpload = await profileImageRoute(profileUploadRequest(svg, "license", "mark.svg"));
+      expect(svgUpload.status).toBe(400);
+      await expect(svgUpload.json()).resolves.toMatchObject({ code: 40000, data: null });
+      const oversized = new Uint8Array(maxImageBytes + 1);
+      oversized.set(png);
+      const tooBig = await profileImageRoute(profileUploadRequest(oversized, "license"));
+      expect(tooBig.status).toBe(400);
+      const unknown = await profileImageRoute(profileUploadRequest(png, "avatar"));
+      expect(unknown.status).toBe(400);
+      expect(storage.puts).toEqual([body.id]);
+      expect(storage.objects.has(body.id)).toBe(true);
+      expect([...storage.objects.keys()]).toEqual([body.id]);
+    });
+  });
+
+  it("shares the catalog upload window and does not write when Redis is down", async () => {
+    await withImageDb(async (sql) => {
+      const storage = memoryStorage();
+      let now = 20_000;
+      const clock: Clock = { now: () => new Date(now) };
+      bind(sql, storage.port, createClockRateLimit(clock), clock);
+      const catalog = await mustCatalog(sql, "mch_a");
+      asMerchant("mch_a");
+
+      for (let attempt = 0; attempt < imageUploadLimit - 1; attempt += 1) {
+        const rejected = await uploadRoute(uploadRequest(catalog.id, svg), {
+          params: Promise.resolve({ id: catalog.id }),
+        });
+        expect(rejected.status).toBe(400);
+      }
+      const thirtieth = await profileImageRoute(profileUploadRequest(png, "contact_qr"));
+      expect(thirtieth.status).toBe(201);
+      expect(storage.puts).toHaveLength(1);
+
+      const limited = await profileImageRoute(profileUploadRequest(png, "license"));
+      expect(limited.status).toBe(429);
+      await expect(limited.json()).resolves.toMatchObject({ code: 42900, data: null });
+      expect(storage.puts).toHaveLength(1);
+
+      now += imageUploadWindowMs + 1;
+      for (let attempt = 0; attempt < imageUploadLimit; attempt += 1) {
+        const rejected = await uploadRoute(uploadRequest(catalog.id, svg), {
+          params: Promise.resolve({ id: catalog.id }),
+        });
+        expect(rejected.status).toBe(400);
+      }
+      const afterCatalogWindow = await profileImageRoute(profileUploadRequest(png, "license"));
+      expect(afterCatalogWindow.status).toBe(429);
+      expect(storage.puts).toHaveLength(1);
+
+      now += imageUploadWindowMs + 1;
+      const down = memoryStorage();
+      bind(sql, down.port, {
+        reserve: () => Promise.resolve({ ok: false, error: "unavailable" }),
+        release: () => Promise.resolve({ ok: true }),
+      });
+      const unavailable = await profileImageRoute(profileUploadRequest(png, "license"));
+      expect(unavailable.status).toBe(503);
+      await expect(unavailable.json()).resolves.toMatchObject({ code: 50301, data: null });
+      expect(down.puts).toEqual([]);
+    });
+  });
+
+  it("serves profile images and refuses to swap them with catalog covers", async () => {
+    await withImageDb(async (sql) => {
+      const storage = memoryStorage();
+      const limiter = countingLimit(createClockRateLimit({ now: () => new Date(30_000) }));
+      bind(sql, storage.port, limiter.port);
+      registerMerchantProfile(sql);
+      process.env.APP_BASE_URL = origin;
+      const catalog = await mustCatalog(sql, "mch_a");
+      asMerchant("mch_a");
+      const profileUpload = await profileImageRoute(profileUploadRequest(png, "license"));
+      const profileImage = ((await profileUpload.json()) as { data: { id: string; url: string } })
+        .data;
+      const catalogUpload = await uploadRoute(uploadRequest(catalog.id, png), {
+        params: Promise.resolve({ id: catalog.id }),
+      });
+      const catalogImage = ((await catalogUpload.json()) as { data: { url: string } }).data;
+      const product = await createProduct(sql, "mch_a", catalog.id, {
+        title: "短靴",
+        price: 100,
+        stock: 1,
+      });
+      expect(product.ok).toBe(true);
+      if (!product.ok) {
+        return;
+      }
+
+      const cover = await patchProductRoute(
+        jsonRequest(catalog.id, product.value.id, { cover: profileImage.url }),
+        { params: Promise.resolve({ id: catalog.id, product_id: product.value.id }) },
+      );
+      expect(cover.status).toBe(404);
+      await expect(cover.json()).resolves.toMatchObject({ code: 40400, data: null });
+      const storedCover = await sql<{ cover: string | null }[]>`
+        SELECT cover FROM products WHERE id = ${product.value.id}
+      `;
+      expect(storedCover[0]?.cover ?? null).toBeNull();
+
+      const license = await putProfileRoute(
+        profileJson({
+          license: {
+            name: "示例企业",
+            credit_code: "91310000MA1FL0000N",
+            legal_person: "例某",
+            registered_address: "示例市示例路 1 号",
+            image_url: catalogImage.url,
+          },
+        }),
+      );
+      expect(license.status).toBe(404);
+      await expect(license.json()).resolves.toMatchObject({ code: 40400, data: null });
+      const own = await merchantProfileRoute(
+        new Request(`${origin}/api/v1/merchant/profile`, {
+          headers: { authorization: "Bearer merchant-token" },
+        }),
+      );
+      await expect(own.json()).resolves.toMatchObject({
+        code: 200,
+        data: { license: null, published: false },
+      });
+
+      const consumesBeforeRead = limiter.consumes;
+      resetAuthenticator();
+      const response = await mediaRoute(new Request(`${origin}/media/${profileImage.id}`), {
+        params: Promise.resolve({ id: profileImage.id }),
+      });
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toBe("image/png");
+      expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(response.headers.get("content-disposition")).toBe("inline");
+      expect(new Uint8Array(await response.arrayBuffer())).toEqual(png);
+      expect(limiter.consumes).toBe(consumesBeforeRead);
+      const hidden = await publicStoreRoute();
+      expect(hidden.status).toBe(404);
+      expect(await hidden.text()).not.toContain(profileImage.url);
+    });
+  });
 });
 
 function asMerchant(merchantId: string): void {
@@ -330,6 +524,39 @@ function uploadRequest(
     method: "POST",
     headers: { authorization: "Bearer merchant-token" },
     body: form,
+  });
+}
+
+function profileUploadRequest(bytes: Uint8Array, purpose: string, name = "photo.png") {
+  const form = new FormData();
+  form.set("file", new File([binaryBody(bytes)], name, { type: "image/png" }));
+  form.set("purpose", purpose);
+  return new Request(`${origin}/api/v1/merchant/profile/images`, {
+    method: "POST",
+    headers: { authorization: "Bearer merchant-token" },
+    body: form,
+  });
+}
+
+function profileJson(overrides: Record<string, unknown> = {}): Request {
+  return new Request(`${origin}/api/v1/merchant/profile`, {
+    method: "PUT",
+    headers: {
+      authorization: "Bearer merchant-token",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      display_name: "南风商店",
+      summary: "一段虚构简介。",
+      website_url: null,
+      logo_url: null,
+      area_served: null,
+      address: null,
+      license: null,
+      contact: null,
+      published: false,
+      ...overrides,
+    }),
   });
 }
 

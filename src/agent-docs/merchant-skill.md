@@ -65,6 +65,7 @@ scope=field:write product:write product:read order:read
 ```http
 GET /api/v1/merchant/profile
 PUT /api/v1/merchant/profile
+POST /api/v1/merchant/profile/images
 GET /api/v1/store
 GET /api/v1/catalogs
 POST /api/v1/catalogs
@@ -105,7 +106,7 @@ GET /api/v1/manage/orders
 
 `GET /api/v1/merchant/profile` 读取自己的介绍，没有请求体。还没有保存时返回空草稿，不是 404。空草稿的 `published` 是 `false`。
 
-`PUT /api/v1/merchant/profile` 整份替换，正文必须是 `application/json`，并且令牌要有 `product:write`。七个字段必须全部出现，不能多也不能少：`display_name`、`summary`、`website_url`、`logo_url`、`area_served`、`address`、`published`。空值用 `null`，不要省略。介绍必须是纯文本，不能包含 HTML 或 Markdown。
+`PUT /api/v1/merchant/profile` 整份替换，正文必须是 `application/json`，并且令牌要有 `product:write`。九个字段必须全部出现，不能多也不能少：`display_name`、`summary`、`website_url`、`logo_url`、`area_served`、`address`、`license`、`contact`、`published`。空值用 `null`，不要省略。介绍必须是纯文本，不能包含 HTML 或 Markdown。
 
 ```json
 {
@@ -115,15 +116,21 @@ GET /api/v1/manage/orders
   "logo_url": null,
   "area_served": "示例城市",
   "address": null,
+  "license": null,
+  "contact": null,
   "published": false
 }
 ```
 
-这只是请求形状，不是任何商家已保存的介绍。展示名不超过 40 个字符，简介不超过 300 个字符。发布时展示名和简介都不能为空。网站和标识必须是不超过 200 个字符的 http 或 https 地址，或者 `null`。标识不是上传接口的返回值专用字段；上传接口只用于商品和规格封面。
+这只是请求形状，不是任何商家已保存的介绍。展示名不超过 40 个字符，简介不超过 300 个字符。发布时展示名和简介都不能为空。网站和标识必须是不超过 200 个字符的 http 或 https 地址，或者 `null`。标识不是资料图片上传的返回值专用字段；商品和规格封面仍只用目录图片上传。
+
+执照和客服是推荐录入，不是创建目录、创建商品、上架商品或发布介绍的前提，可以跳过。非空 `license` 正好是 `name`、`credit_code`、`legal_person`、`registered_address`、`image_url`。非空 `contact` 正好是 `phone`、`label`、`qr_url`。缺任何一项执照字段都不能保存。注册地址不覆盖经营地址 `address`。
+
+先在本地阅读执照图片，向用户展示企业名称、统一社会信用代码、法人姓名和注册地址，并得到用户对这四项的明确同意后，才能上传执照图片或写入 `license`。不要猜测缺失的值。不要在同意前上传。不要解码二维码内容。不要用目录图片接口 `POST /api/v1/catalogs/{id}/images` 上传执照或客服二维码。资料图片使用 `POST /api/v1/merchant/profile/images`，`multipart/form-data` 里文件字段名是 `file`，`purpose` 只能是 `license` 或 `contact_qr`。资料图片地址一旦被知道就可以公开读取，但这不会发布店铺介绍。
 
 只有 `published` 为 `true` 时，落地页和公开接口才会显示这份介绍。把 `published` 改为 `false` 后，落地页立即不再显示。
 
-不要把登录手机号、密码、短信验证码或 API Key 提交为公开资料。不要把登录手机号写进 `website_url`、`summary` 或其他字段。
+不要把登录手机号、密码、短信验证码、API Key 或身份证号提交为公开资料。不要把登录手机号写进 `website_url`、`summary`、`phone`、`label` 或其他字段。
 
 公开读取是 `GET /api/v1/store`，不需要令牌。未发布、已撤回或商家停用时，它返回 `not_found`，不回显草稿。
 

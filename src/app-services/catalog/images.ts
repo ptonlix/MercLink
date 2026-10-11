@@ -21,6 +21,12 @@ export type StoredImage = {
   byteSize: number;
 };
 
+type ProfileImagePurpose = "license" | "contact_qr";
+
+export type StoredProfileImage = StoredImage & {
+  purpose: ProfileImagePurpose;
+};
+
 export type ImageError =
   "validation_error" | "not_found" | "rate_limited" | "dependency_unavailable";
 
@@ -134,15 +140,79 @@ export async function uploadCatalogImage(
   };
 }
 
+export async function uploadProfileImage(
+  sql: Sql,
+  merchantId: string,
+  request: Request,
+): Promise<ImageResult<StoredProfileImage>> {
+  const runtime = mediaRuntime();
+  if (runtime === undefined) {
+    return imageFail("dependency_unavailable", "上传服务暂时不可用。");
+  }
+  const limited = await consumeUpload(runtime.rateLimit, runtime.clock, merchantId);
+  if (!limited.ok) {
+    return limited;
+  }
+  const file = await readProfileImageFile(request);
+  if (!file.ok) {
+    return file;
+  }
+  const detected = detectImage(file.value.bytes);
+  if (!detected.ok) {
+    return imageFail("validation_error", detected.message);
+  }
+  const id = createPublicId("image");
+  try {
+    await runtime.objectStorage.put({
+      key: id,
+      bytes: file.value.bytes,
+      contentType: detected.value.contentType,
+    });
+  } catch {
+    return imageFail("dependency_unavailable", "上传服务暂时不可用。");
+  }
+  try {
+    await sql`
+      INSERT INTO merchant_profile_images (id, merchant_id, purpose, content_type, byte_size)
+      VALUES (
+        ${id},
+        ${merchantId},
+        ${file.value.purpose},
+        ${detected.value.contentType},
+        ${detected.value.byteSize}
+      )
+    `;
+  } catch {
+    await runtime.objectStorage.delete(id).catch(() => undefined);
+    return imageFail("dependency_unavailable", "上传服务暂时不可用。");
+  }
+  return {
+    ok: true,
+    value: {
+      id,
+      url: mediaUrl(runtime.mediaBaseUrl, id),
+      contentType: detected.value.contentType,
+      byteSize: detected.value.byteSize,
+      purpose: file.value.purpose,
+    },
+  };
+}
+
 export async function readPublicImage(
   sql: Sql,
   storage: ObjectStoragePort,
   id: string,
 ): Promise<ImageResult<{ bytes: Uint8Array; contentType: string }>> {
-  const rows = await sql<{ content_type: string }[]>`
+  const productRows = await sql<{ content_type: string }[]>`
     SELECT content_type FROM product_images WHERE id = ${id}
   `;
-  const row = rows[0];
+  const profileRows =
+    productRows[0] === undefined
+      ? await sql<{ content_type: string }[]>`
+          SELECT content_type FROM merchant_profile_images WHERE id = ${id}
+        `
+      : [];
+  const row = productRows[0] ?? profileRows[0];
   if (row === undefined) {
     return imageFail("not_found", "没有找到图片。");
   }
@@ -200,6 +270,49 @@ async function consumeUpload(
   } catch {
     return imageFail("dependency_unavailable", "上传服务暂时不可用。");
   }
+}
+
+async function readProfileImageFile(
+  request: Request,
+): Promise<ImageResult<{ bytes: Uint8Array; purpose: ProfileImagePurpose }>> {
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return imageFail("validation_error", "请使用 multipart/form-data 上传一个文件。");
+  }
+  const files: File[] = [];
+  let purpose: string | undefined;
+  for (const [key, value] of form.entries()) {
+    if (typeof value === "string") {
+      if (key !== "purpose" || purpose !== undefined) {
+        return imageFail("validation_error", "不能提交未声明的字段。");
+      }
+      purpose = value;
+      continue;
+    }
+    if (key !== "file") {
+      return imageFail("validation_error", "文件字段名必须是 file。");
+    }
+    files.push(value);
+  }
+  if (purpose !== "license" && purpose !== "contact_qr") {
+    return imageFail("validation_error", "purpose 必须是 license 或 contact_qr。");
+  }
+  if (files.length !== 1) {
+    return imageFail("validation_error", "每次只能上传一个文件。");
+  }
+  const file = files[0];
+  if (file === undefined || file.size === 0) {
+    return imageFail("validation_error", "图片不能为空。");
+  }
+  if (file.size > maxImageBytes) {
+    return imageFail("validation_error", "图片不能超过 5 MiB。");
+  }
+  return {
+    ok: true,
+    value: { bytes: new Uint8Array(await file.arrayBuffer()), purpose },
+  };
 }
 
 async function readImageFile(request: Request): Promise<ImageResult<Uint8Array>> {

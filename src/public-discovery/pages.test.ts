@@ -17,7 +17,15 @@ import {
   resetPublicStore,
   type PublicStoreProfile,
 } from "../shared/seams/public-store";
-import { emptyProductsNote, storeExplanation, storeSlogan, viewAllProductsLabel } from "./site";
+import { landingMarkdownResponse } from "./markdown";
+import {
+  emptyProductsNote,
+  storeExplanation,
+  storeSlogan,
+  unverifiedProfileNotice,
+  viewAllProductsLabel,
+} from "./site";
+import { serverFactJsonLd } from "./model";
 
 const origin = "https://merclink.example";
 
@@ -266,6 +274,91 @@ describe("public pages", () => {
     expect(onlineStore).not.toHaveProperty("sameAs");
     expect(onlineStore).not.toHaveProperty("areaServed");
     expect(onlineStore).not.toHaveProperty("address");
+    expect(onlineStore).not.toHaveProperty("telephone");
+    expect(onlineStore).not.toHaveProperty("identifier");
+    expect(onlineStore).not.toHaveProperty("taxID");
+    expect(visible).not.toContain(unverifiedProfileNotice);
+    expect(visible).not.toContain('class="profileFacts"');
+  });
+
+  it("shows published license and contact as unverified facts", async () => {
+    const store = publishedStore({
+      address: "西湖区某某路 88 号",
+      license: {
+        name: "示例企业",
+        creditCode: "91310000MA1FL0000N",
+        legalPerson: "例某",
+        registeredAddress: "示例市注册路 1 号",
+        imageUrl: "https://cdn.example/license.png",
+      },
+      contact: null,
+    });
+    publicStore.register({ get: () => Promise.resolve(store) });
+    const html = renderToStaticMarkup(await HomePage());
+    const visible = visibleHtml(html);
+    const onlineStore = landingGraph(html).find((node) => node["@type"] === "OnlineStore");
+    const markdown = await (await landingMarkdownResponse()).text();
+
+    expect(visible).toContain("示例企业");
+    expect(visible).toContain("91310000MA1FL0000N");
+    expect(visible).toContain("例某");
+    expect(visible).toContain("示例市注册路 1 号");
+    expect(visible).toContain(unverifiedProfileNotice);
+    expect(visible.indexOf(unverifiedProfileNotice)).toBeLessThan(visible.indexOf(storeSlogan));
+    expect(onlineStore).toMatchObject({
+      address: { "@type": "PostalAddress", streetAddress: "西湖区某某路 88 号" },
+      identifier: [
+        { "@type": "PropertyValue", name: "统一社会信用代码", value: "91310000MA1FL0000N" },
+        { "@type": "PropertyValue", name: "法人姓名", value: "例某" },
+        { "@type": "PropertyValue", name: "注册地址", value: "示例市注册路 1 号" },
+      ],
+    });
+    expect(onlineStore).not.toHaveProperty("telephone");
+    expect(JSON.stringify(onlineStore)).not.toContain("certification");
+    expect(JSON.stringify(onlineStore)).not.toContain("taxID");
+    expect(JSON.stringify(onlineStore)).not.toContain("founder");
+    expect(JSON.stringify(onlineStore?.address)).not.toContain("示例市注册路 1 号");
+    expect(markdown).toContain("91310000MA1FL0000N");
+    expect(markdown).toContain(unverifiedProfileNotice);
+    expect(markdown).not.toContain("客服电话");
+
+    publicStore.register({
+      get: () =>
+        Promise.resolve(
+          publishedStore({
+            license: null,
+            contact: { phone: "010-00000000", label: "白天", qrUrl: null },
+          }),
+        ),
+    });
+    const phoneHtml = renderToStaticMarkup(await HomePage());
+    const phoneMarkdown = await (await landingMarkdownResponse()).text();
+    expect(visibleHtml(phoneHtml)).toContain("010-00000000");
+    expect(visibleHtml(phoneHtml)).toContain(unverifiedProfileNotice);
+    expect(visibleHtml(phoneHtml)).not.toContain("统一社会信用代码");
+    expect(phoneMarkdown).toContain("010-00000000");
+    expect(phoneMarkdown).toContain(unverifiedProfileNotice);
+    expect(phoneMarkdown).not.toContain("91310000MA1FL0000N");
+    const injected = serverFactJsonLd({
+      declaresStore: true,
+      declaresProduct: false,
+      store: publishedStore({
+        license: store.license,
+        contact: { phone: "010-00000000", label: null, qrUrl: null },
+        address: "西湖区某某路 88 号",
+      }),
+      products: [],
+      product: null,
+    });
+    expect(injected).toMatchObject({
+      telephone: "010-00000000",
+      identifier: [
+        { name: "统一社会信用代码", value: "91310000MA1FL0000N" },
+        { name: "法人姓名" },
+        { name: "注册地址", value: "示例市注册路 1 号" },
+      ],
+    });
+    expect(JSON.stringify(injected)).not.toContain("taxID");
   });
 
   it("shows two product cards in yuan and keeps them without script", async () => {
@@ -417,6 +510,8 @@ function publishedStore(overrides: Partial<PublicStoreProfile> = {}): PublicStor
     logoUrl: null,
     areaServed: null,
     address: null,
+    license: null,
+    contact: null,
     ...overrides,
   };
 }

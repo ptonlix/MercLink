@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- Public navigation must work without the Next client runtime. */
+/* eslint-disable @next/next/no-img-element -- Profile images are served by /media/{id} and must appear without the image optimizer. */
 import { createElement, type ReactNode } from "react";
 import { slotHtml, type SlotContext, type SlotProduct } from "../domain/storefront/slots";
 import { minorUnits } from "../shared/money";
@@ -67,6 +68,7 @@ import {
   storeExplanation,
   storefrontSkillPath,
   storeSlogan,
+  unverifiedProfileNotice,
   viewAllProductsLabel,
 } from "./site";
 
@@ -294,6 +296,7 @@ function StoreHeader({ facts }: { facts: Facts }): ReactNode {
             </>
           )}
         </div>
+        <RecommendedFacts facts={facts} />
       </div>
       {facts?.store?.logo ? (
         <PublicImage src={httpUrl(facts.store.logo)} title={facts.store.displayName} logo />
@@ -301,6 +304,85 @@ function StoreHeader({ facts }: { facts: Facts }): ReactNode {
         <Slot name="store.logo" facts={facts} />
       )}
     </header>
+  );
+}
+
+function RecommendedFacts({ facts }: { facts: Facts }): ReactNode {
+  if (facts === null) {
+    return (
+      <div className="profileFacts">
+        <p>
+          客服电话：
+          <Slot name="store.contact_phone" facts={facts} />
+        </p>
+        <p>
+          客服说明：
+          <Slot name="store.contact_label" facts={facts} />
+        </p>
+        <p>
+          客服二维码：
+          <Slot name="store.contact_qr" facts={facts} />
+        </p>
+        <p>
+          企业名称：
+          <Slot name="store.license_name" facts={facts} />
+        </p>
+        <p>
+          统一社会信用代码：
+          <Slot name="store.license_credit_code" facts={facts} />
+        </p>
+        <p>
+          法人姓名：
+          <Slot name="store.license_legal_person" facts={facts} />
+        </p>
+        <p>
+          注册地址：
+          <Slot name="store.license_address" facts={facts} />
+        </p>
+        <p>
+          营业执照：
+          <Slot name="store.license_image" facts={facts} />
+        </p>
+      </div>
+    );
+  }
+  const store = facts.store;
+  if (store === null) {
+    return null;
+  }
+  const hasContact =
+    store.contactPhone !== null || store.contactLabel !== null || store.contactQr !== null;
+  const hasLicense =
+    store.licenseName !== null ||
+    store.licenseCreditCode !== null ||
+    store.licenseLegalPerson !== null ||
+    store.licenseAddress !== null ||
+    store.licenseImage !== null;
+  if (!hasContact && !hasLicense) {
+    return null;
+  }
+  const qr = store.contactQr === null ? null : httpUrl(store.contactQr);
+  const licenseImage = store.licenseImage === null ? null : httpUrl(store.licenseImage);
+  return (
+    <section className="profileFacts">
+      {hasContact ? (
+        <div>
+          {store.contactPhone ? <p>客服电话：{store.contactPhone}</p> : null}
+          {store.contactLabel ? <p>{store.contactLabel}</p> : null}
+          {qr ? <img src={qr} alt="客服二维码" /> : null}
+        </div>
+      ) : null}
+      {hasLicense ? (
+        <div>
+          {store.licenseName ? <p>{store.licenseName}</p> : null}
+          {store.licenseCreditCode ? <p>统一社会信用代码：{store.licenseCreditCode}</p> : null}
+          {store.licenseLegalPerson ? <p>法人姓名：{store.licenseLegalPerson}</p> : null}
+          {store.licenseAddress ? <p>注册地址：{store.licenseAddress}</p> : null}
+          {licenseImage ? <img src={licenseImage} alt="营业执照" /> : null}
+        </div>
+      ) : null}
+      <p>{unverifiedProfileNotice}</p>
+    </section>
   );
 }
 

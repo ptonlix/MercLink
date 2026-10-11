@@ -280,14 +280,7 @@ async function firstFile(releaseId: string, paths: readonly string[]): Promise<F
   return null;
 }
 
-function storeFrom(store: {
-  displayName: string;
-  summary: string;
-  logoUrl: string | null;
-  websiteUrl: string | null;
-  areaServed: string | null;
-  address: string | null;
-}): SlotStore {
+function storeFrom(store: PublicStoreProfile): SlotStore {
   return {
     displayName: store.displayName,
     summary: store.summary,
@@ -295,6 +288,14 @@ function storeFrom(store: {
     website: store.websiteUrl,
     area: store.areaServed,
     address: store.address,
+    contactPhone: store.contact?.phone ?? null,
+    contactLabel: store.contact?.label ?? null,
+    contactQr: store.contact?.qrUrl ?? null,
+    licenseName: store.license?.name ?? null,
+    licenseCreditCode: store.license?.creditCode ?? null,
+    licenseLegalPerson: store.license?.legalPerson ?? null,
+    licenseAddress: store.license?.registeredAddress ?? null,
+    licenseImage: store.license?.imageUrl ?? null,
   };
 }
 
