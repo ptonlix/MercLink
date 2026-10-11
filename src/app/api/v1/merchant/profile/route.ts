@@ -1,4 +1,3 @@
-import { mediaBaseUrl } from "../../../../../app-services/catalog/media-runtime";
 import {
   getMerchantProfile,
   putMerchantProfile,
@@ -9,5 +8,5 @@ export function GET(request: Request): Promise<Response> {
 }
 
 export function PUT(request: Request): Promise<Response> {
-  return putMerchantProfile(request, mediaBaseUrl());
+  return putMerchantProfile(request);
 }
