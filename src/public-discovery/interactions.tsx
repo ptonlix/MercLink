@@ -254,7 +254,6 @@ export function VariantChooser({
                     {variantStock(variant)} · {availabilityText(variant.availability)}
                   </span>
                   {variant.sku === null ? null : <span className="muted">SKU：{variant.sku}</span>}
-                  <span className="identifier">规格 ID：{variant.id}</span>
                 </span>
               </label>
             </li>
@@ -267,7 +266,9 @@ export function VariantChooser({
             ? "当前规格均缺货，可以让 Agent 稍后重新查询。"
             : "选择规格后，把购买需求交给 Agent。Agent 会重新确认价格、库存和数量。"}
         </p>
-        <noscript>请把商品 ID 和需要的规格交给 Agent，由它查询并确认当前商品信息。</noscript>
+        <noscript>
+          没有脚本时，把本页地址交给 Agent。商品 ID、规格 ID 和整数分写在本页的 Markdown 里。
+        </noscript>
         <CopyText
           key={selectedId}
           text={text}

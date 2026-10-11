@@ -100,15 +100,17 @@ describe("public pages", () => {
 
     expect(visibleHtml(listHtml)).toContain(product.title);
     expect(visibleProduct).toContain(product.title);
-    expect(visibleProduct).toContain(product.id);
-    expect(visibleProduct).toContain(product.catalogId);
+    expect(visibleProduct).not.toContain("目录 ID");
+    expect(visibleProduct).not.toContain("查看结构化商品信息");
+    expect(visibleProduct).not.toContain(product.catalogId);
     expect(visibleProduct).toContain("weight_g");
     expect(visibleProduct).toContain("480");
-    expect(visibleProduct).toContain("var_sentinel");
     expect(visibleProduct).toContain("size=42");
-    expect(visibleProduct).toContain(String(product.offer.price));
+    expect(visibleProduct).not.toContain("规格 ID：");
+    expect(visibleProduct).not.toContain("var_sentinel");
+    expect(visibleProduct).not.toContain(String(product.offer.price));
     expect(visibleProduct).toContain(product.offer.currency);
-    expect(visibleProduct).toContain(product.offer.availability);
+    expect(visibleProduct).not.toContain(product.offer.availability);
     expect(visibleProduct).toContain("USD 2599.00");
     expect(visibleHtml(listHtml)).toContain("USD 2599.00");
     expect(offer).toEqual({
@@ -462,15 +464,31 @@ describe("public pages", () => {
     const visible = visibleHtml(
       renderToStaticMarkup(await ProductPage({ params: Promise.resolve({ id: product.id }) })),
     );
-    expect(visible).toContain("var_unlimited");
-    expect(visible).toContain("var_empty");
+    expect(visible).not.toContain("var_unlimited");
+    expect(visible).not.toContain("var_empty");
     expect(visible).toContain("不限库存");
     expect(visible).toContain("缺货");
     expect(visible).toContain("SKU-1");
     expect(visible).toContain(">是<");
     expect(visible).toContain("未填写");
+    expect(visible).toContain("enabled");
     expect(visible).not.toContain('action="/api/v1/orders"');
     expect(visible).not.toContain('name="price"');
+  });
+
+  it("shows a field label to people and hides the key when the seam provides one", async () => {
+    const product = publishedProduct();
+    product.fields = { origin: "北海合浦", note: null };
+    product.fieldLabels = { origin: "产地" };
+    registerProducts([product]);
+    const visible = visibleHtml(
+      renderToStaticMarkup(await ProductPage({ params: Promise.resolve({ id: product.id }) })),
+    );
+    expect(visible).toContain("产地");
+    expect(visible).toContain("北海合浦");
+    expect(visible).not.toContain("origin");
+    expect(visible).toContain("note");
+    expect(visible).toContain("未填写");
   });
 
   it("formats CNY minor units for people while preserving the structured offer", async () => {

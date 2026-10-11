@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buyerActor, merchantActor, scriptActor } from "../../shared/actor";
 import { canReadSchema, requireMerchantScope } from "./access";
-import { missingRequired, publicFields, validateFields } from "./attributes";
+import { missingRequired, publicFieldLabels, publicFields, validateFields } from "./attributes";
 import {
   defaultCatalogName,
   defaultCatalogPlan,
@@ -275,6 +275,10 @@ describe("attributes, variants, and visibility", () => {
     expect(publicFields([weight, retiredField()], { weight_g: 1, color: "黑" })).toEqual({
       weight_g: 1,
     });
+    expect(publicFieldLabels([weight, retiredField()], { weight_g: 1, color: "黑" })).toEqual({
+      weight_g: "重量",
+    });
+    expect(publicFieldLabels([{ ...weight, label: "" }], { weight_g: 1 })).toEqual({});
   });
 
   it("rejects mixed axes and blocks publish while the default variant is sellable", () => {

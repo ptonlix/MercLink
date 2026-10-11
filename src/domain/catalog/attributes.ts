@@ -66,6 +66,19 @@ export function publicFields(
   return visible;
 }
 
+export function publicFieldLabels(
+  definitions: readonly FieldDefinition[],
+  fields: Fields,
+): Record<string, string> {
+  const labels: Record<string, string> = {};
+  for (const field of activeFields(definitions)) {
+    if (fields[field.key] !== undefined && field.label.length > 0) {
+      labels[field.key] = field.label;
+    }
+  }
+  return labels;
+}
+
 function parseFieldValue(field: FieldDefinition, value: unknown): CatalogResult<FieldValue> {
   if (field.type === "text") {
     if (typeof value !== "string" || value.trim().length === 0 || value.length > 2000) {

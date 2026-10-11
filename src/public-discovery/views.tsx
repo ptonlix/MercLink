@@ -41,25 +41,6 @@ function Slot({
   return <span dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-function ProductToken({
-  token,
-  product,
-  facts,
-}: {
-  token: "id" | "catalogId" | "priceMinor" | "availabilityRaw" | "currency";
-  product?: SlotProduct;
-  facts: Facts;
-}): ReactNode {
-  const current = product ?? facts?.product ?? null;
-  if (facts === null || current === null) {
-    return `{${token}}`;
-  }
-  if (token === "id") return current.id;
-  if (token === "catalogId") return current.catalogId ?? "";
-  if (token === "priceMinor") return String(current.priceMinor);
-  if (token === "availabilityRaw") return current.availability;
-  return current.currency ?? "CNY";
-}
 import {
   apiRootPath,
   buyerSkillPath,
@@ -207,40 +188,27 @@ export function ProductTemplate({ facts = null }: { facts?: Facts }): ReactNode 
               </div>
             </template>
           ) : (
-            Object.entries(facts.product?.fields ?? {}).map(([key, value]) => (
-              <div key={key}>
-                <dt>{key}</dt>
-                <dd>
-                  {value === null
-                    ? "未填写"
-                    : value === true
-                      ? "是"
-                      : value === false
-                        ? "否"
-                        : String(value)}
-                </dd>
-              </div>
-            ))
+            <dl className="facts">
+              {Object.entries(facts.product?.fields ?? {}).map(([key, value]) => {
+                const label = facts.product?.fieldLabels?.[key];
+                const heading = label !== undefined && label.length > 0 ? label : key;
+                return (
+                  <div key={key}>
+                    <dt>{heading}</dt>
+                    <dd>
+                      {value === null
+                        ? "未填写"
+                        : value === true
+                          ? "是"
+                          : value === false
+                            ? "否"
+                            : String(value)}
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
           )}
-          <h2>商品信息</h2>
-          <dl className="facts">
-            <dt>商品 ID</dt>
-            <dd>
-              <ProductToken token="id" facts={facts} />
-            </dd>
-            <dt>目录 ID</dt>
-            <dd>
-              <ProductToken token="catalogId" facts={facts} />
-            </dd>
-          </dl>
-          <details className="structured">
-            <summary>查看结构化商品信息</summary>
-            <pre>
-              <ProductToken token="priceMinor" facts={facts} />{" "}
-              <ProductToken token="availabilityRaw" facts={facts} />{" "}
-              <ProductToken token="currency" facts={facts} />
-            </pre>
-          </details>
         </div>
       </section>
     </PublicShell>

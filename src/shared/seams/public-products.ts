@@ -26,6 +26,7 @@ export type PublicProduct = {
   currency: string;
   offer: PublicOffer;
   fields: Readonly<Record<string, string | number | boolean | null>>;
+  fieldLabels?: Readonly<Record<string, string>>;
   variants: readonly PublicVariant[];
 };
 

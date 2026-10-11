@@ -553,19 +553,6 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
-.structured summary {
-  min-height: 44px;
-  cursor: pointer;
-  padding: 10px 0;
-}
-.structured pre {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  background: var(--ml-surface);
-  padding: 16px;
-  border-radius: 8px;
-  font-size: 12px;
-}
 .empty {
   padding: 32px;
   background: #eeeee6;

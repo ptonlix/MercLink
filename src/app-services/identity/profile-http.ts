@@ -5,6 +5,7 @@ import {
   parseProfileBody,
   type ProfileDraft,
 } from "../../domain/identity/profile";
+import { mediaBaseUrl } from "../catalog/media-runtime";
 import { apiFailure, apiSuccess } from "../../shared/errors";
 import { authenticate } from "../../shared/seams/authenticate";
 import {
@@ -56,10 +57,9 @@ export async function getMerchantProfile(request: Request): Promise<Response> {
   return apiSuccess(merchantProfileJson(row), { request });
 }
 
-export async function putMerchantProfile(
-  request: Request,
-  appBaseUrl = process.env.APP_BASE_URL?.trim() ?? "",
-): Promise<Response> {
+export async function putMerchantProfile(request: Request): Promise<Response> {
+  // Issued image URLs follow the bound media root, not a later APP_BASE_URL change.
+  const appBaseUrl = mediaBaseUrl();
   const auth = await authenticate(request);
   if (!auth.ok) {
     return auth.response;
