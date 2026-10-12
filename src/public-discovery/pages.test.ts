@@ -464,7 +464,16 @@ describe("public pages", () => {
     expect(disabled).toContain('class="infoTip"');
     expect(disabled).toContain("未发布联系方式");
     expect(disabled).not.toContain("<p>店主还没有发布联系方式。</p>");
-    expect(disabled).toContain("我是店主，想上架");
+    expect(disabled).toContain("我是店主，想配置");
+    expect(disabled).not.toContain("我是店主，想上架");
+    expect(disabled).not.toContain("我是店主，想改店面");
+    expect(disabled).toContain("上架商品");
+    expect(disabled).toContain("修改店面");
+    const disabledMerchant = guidePanel(disabled, "guide-panel-1");
+    const disabledStorefront = disabledMerchant.slice(disabledMerchant.indexOf("修改店面"));
+    expect(disabledStorefront).not.toContain("下单");
+    expect(disabledStorefront).not.toContain("购买");
+    expect(disabledStorefront).toContain("查找商品仍走用户 Skill");
     process.env.MERCLINK_PURCHASE = "1";
     resetPurchaseModeCache();
     const visible = visibleHtml(renderToStaticMarkup(await HomePage()));
@@ -477,13 +486,24 @@ describe("public pages", () => {
     expect(visible.indexOf(viewAllProductsLabel)).toBeLessThan(
       visible.indexOf("如何使用 MercLink"),
     );
-    expect((visible.match(/<ol/g) ?? []).length).toBe(2);
-    expect((visible.match(/<li>/g) ?? []).length).toBe(8);
+    expect((visible.match(/<ol/g) ?? []).length).toBe(3);
+    expect((visible.match(/<li>/g) ?? []).length).toBe(12);
     expect(visible).toContain('href="/skill.md"');
     expect(visible).toContain('href="/merchant/skill.md"');
     expect(visible).toContain('href="/storefront/skill.md"');
+    expect(visible).toContain("我是店主，想配置");
+    expect(visible).toContain("上传不等于已经上线");
+    const merchant = guidePanel(visible, "guide-panel-1");
+    const listing = merchant.slice(0, merchant.indexOf("修改店面"));
+    const storefront = merchant.slice(merchant.indexOf("修改店面"));
+    expect(listing).toContain("查看商家 Skill");
+    expect(listing).not.toContain("查看店面 Skill");
+    expect(storefront).toContain("查看店面 Skill");
+    expect(storefront).toContain("购买仍走用户 Skill");
+    expect(storefront).not.toContain("查看商家 Skill");
     expect(visible).toContain("我是用户，想购买");
-    expect(visible).toContain("我是店主，想上架");
+    expect(visible).not.toContain("我是店主，想上架");
+    expect(visible).not.toContain("我是店主，想改店面");
     expect(visible).not.toContain(`${origin}/skill.md`);
     expect(visible).not.toContain("prd_demo");
     delete process.env.MERCLINK_PURCHASE;
@@ -684,6 +704,18 @@ describe("public pages", () => {
     ).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
   });
 });
+
+function guidePanel(html: string, id: string): string {
+  const start = html.indexOf(`id="${id}"`);
+  if (start < 0) {
+    throw new Error(`missing ${id}`);
+  }
+  const nextPanel = html.indexOf('id="guide-panel-', start + 1);
+  const footer = html.indexOf("<footer", start);
+  const bounds = [nextPanel, footer].filter((index) => index >= 0);
+  const end = bounds.length === 0 ? html.length : Math.min(...bounds);
+  return html.slice(start, end);
+}
 
 function publishedStore(overrides: Partial<PublicStoreProfile> = {}): PublicStoreProfile {
   return {

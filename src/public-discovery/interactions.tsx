@@ -185,7 +185,7 @@ export function UsageGuides({
           {buyerTabLabel}
         </label>
         <label htmlFor="usage-merchant" id="guide-tab-1">
-          我是店主，想上架
+          我是店主，想配置
         </label>
       </div>
       <div

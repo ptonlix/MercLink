@@ -10,7 +10,7 @@
 - `/interfaces` 是服务端渲染的接口文档。路径只来自 `src/shared/api-routes.ts`。页面展示字段、认证和权限，每条操作有自己的字段页。
 - 字段页必须和序列化、Skill 一致，不能再手写一份会漂移的协议。
 - `/api/v1` 仍是机器接口前缀和 OAuth 资源标识。不给它加文档响应，也不做 Swagger。
-- `/llms.txt` 仍指向 `/api/v1`，并继续要求 Agent 不要猜路径。本页不是 Agent 的调用说明。
+- `/llms.txt` 仍指向 `/api/v1`，并继续要求 Agent 不要猜路径。本页不是 Agent 的调用说明。指向 `/interfaces` 的目录指引由 `2026-10-12-llms-interface-and-storefront-guide` 规定，不在本变更里把接口清单嵌进目录。
 - 店面激活后不得替换 `/interfaces`。
 - **BREAKING**：只破坏把页脚「API 根地址」或 `href="/api/v1"` 当成落地页契约的读取方。机器前缀不变。
 

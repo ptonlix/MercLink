@@ -505,8 +505,8 @@ function PlatformUsageGuide({ facts }: { facts: Facts }): ReactNode {
       <h2 id="usage-title">如何使用 MercLink</h2>
       <p className="muted">
         {purchaseEnabled
-          ? "从一份 Skill 开始，让 Agent 帮你购买或上架商品。"
-          : "从一份 Skill 开始，让 Agent 帮你查找或上架商品。"}
+          ? "从一份 Skill 开始，让 Agent 帮你购买、上架，或修改店面。"
+          : "从一份 Skill 开始，让 Agent 帮你查找商品、上架，或修改店面。"}
       </p>
       <UsageGuides
         buyerTabLabel={purchaseEnabled ? "我是用户，想购买" : "我是用户，想找商品"}
@@ -577,40 +577,79 @@ function PlatformUsageGuide({ facts }: { facts: Facts }): ReactNode {
         }
         merchant={
           <>
-            <h3 className="guideHeading">店主上架</h3>
-            <ol className="steps">
-              <li>
-                <h4>把商家 Skill 交给 Agent</h4>
-                <p>让 Agent 阅读商家 Skill，了解如何管理这家店的商品。</p>
-                <a className="skillLink" href={merchantSkillPath}>
-                  查看商家 Skill
-                </a>
-                <a className="skillLink" href={storefrontSkillPath}>
-                  查看店面 Skill
-                </a>
-              </li>
-              <li>
-                <h4>店主登录并批准</h4>
-                <p>
-                  打开 Agent 提供的设备码地址，用店主账号登录。首次登录先修改初始密码，再批准商家
-                  Agent。
-                </p>
-              </li>
-              <li>
-                <h4>提供商品资料</h4>
-                <p>
-                  告诉 Agent
-                  商品名称、售价、库存、图片和属性。有颜色或尺码时，说明实际出售的规格组合。
-                </p>
-              </li>
-              <li>
-                <h4>检查资料，完成上架</h4>
-                <p>
-                  Agent
-                  补齐必填字段、创建可售规格、上传封面并上架。成功后商品出现在首页和列表；资料不完整时保持下架。
-                </p>
-              </li>
-            </ol>
+            <section className="guideBranch" aria-labelledby="guide-listing-title">
+              <h3 id="guide-listing-title" className="guideBranchTitle">
+                上架商品
+              </h3>
+              <ol className="steps">
+                <li>
+                  <h4>把商家 Skill 交给 Agent</h4>
+                  <p>让 Agent 阅读商家 Skill，了解如何管理这家店的商品。</p>
+                  <a className="skillLink" href={merchantSkillPath}>
+                    查看商家 Skill
+                  </a>
+                </li>
+                <li>
+                  <h4>店主登录并批准</h4>
+                  <p>
+                    打开 Agent 提供的设备码地址，用店主账号登录。首次登录先修改初始密码，再批准商家
+                    Agent。
+                  </p>
+                </li>
+                <li>
+                  <h4>提供商品资料</h4>
+                  <p>
+                    告诉 Agent
+                    商品名称、售价、库存、图片和属性。有颜色或尺码时，说明实际出售的规格组合。
+                  </p>
+                </li>
+                <li>
+                  <h4>检查资料，完成上架</h4>
+                  <p>
+                    Agent
+                    补齐必填字段、创建可售规格、上传封面并上架。成功后商品出现在首页和列表；资料不完整时保持下架。
+                  </p>
+                </li>
+              </ol>
+            </section>
+            <section className="guideBranch" aria-labelledby="guide-storefront-title">
+              <h3 id="guide-storefront-title" className="guideBranchTitle">
+                修改店面
+              </h3>
+              <ol className="steps">
+                <li>
+                  <h4>把店面 Skill 交给 Agent</h4>
+                  <p>复制文档地址给你的 Agent，告诉它按这份 Skill 修改给人看的页面。</p>
+                  <a className="skillLink" href={storefrontSkillPath}>
+                    查看店面 Skill
+                  </a>
+                </li>
+                <li>
+                  <h4>店主登录并批准</h4>
+                  <p>
+                    打开 Agent
+                    提供的设备码地址，用店主账号登录并批准。只批准管商品时，不能改页面。密码和验证码只在浏览器输入。
+                  </p>
+                </li>
+                <li>
+                  <h4>说明想改的外观</h4>
+                  <p>
+                    告诉 Agent 要改首页、商品页或授权页的版式和文案。商品、价格和店铺介绍仍走商家
+                    Skill。
+                    {purchaseEnabled ? "购买仍走用户 Skill。" : "查找商品仍走用户 Skill。"}
+                    店名、价格、库存、客服和执照必须用槽位，不能写死。
+                  </p>
+                </li>
+                <li>
+                  <h4>预览后再确认上线</h4>
+                  <p>
+                    先看本地预览，再确认激活。上传不等于已经上线。不要改 /llms.txt、三份 Skill、/api
+                    和授权协议。
+                    {purchaseEnabled ? "打开付款链接不表示支付成功。" : null}
+                  </p>
+                </li>
+              </ol>
+            </section>
           </>
         }
       />
