@@ -5,7 +5,15 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { renderPreviewDocument } from "./render-slots.mjs";
 
-const reservedPrefixes = ["/api", "/authorize", "/oauth", "/admin", "/media", "/.well-known"];
+const reservedPrefixes = [
+  "/api",
+  "/authorize",
+  "/oauth",
+  "/admin",
+  "/media",
+  "/.well-known",
+  "/interfaces",
+];
 const reservedExact = new Set([
   "/skill.md",
   "/merchant/skill.md",

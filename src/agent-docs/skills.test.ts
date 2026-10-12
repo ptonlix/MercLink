@@ -35,6 +35,7 @@ describe("buyer skill", () => {
     expect(body).toContain("可售规格");
     expect(body).toContain("variant_id");
     expect(body).toContain("只有该商品恰好有一条可售规格");
+    expect(body).toContain("只传 `product_id`");
     expect(body).toContain("商品 ID");
     expect(body).toContain("分");
     expect(body).toContain("client_order_no");
@@ -134,6 +135,7 @@ describe("merchant skill", () => {
       expect(body).toContain("默认目录");
       expect(body).toContain("data.items[].id");
       expect(body).toContain("data.applied");
+      expect(body).toContain("data.breaking");
       expect(body).toContain("不要向用户索要密码、短信验证码或 API Key");
       expect(body).toContain("字段预览");
       expect(body).toContain('"confirm": true');
@@ -249,6 +251,11 @@ describe("storefront skill", () => {
     expect(response.headers.get("content-type")).toContain("text/markdown");
     expect(body).toBe(file);
     expect(body).toContain("不得替换、遮盖或把未知路径回退到这些地址");
+    expect(body).toContain("`/interfaces`");
+    const accept = await readFile("storefront/accept.mjs", "utf8");
+    const preview = await readFile("storefront/preview.mjs", "utf8");
+    expect(accept).toContain('"/interfaces"');
+    expect(preview).toContain('"/interfaces"');
     expect(body).toContain("`/products/{id}`");
     expect(body).toContain("不得向用户索要支付宝密码");
     expect(body).toContain("Do not ask for an Alipay password.");

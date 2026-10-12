@@ -1,11 +1,18 @@
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { interfaceContractsMatchRegistry } from "./interface-fields";
+import { interfaceDocsMatchRegistry, interfaceSlug } from "./interface-docs";
+import { default as InterfacesPage } from "../app/interfaces/page";
+import { default as InterfaceSlugPage } from "../app/interfaces/[slug]/page";
+import { InterfaceOperationPage } from "./views";
 import { generateMetadata as landingMetadata, default as HomePage } from "../app/page";
 import {
   generateMetadata as productMetadata,
   default as ProductPage,
 } from "../app/products/[id]/page";
 import { generateMetadata as listMetadata, default as ProductsPage } from "../app/products/page";
+import { apiRoutes } from "../shared/api-routes";
 import { minorUnits } from "../shared/money";
 import {
   publicProducts,
@@ -56,7 +63,11 @@ describe("public pages", () => {
     expect(visible).toContain('href="/products"');
     expect(visible).toContain('href="/skill.md"');
     expect(visible).toContain('href="/merchant/skill.md"');
-    expect(visible).toContain('href="/api/v1"');
+    expect(visible).toContain('href="/interfaces"');
+    expect(visible).toContain("接口文档");
+    expect(visible).not.toContain("接口目录");
+    expect(visible).not.toContain("API 根地址");
+    expect(visible).not.toContain('href="/api/v1"');
     expect(visible).toContain('href="/llms.txt"');
     expect(visible).toContain('href="/sitemap.xml"');
     expect(visible.indexOf(product.title)).toBeLessThan(visible.indexOf(storeSlogan));
@@ -518,6 +529,72 @@ describe("public pages", () => {
     expect(visible).toContain('href="/products?cursor=cursor%2B%2F%3D"');
     expect(visible).toContain("下一页商品");
   });
+
+  it("lists registered paths with request and response shapes", () => {
+    expect(interfaceDocsMatchRegistry()).toEqual([]);
+    expect(interfaceContractsMatchRegistry()).toEqual([]);
+    const html = renderToStaticMarkup(InterfacesPage());
+    const visible = elementText(html);
+    expect(html).toContain("<h2>查询参数</h2>");
+    expect(html).toContain("查询已上架且有可售规格的商品");
+    expect(html).not.toContain("从左侧打开一条接口");
+    expect(html).not.toContain('href="/api/v1"');
+    expect(html).toContain('<p class="groupTitle">独立调用</p>');
+    expect(html).not.toMatch(/<a[^>]*>独立调用<\/a>/);
+    expect(html).toContain('<a href="/skill.md">买家 Skill</a>');
+    expect(html).toContain('<a href="/merchant/skill.md">商家 Skill</a>');
+    expect(html).toContain('<a href="/storefront/skill.md">店面 Skill</a>');
+    expect(html).not.toContain("不由 Skill 教调用");
+    expect(html).toContain('href="/interfaces/response-shape"');
+    expect(html.indexOf("独立调用")).toBeLessThan(html.indexOf("响应结构"));
+    for (const route of apiRoutes) {
+      expect(html).toContain(`href="/interfaces/${interfaceSlug(route.method, route.path)}"`);
+      expect(visible).toContain(`>${route.path}<`);
+      expect(html.replace(/\stitle="[^"]*"/g, "")).toContain(route.path);
+    }
+
+    const order = renderToStaticMarkup(
+      createElement(InterfaceOperationPage, { method: "POST", path: "/api/v1/orders" }),
+    );
+    expect(order).toContain("<h2>请求体</h2>");
+    expect(order).toContain("application/json");
+    expect(order).toContain("client_order_no");
+    expect(order).toContain("必填");
+    expect(order).toContain("<h2>响应</h2>");
+    expect(order).toContain(">认证<");
+    expect(order).toContain(">权限<");
+    expect(order).toContain("order:write");
+  });
+
+  it("shows breaking on the field change page", () => {
+    const change = renderToStaticMarkup(
+      createElement(InterfaceOperationPage, {
+        method: "POST",
+        path: "/api/v1/catalogs/{id}/fields/changes",
+      }),
+    );
+    expect(change).toContain("<code>breaking</code>");
+    expect(fieldBlock(change, "breaking")).toContain("未确认的破坏性变更时为 true");
+  });
+
+  it("documents order product_id as optional and does not require variant_id alone", () => {
+    const order = renderToStaticMarkup(
+      createElement(InterfaceOperationPage, { method: "POST", path: "/api/v1/orders" }),
+    );
+    const variant = fieldBlock(order, "items[].variant_id");
+    const product = fieldBlock(order, "items[].product_id");
+    expect(product).toContain("只有一条可售规格时才可传商品 ID");
+    expect(variant).not.toContain("apiRequired");
+    expect(product).not.toContain("apiRequired");
+    expect(fieldBlock(order, "items[].qty")).toContain("apiRequired");
+    expect(order).toContain("至少填一个");
+  });
+
+  it("returns notFound for an unknown interface slug", async () => {
+    await expect(
+      InterfaceSlugPage({ params: Promise.resolve({ slug: "not-a-registered-operation" }) }),
+    ).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
+  });
 });
 
 function publishedStore(overrides: Partial<PublicStoreProfile> = {}): PublicStoreProfile {
@@ -576,6 +653,20 @@ function registerProducts(items: readonly PublicProduct[]): void {
 
 function visibleHtml(html: string): string {
   return html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "");
+}
+
+function elementText(html: string): string {
+  return html.replace(/<([a-zA-Z0-9:-]+)(\s[^<>]*?)?>/g, "<$1>");
+}
+
+function fieldBlock(html: string, name: string): string {
+  const block = html
+    .split('<div class="apiField"')
+    .find((item) => item.includes(`<code>${name}</code>`));
+  if (block === undefined) {
+    throw new Error(`missing field ${name}`);
+  }
+  return block;
 }
 
 function landingGraph(html: string): Record<string, unknown>[] {

@@ -19,7 +19,7 @@ Do not ask the user for a password, SMS code, or API key. Use the device authori
 ## 不要做
 
 - 不要向用户索要密码、短信验证码或 API Key。不要让用户把访问令牌或刷新令牌复制进对话。
-- 不要把商品和可售规格当成同一个 ID。下单必须用规格 ID，字段是 `variant_id`。只有该商品恰好有一条可售规格时，才可以只传商品 ID。
+- 不要把商品和可售规格当成同一个 ID。下单必须用规格 ID，字段是 `variant_id`。只有该商品恰好有一条可售规格时，才可以不传 `variant_id`，只传 `product_id`。
 - 不要自己传价格。价格是整数分，不是元。
 - 不要只为了换渠道而新开一个 `client_order_no`。重复同一个 `client_order_no` 不会切换渠道。
 - 不要向用户索要支付宝密码。打开 `payment.action` 不等于支付成功。只有状态 `paid` 才算支付成功。已关闭订单上的未履约收款不是成功。不要支付已关闭订单的旧链接。
@@ -83,7 +83,7 @@ GET /api/v1/orders/{id}
 
 ## 下单
 
-下单必须用规格 ID，字段是 `variant_id`。只有该商品恰好有一条可售规格时，才可以只传商品 ID。有多条可售规格却只传商品 ID 时，`code` 是 `40004`（`variant_required`），不会创建订单。
+下单必须用规格 ID，字段是 `variant_id`。只有该商品恰好有一条可售规格时，才可以不传 `variant_id`，只传 `product_id`。有多条可售规格却只传 `product_id` 时，`code` 是 `40004`（`variant_required`），不会创建订单。
 
 不要自己传价格。服务端按规格单价乘数量计算行金额，调用方改不了价。`items` 只能有一项。多于一项时 `code` 是 `40003`（`too_many_items`）。
 
@@ -138,7 +138,7 @@ GET /api/v1/orders/{id}
 
 - 还没登录就下单，然后向用户要令牌。应走设备码，让用户在浏览器注册或批准。
 - 申请了商家 scope，把用户送进商家登录页。买家只用 `order:write order:read`。
-- 商品有多条可售规格，却只传商品 ID。先选定 `variant_id`。
+- 商品有多条可售规格，却只传 `product_id`。先选定 `variant_id`。
 - 把 `1599` 元传成价格，或在请求里自己加 `price`。服务端不接受调用方价格。
 - 手机付款人第一次没传 `payment_channel`，之后用新的 `client_order_no` 再下一单。那会再扣库存，也不会切换原来的渠道。
 - 把 `payment.action` 放进 iframe、截断 URL，或向用户要支付宝密码。

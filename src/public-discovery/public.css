@@ -400,6 +400,167 @@
   max-width: 640px;
   color: var(--ml-muted);
 }
+.apiDocs {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.apiDocsFrame {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+.apiDocsNav {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding-right: 8px;
+}
+.apiDocsNav p {
+  margin: 22px 0 6px;
+  color: var(--ml-muted);
+  font-size: 12px;
+}
+.apiDocsNav a {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 1px 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  text-decoration: none;
+}
+.apiDocsNav a:hover {
+  background: var(--ml-surface);
+}
+.apiDocsNav .groupTitle a {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+  text-decoration: underline;
+}
+.apiDocsNav .navCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.apiDocsNav .navPath {
+  overflow-wrap: anywhere;
+  color: var(--ml-muted);
+  font:
+    11px/1.35 ui-monospace,
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+}
+.apiDocsNav .navLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.methodBadge {
+  display: inline-block;
+  flex: none;
+  min-width: 3.6em;
+  margin-right: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--ml-sans);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  line-height: 1.6;
+  text-align: center;
+}
+.methodBadge.GET {
+  background: #edf3ec;
+  color: #346538;
+}
+.methodBadge.POST {
+  background: #e7eef6;
+  color: #24527a;
+}
+.methodBadge.PUT,
+.methodBadge.PATCH {
+  background: #fbf3db;
+  color: #7a5200;
+}
+.methodBadge.DELETE {
+  background: #fdebec;
+  color: #9f2f2d;
+}
+.apiDocsMain h2 {
+  font-size: 22px;
+}
+.factsTable {
+  width: 100%;
+  margin: 16px 0;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.factsTable th,
+.factsTable td {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ml-line);
+  text-align: left;
+  vertical-align: top;
+}
+.factsTable th {
+  width: 4.5em;
+  color: var(--ml-muted);
+  font-weight: 400;
+}
+.apiDocsNav a[aria-current="page"] {
+  background: var(--ml-surface);
+}
+.apiField {
+  padding: 16px 0;
+  border-top: 1px solid var(--ml-line);
+}
+.apiFieldHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+.apiType,
+.contentType {
+  color: var(--ml-muted);
+  font:
+    13px/1.5 ui-monospace,
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+}
+.apiRequired {
+  color: #9f2f2d;
+  font-size: 12px;
+  font-weight: 650;
+}
+.apiFieldMeta {
+  margin-top: 8px;
+  color: var(--ml-muted);
+  font-size: 13px;
+}
+.apiFieldMeta code {
+  margin-right: 6px;
+}
+.statusCode {
+  margin-top: 8px;
+  font-size: 20px;
+  font-weight: 600;
+}
+.apiDocsMain > section {
+  margin-top: 28px;
+}
 .grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -685,4 +846,15 @@
   display: inline-flex;
   align-items: center;
   min-height: 44px;
+}
+@media (max-width: 860px) {
+  .apiDocsFrame {
+    grid-template-columns: 1fr;
+  }
+  .apiDocsNav {
+    position: static;
+    max-height: 240px;
+    padding: 0 0 8px;
+    border-bottom: 1px solid var(--ml-line);
+  }
 }

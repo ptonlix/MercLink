@@ -357,7 +357,7 @@ API Key 只留给没有浏览器的服务器脚本，在登录后的页面创建
 页面必须包含：
 
 - 这个服务是什么：给 Agent 查询已上架商品并下单的商品服务。
-- 买家和 Agent 怎么开始：商品列表、买家 Skill、API 根地址。
+- 买家和 Agent 怎么开始：商品列表、买家 Skill、接口文档。
 - 商家怎么开始：商家 Skill。店主用启动账号批准 Agent。
 - 当前已上架商品的摘要列表，数据来自商品查询，不手工挑选。
 - 发现文件的地址：`/llms.txt`、`/sitemap.xml`。
@@ -368,18 +368,19 @@ API Key 只留给没有浏览器的服务器脚本，在登录后的页面创建
 
 ### 9.2 公开页面
 
-| 路径                 | 谁来读              | 内容                                               |
-| -------------------- | ------------------- | -------------------------------------------------- |
-| `/`                  | 人、搜索引擎、Agent | 总落地页                                           |
-| `/products`          | 人、搜索引擎、Agent | 当前已上架商品列表                                 |
-| `/products/{id}`     | 人、搜索引擎、Agent | 单个已上架商品的全部已公开字段和可售规格           |
-| `/skill.md`          | 买家 Agent          | 如何查商品、下单、付款并查询自己的订单             |
-| `/merchant/skill.md` | 商家 Agent          | 如何建目录、定义字段、建商品和规格、上下架、查订单 |
-| `/index.md`          | Agent               | 与总落地页相同的公开事实 Markdown                  |
-| `/products.md`       | Agent               | 与商品列表相同的公开事实 Markdown                  |
-| `/products/{id}.md`  | Agent               | 与商品页相同的公开事实 Markdown                    |
-| `/llms.txt`          | Agent               | 标题、摘要和链接表，指向页面、Markdown 和 Skill    |
-| `/sitemap.xml`       | 搜索引擎            | 总落地页、商品列表、已上架商品 HTML 和 Skill       |
+| 路径                 | 谁来读              | 内容                                                  |
+| -------------------- | ------------------- | ----------------------------------------------------- |
+| `/`                  | 人、搜索引擎、Agent | 总落地页                                              |
+| `/products`          | 人、搜索引擎、Agent | 当前已上架商品列表                                    |
+| `/products/{id}`     | 人、搜索引擎、Agent | 单个已上架商品的全部已公开字段和可售规格              |
+| `/skill.md`          | 买家 Agent          | 如何查商品、下单、付款并查询自己的订单                |
+| `/merchant/skill.md` | 商家 Agent          | 如何建目录、定义字段、建商品和规格、上下架、查订单    |
+| `/index.md`          | Agent               | 与总落地页相同的公开事实 Markdown                     |
+| `/products.md`       | Agent               | 与商品列表相同的公开事实 Markdown                     |
+| `/products/{id}.md`  | Agent               | 与商品页相同的公开事实 Markdown                       |
+| `/llms.txt`          | Agent               | 标题、摘要和链接表，指向页面、Markdown 和 Skill       |
+| `/sitemap.xml`       | 搜索引擎            | 总落地页、商品列表、已上架商品 HTML 和 Skill          |
+| `/interfaces`        | 人                  | 接口文档。默认展示第一条接口，其余从菜单进入          |
 | `/robots.txt`        | 搜索引擎            | 允许公开 HTML 和 Markdown，不收录授权页、超管页和 API |
 
 商品页从商品记录渲染。不另存一份 SEO 文案。`/api/v1` 和领域层仍用整数分。页面可见价格、meta description 和 JSON-LD 使用同一次换算，把分换成两位主币小数：159900 分是 `1599.00`，800 分是 `8.00`。JSON-LD 的 `price` 不是 API 里的整数分。`in_stock` 写成 `https://schema.org/InStock`，`out_of_stock` 写成 `https://schema.org/OutOfStock`。每个可售规格一个 `Offer`，只复制已有 `sku`。不编造品牌、GTIN、评分、运费或退货政策。

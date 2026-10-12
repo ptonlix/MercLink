@@ -40,6 +40,33 @@ describe("discovery", () => {
     expect(body.data).not.toHaveProperty("total");
   });
 
+  it("serves the human interface directory instead of an API-root document", async () => {
+    const page = await client.request("/interfaces");
+    expect(page.status).toBe(200);
+    expect(page.headers.get("content-type")).toContain("text/html");
+    const html = await page.text();
+    expect(html).toContain("接口文档");
+    expect(html).toContain("<h2>查询参数</h2>");
+    expect(html).toContain('href="/interfaces/post-api-v1-orders"');
+    expect(html.replace(/\stitle="[^"]*"/g, "")).toContain("/api/v1/orders");
+    expect(html).not.toContain("API 根地址");
+    expect(html).not.toContain('href="/api/v1"');
+
+    const order = await client.request("/interfaces/post-api-v1-orders");
+    expect(order.status).toBe(200);
+    const orderHtml = await order.text();
+    expect(orderHtml).toContain("<h2>请求体</h2>");
+    expect(orderHtml).toContain("client_order_no");
+    expect(orderHtml).toContain("items[].product_id");
+    expect(orderHtml).toContain("<h2>响应</h2>");
+
+    const missing = await client.request("/interfaces/not-a-registered-operation");
+    expect(missing.status).toBe(404);
+
+    const prefix = await client.request("/api/v1");
+    expect(prefix.status).toBe(404);
+  });
+
   it("points discovery at markdown facts without a product catalog", async () => {
     const llms = await client.request("/llms.txt");
     expect(llms.status).toBe(200);

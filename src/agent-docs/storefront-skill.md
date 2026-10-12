@@ -50,7 +50,7 @@ Local preview fills fact slots from the source deployment before activation. It 
 
 下列规则没有例外。本地预览看起来正常，也不能违反。
 
-1. 不得替换、遮盖或把未知路径回退到这些地址：`/api`、`/authorize`、`/oauth`、`/admin`、`/media`、`/.well-known`、`/skill.md`、`/merchant/skill.md`、`/storefront/skill.md`、`/llms.txt`、`/sitemap.xml`、`/robots.txt`。也不得把 `/products` 或 `/products/{id}` 回退成首页。
+1. 不得替换、遮盖或把未知路径回退到这些地址：`/api`、`/authorize`、`/oauth`、`/admin`、`/media`、`/.well-known`、`/skill.md`、`/merchant/skill.md`、`/storefront/skill.md`、`/llms.txt`、`/sitemap.xml`、`/robots.txt`、`/interfaces` 及其子路径。也不得把 `/products` 或 `/products/{id}` 回退成首页。
 2. 不得向用户索要支付宝密码。不得把 `payment.action` 放进 iframe，不得截断或改写它。必须用顶层导航打开完整 URL。Do not ask for an Alipay password. Open the complete `payment.action` URL with top-level navigation rather than an iframe or a truncated URL.
 3. 打开 `payment.action`、从支付宝跳回、或页面自己写「支付成功」，都不是支付成功。只有订单状态 `paid` 才算成功。不得新增回跳即成功的接口，也不得把未履约收款或已关闭订单的旧链接当成成功。
 4. 注册、登录和批准可以改外观，但必须提交到现有服务端授权地址。买家提交仍是 `/authorize/buyer/submit`。商家提交仍是 `/authorize/merchant/submit`。设备码确认仍由服务端的 `verification_uri` 完成。不得在购物授权里注册商家，也不得增加商家注册入口。

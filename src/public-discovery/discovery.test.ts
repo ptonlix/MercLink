@@ -58,6 +58,7 @@ describe("discovery files", () => {
         `${origin}/skill.md`,
         `${origin}/merchant/skill.md`,
         `${origin}/storefront/skill.md`,
+        `${origin}/interfaces`,
         `${origin}/products/${first.id}`,
         `${origin}/products/${second.id}`,
       ]),
