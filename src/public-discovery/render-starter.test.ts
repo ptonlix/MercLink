@@ -7,8 +7,75 @@ import {
 } from "../domain/storefront/authorize";
 import { renderStarterFragments } from "./render-starter";
 import { starterDocument } from "./starter-markup";
+import { renderDocument, type SlotProduct } from "../domain/storefront/slots";
 
 describe("starter documents", () => {
+  it("populates the default product layout without client-only controls", () => {
+    const product: SlotProduct = {
+      id: "prd_native",
+      name: "Food & Culture",
+      cover: "https://merclink.example/media/cover",
+      fields: { description: "第一段\n\n第二段", custom: "自定义字段" },
+      priceMinor: 30800,
+      availability: "in_stock",
+      stock: null,
+      variants: [
+        {
+          id: "var_native",
+          optionValues: {},
+          priceMinor: 30800,
+          stock: null,
+          availability: "in_stock",
+        },
+      ],
+    };
+    const html = renderDocument(starterDocument("products/item.html"), {
+      store: null,
+      products: [],
+      product,
+      orderStatus: null,
+      nextCursor: null,
+    });
+    expect(html).toContain('name="viewport"');
+    expect(html).toContain('class="detailCover"');
+    expect(html).toContain('src="https://merclink.example/media/cover"');
+    expect(html).toContain("Food &amp; Culture");
+    expect(html).not.toContain("Food &amp;amp; Culture");
+    expect(html).toContain("¥308.00");
+    expect(html).toContain("第一段\n\n第二段");
+    expect(html).toContain("自定义字段");
+    expect(html).toContain("var_native");
+    expect(html).not.toContain("merclink-slot");
+    expect(html).not.toContain("复制购买需求");
+    expect(html).toContain('href="/skill.md"');
+  });
+  it("populates homepage panels as working links without client scripts", () => {
+    const product: SlotProduct = {
+      id: "prd_panel",
+      name: "Food & Culture",
+      cover: null,
+      fields: {},
+      priceMinor: 30800,
+      availability: "in_stock",
+      stock: null,
+      variants: [],
+    };
+    const html = renderDocument(starterDocument("index.html"), {
+      store: null,
+      products: [product, { ...product, id: "prd_second", name: "Night ride" }],
+      product: null,
+      orderStatus: null,
+      nextCursor: null,
+    });
+    expect(html.match(/class="deckCard"/g)).toHaveLength(2);
+    expect(html).toContain('href="/products/prd_panel"');
+    expect(html).toContain('href="/products/prd_second"');
+    expect(html).toContain("Food &amp; Culture");
+    expect(html).toContain("¥308.00");
+    expect(html).not.toContain("merclink-slot");
+    expect(html).not.toContain("pause-film");
+  });
+
   it("keeps the downloaded pages on the same templates as the renderer", () => {
     const fragments = renderStarterFragments();
     expect(fragments["index.html"]).toContain("merclink-slot");

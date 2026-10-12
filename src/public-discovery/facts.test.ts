@@ -19,7 +19,7 @@ import { resetPublicStore } from "../shared/seams/public-store";
 import { landingMarkdownResponse, listMarkdownResponse, productMarkdownResponse } from "./markdown";
 import { loadProduct } from "./model";
 import { markdownRewritePath } from "./negotiate";
-import { majorUnitDecimal } from "./presentation";
+import { majorUnitDecimal, purchaseRequest } from "./presentation";
 
 const origin = "https://merclink.example";
 
@@ -41,6 +41,17 @@ describe("public fact discovery", () => {
     expect(majorUnitDecimal(800)).toBe("8.00");
     expect(minorUnits(159900)).toBe(159900);
     expect(minorUnits(800)).toBe(800);
+  });
+
+  it("copies the selected tour quantity while requiring fresh price and stock confirmation", () => {
+    const selected = variant("var_tour", 30800, "in_stock", null);
+    const request = purchaseRequest("prd_tour", selected, 2);
+    expect(request).toContain("商品 prd_tour，规格 var_tour");
+    expect(request).toContain("人数 2 人（购买数量 2）");
+    expect(request).toContain("请先查询当前价格和库存");
+    expect(request).toContain("向我确认商品、规格和数量后再购买");
+    expect(purchaseRequest("prd_tour", selected, 1)).toContain("人数 1 人（购买数量 1）");
+    expect(purchaseRequest("prd_tour", selected)).not.toContain("人数");
   });
 
   it("publishes one offer per sellable variant without invented identifiers", async () => {

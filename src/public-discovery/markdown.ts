@@ -18,6 +18,8 @@ function renderLandingMarkdown(model: LandingModel): string {
   appendStoreFacts(lines, model.store);
   lines.push("## 已上架商品", "");
   appendProducts(lines, model.products);
+  if (model.nextCursor !== null)
+    lines.push(`下一组商品：/index.md?cursor=${encodeURIComponent(model.nextCursor)}`, "");
   return lines.join("\n");
 }
 
@@ -82,8 +84,14 @@ function renderProductMarkdown(model: VisibleProductModel): string {
   return lines.join("\n");
 }
 
-export async function landingMarkdownResponse(): Promise<Response> {
-  return markdownResponse(renderLandingMarkdown(await loadLanding()), "/");
+export async function landingMarkdownResponse(request?: Request): Promise<Response> {
+  const cursor =
+    request === undefined
+      ? undefined
+      : (new URL(request.url).searchParams.get("cursor") ?? undefined);
+  const model = await loadLanding(cursor);
+  const path = cursor ? `/?cursor=${encodeURIComponent(cursor)}` : "/";
+  return markdownResponse(renderLandingMarkdown(model), path);
 }
 
 export async function listMarkdownResponse(request: Request): Promise<Response> {

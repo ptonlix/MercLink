@@ -27,6 +27,25 @@ describe("discovery", () => {
     expect(llms.headers.get("content-type")).not.toContain("application/json");
   });
 
+  it("serves the homepage collection without a list detour", async () => {
+    const response = await client.request("/");
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('id="collection"');
+    expect(html).not.toContain('href="/products"');
+    expect(html).toContain("探索商品");
+    expect(html).toContain('class="footerGuide"');
+    expect(html).not.toContain("悬停展开");
+    const detailPath = /href="(\/products\/prd_[^"?]+)"/.exec(html)?.[1];
+    if (detailPath !== undefined) {
+      const detail = await client.request(detailPath);
+      expect(detail.status).toBe(200);
+      const detailHtml = await detail.text();
+      expect(detailHtml).toContain('href="/">返回首页');
+      expect(detailHtml).not.toContain('href="/products"');
+    }
+  });
+
   it("lists products with cursor fields inside data", async () => {
     const response = await client.request("/api/v1/products");
     const body = await readEnvelope(response);
@@ -46,6 +65,8 @@ describe("discovery", () => {
     expect(page.headers.get("content-type")).toContain("text/html");
     const html = await page.text();
     expect(html).toContain("接口文档");
+    expect(html).toContain('class="apiDocsMenu"');
+    expect(html).toContain("<summary>浏览接口</summary>");
     expect(html).toContain("<h2>查询参数</h2>");
     expect(html).toContain('href="/interfaces/post-api-v1-orders"');
     expect(html.replace(/\stitle="[^"]*"/g, "")).toContain("/api/v1/orders");

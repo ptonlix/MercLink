@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <title>成都大熊猫</title>
+  <rect width="64" height="64" rx="16" fill="#9ee8e0" />
+      <g fill="#0c1218">
+        <circle cx="17" cy="17" r="9" />
+        <circle cx="47" cy="17" r="9" />
+      </g>
+      <ellipse cx="32" cy="35" rx="23" ry="22" fill="#edf4f7" />
+      <g fill="#0c1218">
+        <ellipse cx="23" cy="34" rx="7" ry="9" transform="rotate(25 23 34)" />
+        <ellipse cx="41" cy="34" rx="7" ry="9" transform="rotate(-25 41 34)" />
+        <path d="M28 44Q32 41 36 44Q36 48 32 49Q28 48 28 44Z" />
+      </g>
+      <g fill="#edf4f7">
+        <circle cx="25" cy="32" r="2.6" />
+        <circle cx="39" cy="32" r="2.6" />
+      </g>
+      <path d="M32 48v3m-6-1c2 4 10 4 12 0" stroke="#0c1218" stroke-width="2.5" stroke-linecap="round" />
+</svg>

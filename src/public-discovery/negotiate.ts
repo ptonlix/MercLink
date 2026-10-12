@@ -80,7 +80,15 @@ export function markdownRewritePath(pathname: string, accept: string | null): st
 export function htmlDiscoveryLinks(pathname: string, search: string): string | null {
   const path = pathOnly(pathname);
   if (path === "/") {
-    return joinLinks([alternateMarkdown("/index.md"), describedByLlms()]);
+    const cursor = cursorFromSearch(search);
+    const markdown =
+      cursor === null ? "/index.md" : `/index.md?cursor=${encodeURIComponent(cursor)}`;
+    const parts = [alternateMarkdown(markdown), describedByLlms()];
+    if (cursor !== null) {
+      parts.unshift(canonicalLink(`/?cursor=${encodeURIComponent(cursor)}`));
+      parts.push(relationLink("prev", "/"));
+    }
+    return joinLinks(parts);
   }
   if (path === "/products") {
     const cursor = cursorFromSearch(search);

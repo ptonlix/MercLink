@@ -1,29 +1,51 @@
+/* finesse · register=product · shell=warm-ink-shared-controls */
 :root {
-  color-scheme: light;
-  --ml-paper: #f6f4ee;
-  --ml-surface: #fff;
-  --ml-ink: #26332b;
-  --ml-muted: #60695f;
-  --ml-moss: #4e653e;
-  --ml-line: #d8ddd1;
-  --ml-error: #a13e30;
+  color-scheme: dark;
+  --ml-paper: #161311;
+  --ml-surface: #211d19;
+  --ml-raised: #2b251f;
+  --ml-ink: #f3ece2;
+  --ml-muted: #b7aa9a;
+  --ml-moss: #d7b07a;
+  --ml-line: rgba(243, 236, 226, 0.16);
+  --ml-accent-wash: rgba(215, 176, 122, 0.1);
+  --ml-error: #e7a398;
+  --ml-error-wash: rgba(231, 163, 152, 0.1);
   --ml-serif: "Iowan Old Style", "Songti SC", "Noto Serif CJK SC", serif;
   --ml-sans: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --ml-mono: "SFMono-Regular", Consolas, monospace;
+  --ml-radius: 6px;
 }
-
+html {
+  scrollbar-gutter: stable;
+}
 body {
   margin: 0;
   background: var(--ml-paper);
   color: var(--ml-ink);
   font-family: var(--ml-sans);
   line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
 }
-
+::selection {
+  background: var(--ml-moss);
+  color: var(--ml-paper);
+}
 :focus-visible {
   outline: 2px solid var(--ml-moss);
   outline-offset: 4px;
 }
-
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

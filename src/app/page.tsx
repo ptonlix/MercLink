@@ -7,16 +7,24 @@ import { LandingTemplate } from "../public-discovery/views";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const model = await loadLanding();
+type HomePageProps = { searchParams?: Promise<{ cursor?: string | string[] }> };
+
+async function homeCursor({ searchParams }: HomePageProps): Promise<string | undefined> {
+  const params = searchParams === undefined ? {} : await searchParams;
+  return typeof params.cursor === "string" ? params.cursor : undefined;
+}
+
+export async function generateMetadata(props: HomePageProps = {}): Promise<Metadata> {
+  const model = await loadLanding(await homeCursor(props));
   return {
     metadataBase: new URL(publicBaseUrl()),
     ...pageDiscovery(model),
   };
 }
 
-export default async function HomePage(): Promise<ReactNode> {
-  const model = await loadLanding();
+export default async function HomePage(props: HomePageProps = {}): Promise<ReactNode> {
+  const cursor = await homeCursor(props);
+  const model = await loadLanding(cursor);
   const facts = {
     store: slotStoreFromPublic(model.store),
     products: model.products.map(slotProductFromPublic),
@@ -31,8 +39,10 @@ export default async function HomePage(): Promise<ReactNode> {
         jsonLd={model.jsonLd}
         canonical={model.canonicalUrl}
         markdown={model.markdownPath}
+        prev={cursor ? "/" : null}
+        next={model.nextCursor ? `/?cursor=${encodeURIComponent(model.nextCursor)}` : null}
       />
-      <LandingTemplate facts={facts} />
+      <LandingTemplate facts={facts} paginated={Boolean(cursor)} />
     </>
   );
 }

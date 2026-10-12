@@ -130,9 +130,13 @@ function truncateChars(value: string, max: number): string {
   return Array.from(value).slice(0, max).join("");
 }
 
-export async function loadLanding(): Promise<LandingModel> {
+export async function loadLanding(cursor?: string): Promise<LandingModel> {
+  const requested = cursor !== undefined && cursor.length > 0 ? cursor : undefined;
   const [page, store] = await Promise.all([
-    publicProducts.list({ limit: listLimit }),
+    publicProducts.list({
+      limit: listLimit,
+      ...(requested === undefined ? {} : { cursor: requested }),
+    }),
     publicStore.get(),
   ]);
   const origin = publicBaseUrl();
@@ -149,8 +153,12 @@ export async function loadLanding(): Promise<LandingModel> {
   return {
     title,
     description,
-    canonicalUrl: absoluteUrl("/", origin),
-    markdownPath: "/index.md",
+    canonicalUrl: absoluteUrl(
+      requested === undefined ? "/" : `/?cursor=${encodeURIComponent(requested)}`,
+      origin,
+    ),
+    markdownPath:
+      requested === undefined ? "/index.md" : `/index.md?cursor=${encodeURIComponent(requested)}`,
     store,
     products: page.items,
     nextCursor: page.nextCursor,

@@ -27,14 +27,9 @@ import {
   type PublicStoreProfile,
 } from "../shared/seams/public-store";
 import { landingMarkdownResponse } from "./markdown";
-import {
-  emptyProductsNote,
-  storeExplanation,
-  storeSlogan,
-  unverifiedProfileNotice,
-  viewAllProductsLabel,
-} from "./site";
+import { emptyProductsNote, storeExplanation, unverifiedProfileNotice } from "./site";
 import { serverFactJsonLd } from "./model";
+import { htmlDiscoveryLinks } from "./negotiate";
 
 const origin = "https://merclink.example";
 
@@ -65,8 +60,8 @@ describe("public pages", () => {
 
     expect(visible).toContain(product.title);
     expect(visible).toContain("USD 2599.00");
-    expect(visible).toContain("有货");
-    expect(visible).toContain('href="/products"');
+    expect(visible.split("<footer")[0]).not.toContain("有货");
+    expect(visible).not.toContain('href="/products"');
     expect(visible).toContain('href="/skill.md"');
     expect(visible).toContain('href="/merchant/skill.md"');
     expect(visible).toContain('href="/interfaces"');
@@ -76,9 +71,9 @@ describe("public pages", () => {
     expect(visible).not.toContain('href="/api/v1"');
     expect(visible).toContain('href="/llms.txt"');
     expect(visible).toContain('href="/sitemap.xml"');
-    expect(visible.indexOf(product.title)).toBeLessThan(visible.indexOf(storeSlogan));
+    expect(visible.indexOf(product.title)).toBeLessThan(visible.indexOf("如何使用"));
     expect(visible.indexOf(product.title)).toBeLessThan(visible.indexOf('href="/skill.md"'));
-    expect(visible).toContain(storeExplanation);
+    expect(visible).not.toContain(storeExplanation);
     expect(visible).not.toContain("查询已上架商品并下单");
     expect(visible).not.toContain("不能自助注册");
     expect(visible).not.toContain("进入这一家的店");
@@ -117,6 +112,8 @@ describe("public pages", () => {
 
     expect(visibleHtml(listHtml)).toContain(product.title);
     expect(visibleProduct).toContain(product.title);
+    expect(visibleProduct).toContain('href="/">返回首页');
+    expect(visibleProduct).not.toContain('href="/products"');
     expect(visibleProduct).not.toContain("目录 ID");
     expect(visibleProduct).not.toContain("查看结构化商品信息");
     expect(visibleProduct).not.toContain(product.catalogId);
@@ -164,6 +161,141 @@ describe("public pages", () => {
     expect(offer.availability).toBe("https://schema.org/InStock");
   });
 
+  it("escapes public text once and keeps long fields and images readable", async () => {
+    process.env.MERCLINK_PURCHASE = "1";
+    resetPurchaseModeCache();
+    const product = publishedProduct();
+    product.title = 'Food & Culture <img src=x onerror="alert(1)">';
+    product.fields = {
+      ...product.fields,
+      price_unit: "每人",
+      description: "第一段介绍。\n\n第二段保留换行与 <script> 字样。",
+      description_zh: "这是中文介绍。",
+      unfamiliar_field: "商家自定义事实",
+      gallery:
+        "https://merclink.example/media/second https://merclink.example/media/third 图片说明保留",
+    };
+    registerProducts([product]);
+    const detail = visibleHtml(
+      renderToStaticMarkup(await ProductPage({ params: Promise.resolve({ id: product.id }) })),
+    );
+    const list = visibleHtml(renderToStaticMarkup(await ProductsPage({})));
+    const home = visibleHtml(renderToStaticMarkup(await HomePage()));
+    for (const html of [detail, list, home]) {
+      expect(html).toContain("Food &amp; Culture &lt;img");
+      expect(html).not.toContain("Food &amp;amp; Culture");
+      expect(html).not.toContain('<img src=x onerror="alert(1)">');
+    }
+    expect(detail).toContain('class="priceUnit">每人');
+    expect(detail).toMatch(/<input[^>]*id="description-en"[^>]*checked=""/);
+    expect(detail).toContain('id="description-zh"');
+    expect(detail).toContain("这是中文介绍。");
+    expect(detail).toContain('aria-label="下一张图片"');
+    expect(detail.match(/src="https:\/\/merclink.example\/media\/second"/g)).toHaveLength(2);
+    expect(detail).toContain('class="galleryThumb"');
+    expect(detail).toContain('class="purchaseActions"');
+    expect(detail).toContain('class="skillIcon"');
+    expect(detail).toContain("商家自定义事实");
+    expect(detail).toContain("图片说明保留");
+    expect(detail).toContain("第二段保留换行与 &lt;script&gt; 字样。");
+    expect(detail).toContain('src="https://merclink.example/media/second"');
+    expect(detail.indexOf('class="gallery"')).toBeLessThan(detail.indexOf('class="detailInfo"'));
+    expect(detail.indexOf('class="detailInfo"')).toBeLessThan(detail.indexOf("第一段介绍。"));
+  });
+
+  it("promotes tour facts beside the image and omits missing meeting points", async () => {
+    process.env.MERCLINK_PURCHASE = "1";
+    resetPurchaseModeCache();
+    const product = publishedProduct();
+    product.fields = {
+      tour_time: "19:00–21:30",
+      meeting_point: "Jinshi Road Station\n金石路站E2口",
+      other_payment: "https://www.guruwalk.com/walks/69203-night-tour",
+    };
+    registerProducts([product]);
+    const render = async (): Promise<string> =>
+      visibleHtml(
+        renderToStaticMarkup(await ProductPage({ params: Promise.resolve({ id: product.id }) })),
+      );
+    const html = await render();
+    expect(html).toContain('class="tourFacts"');
+    expect(html.match(/19:00–21:30/g)).toHaveLength(1);
+    expect(html.match(/金石路站E2口/g)).toHaveLength(1);
+    expect(html).toContain(
+      'href="https://www.guruwalk.com/walks/69203-night-tour" target="_blank" rel="noopener noreferrer"',
+    );
+    expect(html.indexOf("金石路站E2口")).toBeLessThan(html.indexOf('class="variantFieldset"'));
+    expect(html).toContain('id="participant-count" aria-live="polite">1</output>');
+    expect(html).toContain("默认 1 人，请将实际参加人数告诉 Agent。");
+    product.fields = { ...product.fields, meeting_point: null };
+    const withoutAddress = await render();
+    expect(withoutAddress).not.toContain("Meeting point");
+    expect(withoutAddress).toContain("19:00–21:30");
+  });
+
+  it("keeps tour discovery and footer contact while gating purchase actions", async () => {
+    const product = publishedProduct();
+    product.fields = {
+      tour_time: "19:00–21:30",
+      other_payment: "https://www.guruwalk.com/walks/tour",
+    };
+    registerProducts([product]);
+    publicStore.register({
+      get: () =>
+        Promise.resolve(
+          publishedStore({ contact: { phone: "028-12345678", label: null, qrUrl: null } }),
+        ),
+    });
+    const detail = visibleHtml(
+      renderToStaticMarkup(await ProductPage({ params: Promise.resolve({ id: product.id }) })),
+    );
+    expect(detail).not.toContain("复制购买需求");
+    expect(detail).not.toContain("下单前登录并批准");
+    expect(detail).toContain('aria-label="查看用户 Skill"');
+    expect(detail).toContain('id="participant-count"');
+    expect(detail).toContain("19:00–21:30");
+    expect(detail).toContain('href="https://www.guruwalk.com/walks/tour"');
+    const home = visibleHtml(renderToStaticMarkup(await HomePage()));
+    const footer = home.slice(home.indexOf("<footer"));
+    expect(footer).toContain("028-12345678");
+    expect(footer).not.toContain("未发布联系方式");
+    expect(footer).toContain("修改店面");
+    process.env.MERCLINK_PURCHASE = "1";
+    resetPurchaseModeCache();
+    const enabled = visibleHtml(
+      renderToStaticMarkup(await ProductPage({ params: Promise.resolve({ id: product.id }) })),
+    );
+    expect(enabled).toContain("复制购买需求");
+    expect(enabled).toContain('class="skillIcon"');
+    expect(enabled).toContain('id="participant-count"');
+  });
+
+  it("renders a single native link per orbit card", async () => {
+    const products = Array.from({ length: 5 }, (_, index) => ({
+      ...publishedProduct(),
+      id: `prd_panel_${index}`,
+      title: `Product ${index}`,
+    }));
+    registerProducts(products);
+    const html = visibleHtml(renderToStaticMarkup(await HomePage()));
+    for (const product of products) {
+      expect(html.split(`href="/products/${product.id}"`)).toHaveLength(2);
+      expect(html).toContain(product.title);
+    }
+    expect(html).toContain('class="productDeck"');
+    expect(html).not.toContain("deckClone");
+    expect(html).not.toContain("deckTrack");
+    expect(html).toContain('aria-label="下一件商品"');
+    expect(html).not.toContain("deckIndex");
+    expect(html).not.toContain("deckAvailability");
+    expect(html).not.toContain('id="pause-film"');
+    expect(html).not.toContain("filmCopy");
+    expect(html).not.toContain('href="/products"');
+    registerProducts([publishedProduct()]);
+    const single = visibleHtml(renderToStaticMarkup(await HomePage()));
+    expect(single.match(/class="deckCard"/g)).toHaveLength(1);
+  });
+
   it("returns a noindex 404 when the seam does not return the product", async () => {
     const hiddenPrice = 424242;
     registerProducts([publishedProduct()]);
@@ -203,7 +335,7 @@ describe("public pages", () => {
     const home = renderToStaticMarkup(await HomePage());
     const list = renderToStaticMarkup(await ProductsPage({}));
 
-    expect(visibleHtml(home)).toContain(storeExplanation);
+    expect(visibleHtml(home)).toContain("如何使用");
     expect(visibleHtml(home)).toContain(emptyProductsNote);
     expect(visibleHtml(home)).not.toContain("查询已上架商品并下单");
     expect(visibleHtml(home)).not.toContain("不能自助注册");
@@ -241,8 +373,8 @@ describe("public pages", () => {
 
     expect(visible.indexOf(store.displayName)).toBeLessThan(visible.indexOf(store.summary));
     expect(visible.indexOf(store.summary)).toBeLessThan(visible.indexOf(product.title));
-    expect(visible.indexOf(product.title)).toBeLessThan(visible.indexOf(storeSlogan));
-    expect(visible).toMatch(/<h1[^>]*>南风商店<\/h1>/);
+    expect(visible.indexOf(product.title)).toBeLessThan(visible.indexOf("如何使用"));
+    expect(visible).toContain('aria-label="南风商店"');
     expect(visible).toContain("https://cdn.example/logo.png");
     expect(visible).toContain("杭州市");
     expect(visible).toContain("西湖区某某路 88 号");
@@ -323,7 +455,7 @@ describe("public pages", () => {
     expect(visible).toContain("例某");
     expect(visible).toContain("示例市注册路 1 号");
     expect(visible).toContain(unverifiedProfileNotice);
-    expect(visible.indexOf(unverifiedProfileNotice)).toBeLessThan(visible.indexOf(storeSlogan));
+    expect(visible.indexOf(unverifiedProfileNotice)).toBeLessThan(visible.indexOf("如何使用"));
     expect(onlineStore).toMatchObject({
       address: { "@type": "PostalAddress", streetAddress: "西湖区某某路 88 号" },
       identifier: [
@@ -405,19 +537,19 @@ describe("public pages", () => {
 
     expect(visible).toContain("¥1599.00");
     expect(visible).toContain("¥8.00");
-    expect(visible).toContain("有货");
-    expect(visible).toContain("缺货");
+    expect(visible.split("<footer")[0]).not.toContain("有货");
+    expect(visible).not.toContain("缺货");
     expect(visible).toContain(`href="/products/${boots.id}"`);
     expect(visible).toContain(`href="/products/${cup.id}"`);
     expect(visible).toContain("placeholder");
     expect(visible).not.toContain(">无<");
-    expect(visible).toContain(viewAllProductsLabel);
+    expect(visible).not.toContain("查看更多");
     expect(html).not.toContain("linear-gradient");
     expect(html).not.toContain("autoplay");
-    expect(visible.indexOf(boots.title)).toBeLessThan(visible.indexOf(storeSlogan));
+    expect(visible.indexOf(boots.title)).toBeLessThan(visible.indexOf("如何使用"));
   });
 
-  it("links to the product list when the shelf has another page", async () => {
+  it("keeps the homepage journey free of a list detour", async () => {
     const products = ["甲", "乙", "丙", "丁", "戊"].map((title, index) => {
       const product = publishedProduct();
       product.id = `prd_shelf_${String(index)}`;
@@ -427,10 +559,42 @@ describe("public pages", () => {
     registerProducts(products);
     const html = renderToStaticMarkup(await HomePage());
     const visible = visibleHtml(html);
-    expect(visible).toContain(viewAllProductsLabel);
-    expect(visible).toContain('href="/products"');
+    expect(visible).not.toContain("查看更多");
+    expect(visible).not.toContain('href="/products"');
     expect(products.every((product) => visible.includes(`href="/products/${product.id}"`))).toBe(
       true,
+    );
+  });
+
+  it("paginates on the homepage with matching Markdown facts", async () => {
+    const first = { ...publishedProduct(), id: "prd_first", title: "First trip" };
+    const second = { ...publishedProduct(), id: "prd_second", title: "Second trip" };
+    publicProducts.register({
+      list: (query) =>
+        Promise.resolve(
+          query.cursor === "next+page"
+            ? { items: [second], nextCursor: null }
+            : { items: [first], nextCursor: "next+page" },
+        ),
+      get: () => Promise.resolve({ ok: true, product: first }),
+    });
+    const firstHtml = visibleHtml(renderToStaticMarkup(await HomePage()));
+    expect(firstHtml).toContain('href="/?cursor=next%2Bpage#collection"');
+    const secondHtml = visibleHtml(
+      renderToStaticMarkup(
+        await HomePage({ searchParams: Promise.resolve({ cursor: "next+page" }) }),
+      ),
+    );
+    expect(secondHtml).toContain("Second trip");
+    expect(secondHtml).not.toContain("First trip");
+    expect(secondHtml).toContain('href="/#collection"');
+    const markdown = await landingMarkdownResponse(
+      new Request(`${origin}/index.md?cursor=next%2Bpage`),
+    );
+    expect(await markdown.text()).toContain("Second trip");
+    expect(markdown.headers.get("link")).toContain("/?cursor=next%2Bpage");
+    expect(htmlDiscoveryLinks("/", "?cursor=next%2Bpage")).toContain(
+      "/index.md?cursor=next%2Bpage",
     );
   });
 
@@ -446,7 +610,7 @@ describe("public pages", () => {
     expect(withdrawn).not.toContain("可以直接交给 Agent 购买");
     expect(landingGraph(html).find((node) => node["@type"] === "OnlineStore")).toBeUndefined();
   });
-  it("keeps both ordered role guides and the more link in server HTML even without products", async () => {
+  it("keeps both ordered role guides inside the footer without redundant page links", async () => {
     const disabled = visibleHtml(renderToStaticMarkup(await HomePage()));
     expect(disabled).not.toContain("完成购买");
     expect(disabled).not.toContain("复制购买需求");
@@ -477,15 +641,12 @@ describe("public pages", () => {
     process.env.MERCLINK_PURCHASE = "1";
     resetPurchaseModeCache();
     const visible = visibleHtml(renderToStaticMarkup(await HomePage()));
-    expect(visible).toContain(viewAllProductsLabel);
+    expect(visible).not.toContain("查看更多");
     expect(visible).toContain("如何使用 MercLink");
     expect(visible).toContain("把用户 Skill 交给 Agent");
     expect(visible).toContain("把商家 Skill 交给 Agent");
     expect(visible).toContain("首次登录先修改初始密码");
     expect(visible).toContain("打开付款链接不表示支付成功");
-    expect(visible.indexOf(viewAllProductsLabel)).toBeLessThan(
-      visible.indexOf("如何使用 MercLink"),
-    );
     expect((visible.match(/<ol/g) ?? []).length).toBe(3);
     expect((visible.match(/<li>/g) ?? []).length).toBe(12);
     expect(visible).toContain('href="/skill.md"');

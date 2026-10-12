@@ -35,3 +35,15 @@ export function optionText(options: PublicVariant["optionValues"]): string {
   const parts = Object.entries(options).map(([key, value]) => `${key}=${value}`);
   return parts.length === 0 ? "默认规格" : parts.join("，");
 }
+
+export function purchaseRequest(
+  productId: string,
+  variant: PublicVariant,
+  participants?: number,
+): string {
+  const count =
+    participants === undefined
+      ? ""
+      : `，人数 ${String(participants)} 人（购买数量 ${String(participants)}）`;
+  return `我想购买商品 ${productId}，规格 ${variant.id}（${optionText(variant.optionValues)}）${count}。请先查询当前价格和库存，向我确认商品、规格和数量后再购买。`;
+}

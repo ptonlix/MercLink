@@ -1,0 +1,510 @@
+/* finesse · register=brand+commerce · A=graphite+ice · B=bold-sans
+ * C=elliptical-floating-cards · D=rAF-CSS3D+WAAPI-letter-path · E=Chengdu-bridge+panda
+ * SOUL=8 SPECTACLE=7 DENSITY=4 */
+.page.storefront {
+  --ml-paper: #0c1218;
+  --ml-surface: #141e27;
+  --ml-raised: #1c2c36;
+  --ml-ink: #edf4f7;
+  --ml-muted: #a9bcc6;
+  --ml-moss: #9ee8e0;
+  --ml-accent-wash: rgba(158, 232, 224, 0.1);
+  --ml-line: rgba(189, 224, 235, 0.19);
+  --home-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  background: var(--ml-paper);
+  color: var(--ml-ink);
+}
+.storefront :is(h1, h2, h3, h4) {
+  font-family: var(--ml-sans);
+}
+.page.home {
+  padding: 0 clamp(20px, 4vw, 72px);
+  overflow: clip;
+  position: relative;
+  isolation: isolate;
+}
+.home::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(189, 224, 235, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(189, 224, 235, 0.035) 1px, transparent 1px);
+  background-size: 96px 96px;
+  mask-image: linear-gradient(to bottom, #edf4f7, transparent 950px);
+}
+.homeFrame {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+.homeIntro {
+  padding-top: clamp(54px, 5vw, 80px);
+}
+.home .storeHeader {
+  position: relative;
+  border: 0;
+  padding: 0 0 30px;
+}
+.home .storeHeader > div:first-child {
+  width: 100%;
+  min-width: 0;
+}
+.home .storeName {
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 2vw, 32px);
+  font: 600 clamp(46px, 7.7vw, 112px)/1.07 var(--ml-sans);
+  letter-spacing: -0.065em;
+  text-wrap: initial;
+}
+.chengduMark {
+  width: 0.86em;
+  height: 0.86em;
+  flex: 0 0 0.86em;
+  color: var(--ml-moss);
+}
+.titleLetters {
+  position: relative;
+  min-width: 0;
+}
+.titleWord {
+  white-space: normal;
+  max-width: 100%;
+  display: inline-block;
+}
+.titleWord:not(:last-child) {
+  margin-right: 0.2em;
+}
+.titleLetter {
+  display: inline-block;
+}
+.titlePanda {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 52px;
+  height: 40px;
+  pointer-events: none;
+  transform: translateY(-26px);
+}
+.pandaDrawing {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.pandaFeet {
+  transform-origin: 35px 42px;
+  animation: panda-gait 650ms ease-in-out infinite alternate;
+}
+@keyframes panda-gait {
+  from {
+    transform: rotate(-10deg);
+  }
+  to {
+    transform: rotate(12deg);
+  }
+}
+.home .summary {
+  max-width: 92ch;
+  margin-top: 24px !important;
+  font-size: clamp(14px, 1.2vw, 17px);
+  line-height: 1.85;
+  color: var(--ml-muted);
+}
+.typedSummary {
+  position: relative;
+}
+.summaryTyped {
+  display: none;
+}
+.isTyping .summaryOriginal {
+  opacity: 0;
+}
+.isTyping .summaryTyped {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+.isTyping .summaryTyped::after {
+  content: "";
+  display: inline-block;
+  height: 1em;
+  width: 2px;
+  margin-left: 3px;
+  vertical-align: -0.1em;
+  background: var(--ml-moss);
+}
+.home .storeMeta {
+  margin-top: 12px;
+}
+.home .storeMeta:empty {
+  display: none;
+}
+.home .storeHeader > .logo {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+}
+.collectionHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 0;
+  border-top: 1px solid var(--ml-line);
+}
+.home .collectionHeading h2 {
+  font: 500 15px var(--ml-sans);
+  letter-spacing: 0.04em;
+}
+.motionToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--ml-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.motionToggle input {
+  accent-color: var(--ml-moss);
+  width: 16px;
+  height: 16px;
+}
+.productDeck {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  gap: 24px;
+  padding: 24px 0;
+}
+.deckRow {
+  display: contents;
+}
+.home:has(#store-motion-pause:checked) .pandaFeet {
+  animation-play-state: paused;
+}
+.home .deckCard {
+  position: relative;
+  display: block;
+  min-width: 0;
+  height: 440px;
+  color: var(--ml-ink);
+  border-radius: 12px;
+  text-decoration: none;
+  outline-offset: 5px;
+}
+.deckSurface {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--ml-surface);
+  transition:
+    transform 450ms var(--home-ease),
+    box-shadow 450ms var(--home-ease);
+}
+.productDeck[data-orbit="ready"] {
+  position: relative;
+  display: block;
+  height: 575px;
+  padding: 0;
+  perspective: 1100px;
+  perspective-origin: 50% 38%;
+  isolation: isolate;
+}
+.productDeck[data-orbit="ready"]::before {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 2px;
+  height: 170px;
+  border: 1px solid var(--ml-line);
+  border-radius: 50%;
+  transform: rotateX(62deg);
+  background: radial-gradient(ellipse, var(--ml-accent-wash), transparent 70%);
+  pointer-events: none;
+}
+.home .productDeck[data-orbit="ready"] .deckCard {
+  position: absolute;
+  top: 52px;
+  left: 50%;
+  width: clamp(280px, 28vw, 360px);
+  margin-left: calc(clamp(280px, 28vw, 360px) / -2);
+  height: 410px;
+  will-change: transform;
+}
+.productDeck[data-orbit="ready"] .deckSurface {
+  box-shadow:
+    0 32px 48px -14px rgba(0, 5, 12, 0.65),
+    0 1px 0 var(--ml-line) inset;
+}
+.productDeck[data-orbit="ready"] .deckPhoto {
+  filter: brightness(var(--orbit-light, 1));
+}
+.orbitControls {
+  display: none;
+}
+.orbitControls[data-orbit="ready"] {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding-bottom: 16px;
+}
+.orbitControls button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--ml-line);
+  border-radius: 50%;
+  color: var(--ml-ink);
+  background: var(--ml-surface);
+}
+.orbitControls svg {
+  width: 22px;
+  height: 22px;
+}
+.orbitControls button:is(:hover, :focus-visible) {
+  color: var(--ml-paper);
+  background: var(--ml-moss);
+}
+.deckSurface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--ml-line);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.deckPhoto {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  transition:
+    transform 900ms var(--home-ease),
+    opacity 600ms ease;
+}
+.deckPhoto .cover {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  aspect-ratio: auto;
+}
+.deckPhoto > span:not(.cover) {
+  display: contents;
+}
+.deckPhoto > span > img,
+.deckPhoto > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.deckPhoto .placeholder {
+  align-items: flex-start;
+  padding-top: 90px;
+}
+.deckSurface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    180deg,
+    rgba(6, 13, 20, 0.05) 20%,
+    rgba(6, 13, 20, 0.85) 75%,
+    rgba(6, 13, 20, 0.97)
+  );
+  pointer-events: none;
+}
+.deckContent {
+  padding: 28px;
+}
+.home .deckContent h3 {
+  font: 500 clamp(21px, 1.8vw, 27px)/1.2 var(--ml-sans);
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+  max-width: 26ch;
+  text-wrap: pretty;
+}
+.home .deckSubtitle {
+  font-size: 13px;
+  line-height: 1.7;
+  margin-top: 14px;
+  color: var(--ml-muted);
+}
+.deckBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+}
+.deckPrice {
+  font: 500 20px var(--ml-sans);
+  color: var(--ml-moss);
+  white-space: nowrap;
+}
+.deckEntry {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--ml-line);
+  border-radius: 50%;
+  transition: background 250ms ease;
+}
+.deckEntry svg {
+  width: 22px;
+  height: 22px;
+}
+.deckCard:is(:hover, :focus-visible) .deckEntry {
+  background: var(--ml-moss);
+  color: var(--ml-paper);
+}
+.deckLight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: var(--ml-moss);
+  opacity: 0;
+}
+.deckCard:is(:hover, :focus-visible) .deckLight {
+  opacity: 1;
+}
+.homeBelow {
+  padding: 0 0 24px;
+}
+.storefront .compactFooter {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 0 20px;
+  margin-top: 20px;
+  padding: 16px 0;
+  border: 0;
+}
+.footerSignature {
+  padding-top: 14px;
+  color: var(--ml-muted);
+  font-size: 12px;
+}
+.footerGuide {
+  display: contents;
+}
+.footerGuide > summary {
+  grid-column: 2;
+  grid-row: 1;
+  cursor: pointer;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  min-height: 44px;
+  font-size: 13px;
+  list-style: none;
+}
+.footerGuide > summary::-webkit-details-marker {
+  display: none;
+}
+.footerGuide[open] > summary span {
+  transform: rotate(45deg);
+}
+.footerGuideBody {
+  grid-column: 1 / -1;
+  padding: 24px 0;
+}
+.footerGuide:not([open]) .footerGuideBody {
+  display: none;
+}
+.storefront .usage {
+  padding-top: 24px;
+}
+.storefront .card {
+  background: var(--ml-surface);
+  border-color: var(--ml-line);
+}
+.storefront .card h3 {
+  font-family: var(--ml-sans);
+}
+.storefront .wordmark {
+  font-family: var(--ml-sans);
+  color: var(--ml-moss);
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .deckCard:hover .deckSurface {
+    transform: translateY(-18px) scale(1.045);
+    box-shadow: 0 45px 60px -16px rgba(0, 5, 12, 0.75);
+  }
+}
+.deckCard:focus-visible .deckSurface {
+  transform: translateY(-10px);
+}
+@media (max-width: 600px) {
+  .home .storeName {
+    font-size: clamp(36px, 10.5vw, 62px);
+    gap: 12px;
+  }
+  .homeIntro {
+    padding-top: 52px;
+  }
+  .home .summary {
+    margin-top: 20px !important;
+  }
+  .titlePanda {
+    width: 42px;
+    height: 34px;
+  }
+  .productDeck[data-orbit="ready"] {
+    height: 535px;
+    perspective: 950px;
+  }
+  .home .productDeck[data-orbit="ready"] .deckCard {
+    width: min(72vw, 280px);
+    margin-left: calc(min(72vw, 280px) / -2);
+    height: 395px;
+    top: 48px;
+  }
+  .deckContent {
+    padding: 22px;
+  }
+  .home .deckContent h3 {
+    font-size: 21px;
+  }
+  .footerGuide > summary {
+    gap: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pandaFeet {
+    animation: none;
+  }
+  .home .deckSurface,
+  .deckPhoto {
+    transition: none;
+    transform: none;
+  }
+  .motionToggle {
+    display: none;
+  }
+}
+
+.storefront .card {
+  border: 1px solid var(--ml-line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.storefront .card .cardBody {
+  padding: 22px;
+}
+.storefront .card .cover {
+  border-radius: 0;
+}

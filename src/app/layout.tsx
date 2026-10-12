@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 import "../public-discovery/public.css";
+import "../public-discovery/home.css";
 
 export const metadata: Metadata = {
   title: "MercLink",

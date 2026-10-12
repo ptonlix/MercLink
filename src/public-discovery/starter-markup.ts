@@ -56,6 +56,7 @@ export function starterDocument(name: StarterName): string {
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${starterTitles[name]}</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
@@ -70,6 +71,7 @@ export function starterStyles(): string {
   const root = process.cwd();
   const globals = readFileSync(path.join(root, "src/app/globals.css"), "utf8");
   const publicCss = readFileSync(path.join(root, "src/public-discovery/public.css"), "utf8");
+  const homeCss = readFileSync(path.join(root, "src/public-discovery/home.css"), "utf8");
   const authorizeCss = readFileSync(path.join(root, "src/app/authorize/authorize.css"), "utf8");
-  return `${globals}\n${publicCss}\n${authorizeCss}`;
+  return `${globals}\n${publicCss}\n${homeCss}\n${authorizeCss}`;
 }

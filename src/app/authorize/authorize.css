@@ -1,8 +1,9 @@
+/* finesse · register=product · shell=single-column-native-form */
 .ml-auth {
   box-sizing: border-box;
-  max-width: 520px;
-  margin: 64px auto;
-  padding: 32px;
+  max-width: 560px;
+  margin: clamp(32px, 8vh, 88px) auto;
+  padding: 40px;
   background: var(--ml-surface);
   color: var(--ml-ink);
   border: 1px solid var(--ml-line);
@@ -21,7 +22,7 @@
 }
 .ml-auth h1 {
   margin: 0 0 16px;
-  font: 500 36px/1.2 var(--ml-serif);
+  font: 600 32px/1.35 var(--ml-sans);
   letter-spacing: -0.025em;
 }
 .ml-auth h2 {
@@ -35,17 +36,17 @@
 }
 .ml-auth .notice {
   margin: 20px 0;
-  border-left: 3px solid var(--ml-error);
+  border: 1px solid var(--ml-error);
   padding: 12px 16px;
   color: var(--ml-ink);
-  background: #fcf1ed;
+  background: var(--ml-error-wash);
 }
 .ml-auth .secret {
   margin: 20px 0;
   padding: 16px;
-  background: #e9eee3;
+  background: var(--ml-accent-wash);
   border: 1px solid var(--ml-line);
-  border-radius: 8px;
+  border-radius: var(--ml-radius);
 }
 .ml-auth .secret p {
   margin-top: 0;
@@ -70,19 +71,19 @@
   width: 100%;
   min-height: 48px;
   border: 1px solid var(--ml-line);
-  border-radius: 8px;
+  border-radius: var(--ml-radius);
   padding: 10px 12px;
-  font: inherit;
+  font: 16px/1.5 var(--ml-sans);
   color: var(--ml-ink);
-  background: var(--ml-surface);
+  background: var(--ml-paper);
 }
 .ml-auth button {
   min-height: 44px;
   border: 1px solid var(--ml-moss);
-  border-radius: 8px;
+  border-radius: var(--ml-radius);
   padding: 10px 20px;
-  background: var(--ml-moss);
-  color: #fff;
+  background: var(--ml-ink);
+  color: var(--ml-paper);
   font: inherit;
   cursor: pointer;
 }
@@ -134,8 +135,10 @@
   margin: 24px 0;
   color: var(--ml-muted);
   font-size: 12px;
+  counter-reset: auth-step;
 }
 .ml-auth .auth-steps li {
+  counter-increment: auth-step;
   border-top: 2px solid var(--ml-line);
   padding-top: 8px;
 }
@@ -177,5 +180,53 @@
   }
   .ml-auth h1 {
     font-size: 30px;
+  }
+}
+
+.ml-auth .auth-steps li::before {
+  content: counter(auth-step, decimal-leading-zero);
+  display: block;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+.ml-auth .auth-steps li[aria-current="step"] {
+  font-weight: 650;
+}
+.ml-auth .auth-steps li[aria-current="step"]::after {
+  content: "当前";
+  display: block;
+  font-size: 11px;
+  margin-top: 4px;
+}
+.ml-auth .notice {
+  border-radius: var(--ml-radius);
+  font-size: 14px;
+}
+.ml-auth input:focus-visible {
+  background: var(--ml-surface);
+}
+.ml-auth button:hover:not(:disabled) {
+  background: var(--ml-moss);
+  color: var(--ml-paper);
+}
+.ml-auth button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.ml-auth .secondary-action button {
+  border-color: var(--ml-line);
+}
+.ml-auth .hint {
+  line-height: 1.75;
+}
+.ml-auth .stack > .hint {
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .ml-auth {
+    margin: 24px 16px;
+    padding: 28px 20px;
+  }
+  .ml-auth h1 {
+    font-size: 28px;
   }
 }

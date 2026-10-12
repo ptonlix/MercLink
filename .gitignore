@@ -71,3 +71,4 @@ Thumbs.db
 
 # 本地 Agent 缓存。项目技能本身保留在 .agents/skills。
 .serena/
+.finesse/
