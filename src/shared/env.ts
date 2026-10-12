@@ -5,6 +5,7 @@ import {
   devUnusedCredential,
   vendorCredentials,
 } from "./dev-stubs";
+import { readPurchaseMode } from "./purchase-mode";
 
 const nonEmpty = z.string().trim().min(1);
 
@@ -79,10 +80,18 @@ export function loadEnv(source: Readonly<Record<string, string | undefined>>): L
       message: "MERCLINK_DEV_STUBS cannot be enabled when NODE_ENV=production\n",
     };
   }
+  const purchase = readPurchaseMode(source);
+  if (!purchase.ok) {
+    return { ok: false, missing: [], message: purchase.message };
+  }
   const skipped = devStubsEnabled(source)
     ? new Set<string>(vendorCredentials())
     : new Set<string>();
-  if (source.MERCLINK_PAYMENT_PROVIDER === "easypay") {
+  if (!purchase.enabled) {
+    for (const key of vendorCredentials()) {
+      skipped.add(key);
+    }
+  } else if (source.MERCLINK_PAYMENT_PROVIDER === "easypay") {
     for (const key of [
       "ALIPAY_APP_ID",
       "ALIPAY_PRIVATE_KEY",

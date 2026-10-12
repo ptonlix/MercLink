@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { resetPurchaseModeCache } from "../shared/purchase-mode";
 import nextConfig from "../../next.config";
 import { GET as buyerSkill } from "../app/agent-docs/buyer-skill/route";
 import { GET as merchantSkill } from "../app/agent-docs/merchant-skill/route";
@@ -10,11 +11,17 @@ import { publicProducts, resetPublicProducts } from "../shared/seams/public-prod
 import { publicStore, resetPublicStore } from "../shared/seams/public-store";
 
 const buyerFile = "src/agent-docs/skill.md";
+const disabledBuyerFile = "src/agent-docs/skill-disabled.md";
 const merchantFile = "src/agent-docs/merchant-skill.md";
 const storefrontFile = "src/agent-docs/storefront-skill.md";
 const apiPathPattern = /\/api\/v1(?:\/(?:[A-Za-z0-9_-]+|\{[A-Za-z0-9_]+\}))+/g;
 
 describe("buyer skill", () => {
+  beforeEach(() => {
+    process.env.MERCLINK_PURCHASE = "1";
+    resetPurchaseModeCache();
+  });
+
   it("is public and teaches query, registration, variants, minor units, and paid", async () => {
     const response = await buyerSkill();
     const body = await response.text();
@@ -56,7 +63,7 @@ describe("buyer skill", () => {
     expect(body).toContain("不会切换渠道");
     expect(body).toContain("电脑收银台");
     expect(body).toContain("`paid`");
-    expect(body).toContain("The buyer does not choose the payment provider.");
+    expect(body).toContain("The user does not choose the payment provider.");
     expect(body).toContain("The provider is fixed by server startup configuration.");
     expect(body).toContain("`payment_channel` only chooses desktop or mobile.");
     expect(body).toContain("A closed order with an unapplied receipt is not success");
@@ -81,6 +88,38 @@ describe("buyer skill", () => {
     expect(body).toContain("不要重新申请设备码");
     expect(body).toContain("`unknown_field`");
     expect(body).toContain("`forbidden`");
+    expect(body).not.toMatch(/Bearer\s+[A-Za-z0-9\-._]{12,}/);
+    expect(body).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}/);
+    expect(body.startsWith("# 用户 Skill")).toBe(true);
+    expect(body).not.toContain("买家 Skill");
+  });
+
+  it("serves the query-only user skill when purchase is disabled", async () => {
+    delete process.env.MERCLINK_PURCHASE;
+    resetPurchaseModeCache();
+    const response = await buyerSkill();
+    const body = await response.text();
+    const file = await readFile(disabledBuyerFile, "utf8");
+
+    expect(response.status).toBe(200);
+    expect(body).toBe(file);
+    expect(body.startsWith("# 用户 Skill")).toBe(true);
+    expect(body).toContain("匿名查询");
+    expect(body).toContain("已上架");
+    expect(body).toContain("可售规格");
+    expect(body).toContain("整数分");
+    expect(body).toContain("purchase_disabled");
+    expect(body).toContain("40302");
+    expect(body).toContain("本部署未开启买入");
+    expect(body).not.toContain("POST /api/v1/orders");
+    expect(body).not.toContain("GET /api/v1/orders");
+    expect(body).not.toContain("令牌");
+    expect(body).not.toContain("买家 Skill");
+    expect(body).not.toContain("设备码");
+    expect(body).not.toContain("注册");
+    expect(body).not.toContain("payment.action");
+    expect(body).not.toContain("支付成功");
+    expect(body).not.toContain("`paid`");
     expect(body).not.toMatch(/Bearer\s+[A-Za-z0-9\-._]{12,}/);
     expect(body).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}/);
   });
@@ -261,6 +300,8 @@ describe("storefront skill", () => {
     expect(body).toContain("Do not ask for an Alipay password.");
     expect(body).toContain("只有订单状态 `paid` 才算成功");
     expect(body).toContain("/authorize/buyer/submit");
+    expect(body).toContain("用户 Skill");
+    expect(body).not.toContain("买家 Skill");
     expect(body).toContain("/authorize/merchant/submit");
     expect(body).toContain("不得增加商家注册入口");
     expect(body).toContain("未完成人机验证，不得请求发送短信");

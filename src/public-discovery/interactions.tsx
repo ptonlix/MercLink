@@ -164,9 +164,11 @@ function CopyText({
 export function UsageGuides({
   buyer,
   merchant,
+  buyerTabLabel = "我是用户，想购买",
 }: {
   buyer: ReactNode;
   merchant: ReactNode;
+  buyerTabLabel?: string;
 }): ReactNode {
   return (
     <div className="guideTabs">
@@ -180,7 +182,7 @@ export function UsageGuides({
       <input className="guideTabInput" type="radio" name="usage-guide" id="usage-merchant" />
       <div className="tabs" role="tablist" aria-label="选择使用身份">
         <label htmlFor="usage-buyer" id="guide-tab-0">
-          我是买家，想购买
+          {buyerTabLabel}
         </label>
         <label htmlFor="usage-merchant" id="guide-tab-1">
           我是店主，想上架
@@ -209,9 +211,11 @@ export function UsageGuides({
 export function VariantChooser({
   productId,
   variants,
+  purchaseEnabled = true,
 }: {
   productId: string;
   variants: readonly PublicVariant[];
+  purchaseEnabled?: boolean;
 }): ReactNode {
   const available = variants.filter(
     (variant) => variant.availability === "in_stock" && variant.stock !== 0,
@@ -260,22 +264,24 @@ export function VariantChooser({
           ))}
         </ul>
       </fieldset>
-      <div className="assistance">
-        <p>
-          {available.length === 0
-            ? "当前规格均缺货，可以让 Agent 稍后重新查询。"
-            : "选择规格后，把购买需求交给 Agent。Agent 会重新确认价格、库存和数量。"}
-        </p>
-        <noscript>
-          没有脚本时，把本页地址交给 Agent。商品 ID、规格 ID 和整数分写在本页的 Markdown 里。
-        </noscript>
-        <CopyText
-          key={selectedId}
-          text={text}
-          label={selected === undefined ? "请先选择有货规格" : "复制购买需求"}
-          disabled={selected === undefined}
-        />
-      </div>
+      {purchaseEnabled ? (
+        <div className="assistance">
+          <p>
+            {available.length === 0
+              ? "当前规格均缺货，可以让 Agent 稍后重新查询。"
+              : "选择规格后，把购买需求交给 Agent。Agent 会重新确认价格、库存和数量。"}
+          </p>
+          <noscript>
+            没有脚本时，把本页地址交给 Agent。商品 ID、规格 ID 和整数分写在本页的 Markdown 里。
+          </noscript>
+          <CopyText
+            key={selectedId}
+            text={text}
+            label={selected === undefined ? "请先选择有货规格" : "复制购买需求"}
+            disabled={selected === undefined}
+          />
+        </div>
+      ) : null}
     </>
   );
 }

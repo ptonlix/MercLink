@@ -7,6 +7,7 @@ import { systemClock, type Clock } from "../../ports/clock";
 import type { PaymentPort, PaymentRefundPort } from "../../ports/payment";
 import { devStubsEnabled } from "../../shared/dev-stubs";
 import { loadEnv } from "../../shared/env";
+import { currentPurchaseEnabled, resetPurchaseModeCache } from "../../shared/purchase-mode";
 import { isPaymentProvider, type PaymentProviderName } from "../../domain/commerce/order";
 import { createDrizzleCommerceRepository } from "./drizzle-store";
 import type { CommerceRepository } from "./repository";
@@ -24,6 +25,7 @@ export type CommerceRuntime = {
   payments?: PaymentRegistry;
   startupProvider?: PaymentProviderName;
   startupReady?: boolean;
+  purchaseEnabled?: boolean;
   clock: Clock;
   ownedCatalogs: CatalogOwnership;
 };
@@ -79,6 +81,7 @@ export function useCommerceRuntime(runtime: CommerceRuntime): void {
 export function resetCommerceRuntime(): void {
   override = undefined;
   cached = undefined;
+  resetPurchaseModeCache();
 }
 
 export function commerceRuntime(): CommerceRuntime {
@@ -124,6 +127,7 @@ function createProductionRuntime(): CommerceRuntime {
     payments,
     startupProvider: startupProvider ?? "alipay",
     startupReady,
+    purchaseEnabled: currentPurchaseEnabled(),
     clock: systemClock,
     ownedCatalogs: (merchantId) => ownership(merchantId),
   };

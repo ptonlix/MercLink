@@ -91,13 +91,13 @@ pnpm run check
 
 它包含格式、lint、类型、测试、依赖方向和 Knip。编辑器没有报错不能代替这条命令。
 
-改了路由、公开发现、鉴权、下单、支付或店面时，还要让冒烟全部通过。设置 `SMOKE_BASE_URL`、`SMOKE_DATABASE_URL` 和 `SMOKE_DEV_STUBS=1` 后运行：
+改了路由、公开发现、鉴权、下单、支付或店面时，还要让冒烟全部通过。设置 `SMOKE_BASE_URL`、`SMOKE_DATABASE_URL`、`SMOKE_DEV_STUBS=1` 和 `SMOKE_PURCHASE=1` 后运行：
 
 ```bash
 pnpm run test:smoke
 ```
 
-库名必须是 `merclink_smoke`。不要把连接串写进代码、测试或这份规范。没有这个进程时，至少跑 `pnpm exec vitest run --config vitest.smoke.config.ts tests/smoke/coverage.test.ts`，并写明完整冒烟没跑。不要把没跑的冒烟说成通过。
+库名必须是 `merclink_smoke`。下单冒烟要求 `SMOKE_PURCHASE=1`，且服务进程必须以 `MERCLINK_PURCHASE=1` 启动。不要把连接串写进代码、测试或这份规范。没有这个进程时，至少跑 `pnpm exec vitest run --config vitest.smoke.config.ts tests/smoke/coverage.test.ts`，并写明完整冒烟没跑。不要把没跑的冒烟说成通过。
 
 不要主动提交或推送。用户要求提交时，说明用一句祈使句，重点写为什么，而不是罗列文件。
 

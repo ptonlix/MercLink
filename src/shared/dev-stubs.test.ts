@@ -15,6 +15,7 @@ function filledEnv(): Record<string, string> {
 describe("development stubs", () => {
   it("keeps vendor credentials required unless the flag is set outside production", () => {
     const source = filledEnv();
+    source.MERCLINK_PURCHASE = "1";
     delete source.ALIPAY_PRIVATE_KEY;
     expect(loadEnv(source).ok).toBe(false);
 

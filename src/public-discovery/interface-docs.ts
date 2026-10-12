@@ -1,4 +1,5 @@
 import { apiRoutes } from "../shared/api-routes";
+import { currentPurchaseEnabled } from "../shared/purchase-mode";
 
 // 请求和响应字段只在 interface-fields.ts。这里不写第二份示例。
 export type InterfaceOperationDoc = {
@@ -273,7 +274,28 @@ export function interfaceOperationDoc(method: string, path: string): InterfaceOp
   if (found === undefined) {
     throw new Error(`缺少接口说明：${method} ${path}`);
   }
-  return found;
+  return applyPurchaseCopy(found);
+}
+
+function applyPurchaseCopy(doc: InterfaceOperationDoc): InterfaceOperationDoc {
+  if (currentPurchaseEnabled()) {
+    return doc;
+  }
+  if (doc.method === "GET" && doc.path === "/api/v1/orders/{id}") {
+    return {
+      ...doc,
+      summary: "本部署未开启买入。调用返回 40302，不查询支付。",
+      permission: "order:read 在本部署未开启买入时返回 40302，不查询支付。",
+    };
+  }
+  if (doc.method === "POST" && doc.path === "/api/v1/orders") {
+    return {
+      ...doc,
+      summary: "本部署未开启买入。调用返回 40302，不能创建订单，不扣库存。",
+      permission: "order:write 在本部署未开启买入时返回 40302，不能创建订单，不扣库存。",
+    };
+  }
+  return doc;
 }
 
 export function interfaceSlug(method: string, path: string): string {

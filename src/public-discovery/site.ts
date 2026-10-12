@@ -1,10 +1,16 @@
 import { apiRoutes, type ApiAudience } from "../shared/api-routes";
+import { currentPurchaseEnabled } from "../shared/purchase-mode";
 
 const localOrigin = "http://localhost:3000";
 
 export const storeSlogan = "在 AI 时代，让天下没有难做的生意";
 
-export const storeExplanation = "帮中小商家做自己的店，并让各种 Agent 直接找到商品、完成购买。";
+export const storeExplanation = "帮中小商家做自己的店，并让各种 Agent 直接找到商品。";
+const purchaseStoreExplanation = "帮中小商家做自己的店，并让各种 Agent 直接找到商品、完成购买。";
+
+export function explanationFor(purchaseEnabled: boolean): string {
+  return purchaseEnabled ? purchaseStoreExplanation : storeExplanation;
+}
 
 export const emptyProductsNote = "没有可展示的商品。";
 
@@ -108,7 +114,7 @@ export type InterfaceDirectoryGroup = {
 };
 
 const directorySkills = [
-  { audience: "buyer", title: "买家 Skill", href: buyerSkillPath },
+  { audience: "buyer", title: "用户 Skill", href: buyerSkillPath },
   { audience: "merchant", title: "商家 Skill", href: merchantSkillPath },
   { audience: "storefront", title: "店面 Skill", href: storefrontSkillPath },
 ] as const satisfies readonly {
@@ -148,9 +154,22 @@ export type StoreQuote = {
 
 // llms.txt is a directory. A published name and summary may appear only in the H1 and blockquote.
 // Link descriptions may cite field names and the fixed unverified notice. They must not embed values.
-export function llmsText(origin = publicBaseUrl(), store: StoreQuote | null = null): string {
+export function llmsText(
+  origin = publicBaseUrl(),
+  store: StoreQuote | null = null,
+  purchaseEnabled = currentPurchaseEnabled(),
+): string {
   const title = store === null ? siteName : oneLine(store.displayName);
-  const summary = store === null ? storeExplanation : oneLine(store.summary);
+  const summary = store === null ? explanationFor(purchaseEnabled) : oneLine(store.summary);
+  const userSkill = purchaseEnabled
+    ? "用户 Agent 的调用说明，不是这家店的商品数据，也不是第二份说明。用它查已上架商品、读目录字段，并可下一笔只有一行的订单，随后查询该订单。未登录可以查商品。不要向用户要密码、短信验证码或 API Key。不要自己传价格。"
+    : "用户 Agent 的调用说明，用于查找已上架商品。";
+  const storefrontSkill = purchaseEnabled
+    ? "商品、价格、店铺介绍仍走商家 Skill。购买仍走同一份用户 Skill。"
+    : "商品、价格、店铺介绍仍走商家 Skill。查找已上架商品走用户 Skill。";
+  const apiSkill = purchaseEnabled
+    ? "商品查询公开。下单和改资料要设备码换来的令牌。"
+    : "商品查询公开。改资料要设备码换来的令牌。本部署未开启买入。";
   const lines = [
     `# ${title}`,
     "",
@@ -160,7 +179,7 @@ export function llmsText(origin = publicBaseUrl(), store: StoreQuote | null = nu
     "",
     `- [落地页 Markdown（/index.md）](${absoluteUrl("/index.md", origin)}): 这家店的已发布事实，和总落地页相同。包括展示名、简介、区域、经营地址、网站和标识。客服电话、客服说明、客服二维码、企业名称、统一社会信用代码、法人、注册地址和执照图只在商家已发布时出现，并带「${unverifiedProfileNotice}」两组都没有时不写空段。这里没有规格 ID，不能靠它下单。`,
     `- [商品列表 Markdown（/products.md）](${absoluteUrl("/products.md", origin)}): 当前已上架商品的摘要，和 /products 相同。每行是名称、主币价格、有货或没货、商品 ID。没有店铺介绍，没有规格 ID。单件的公开字段、封面、整数分和规格 ID 在 /products/{id}.md。超过一页时正文给出下一页 cursor。`,
-    `- [买家 Skill（/skill.md）](${absoluteUrl(buyerSkillPath, origin)}): 买家 Agent 的调用说明，不是这家店的商品数据。用它查已上架商品、读目录字段、用规格 ID 下一笔只有一行的订单、打开支付，再查自己的订单。未登录可以查商品。不要向用户要密码、短信验证码或 API Key。不要自己传价格。打开支付链接不等于已支付。`,
+    `- [用户 Skill（/skill.md）](${absoluteUrl(buyerSkillPath, origin)}): ${userSkill}`,
     "",
     "## 页面",
     "",
@@ -171,8 +190,8 @@ export function llmsText(origin = publicBaseUrl(), store: StoreQuote | null = nu
     "",
     `- [店铺 JSON（/api/v1/store）](${absoluteUrl("/api/v1/store", origin)}): 已发布介绍的机器读取，不需要令牌。字段始终都在；没有的网站、标识、license、contact 是 null，不是省略。未发布时 404，不回显草稿。不要从 Markdown 猜测缺了哪一项。`,
     `- [商家 Skill（/merchant/skill.md）](${absoluteUrl(merchantSkillPath, origin)}): 商家 Agent 的调用说明，不含这家店的资料或令牌。用它管理目录、目录字段、商品、规格、上下架，以及整店一份的介绍。介绍不是每本目录一份。客服和执照是推荐录入，不是上架条件；写入执照前必须先向用户读出四项并得到同意。不要用它给买家下单。`,
-    `- [店面 Skill（/storefront/skill.md）](${absoluteUrl(storefrontSkillPath, origin)}): 只讲怎么改给人看的页面。商品、价格、店铺介绍仍走商家 Skill。购买仍走买家 Skill。不能改 /llms.txt、三份 Skill、/api、授权页协议和支付结果判断。页面上的客服和执照必须用槽位，不能写死。`,
-    `- [API（/api/v1）](${absoluteUrl(apiRootPath, origin)}): HTTP API 根地址。具体路径在三份 Skill 里，不要猜。商品查询公开。下单和改资料要设备码换来的令牌。robots.txt 禁止 /api 只约束爬虫，不禁止已批准的 Agent。`,
+    `- [店面 Skill（/storefront/skill.md）](${absoluteUrl(storefrontSkillPath, origin)}): 只讲怎么改给人看的页面。${storefrontSkill}不能改 /llms.txt、三份 Skill、/api、授权页协议和支付结果判断。页面上的客服和执照必须用槽位，不能写死。`,
+    `- [API（/api/v1）](${absoluteUrl(apiRootPath, origin)}): HTTP API 根地址。具体路径在三份 Skill 里，不要猜。${apiSkill}robots.txt 禁止 /api 只约束爬虫，不禁止已批准的 Agent。`,
     "",
   ];
   return lines.join("\n");

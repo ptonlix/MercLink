@@ -1,8 +1,8 @@
-# 买家 Skill
+# 用户 Skill
 
-用这一份公开文档代表买家使用这一家店：查询已上架商品，比较可售规格，创建订单，把支付交给付款人，再查询自己的订单。购买只是其中一步。未登录可以查询。下单和查询自己的订单前，用设备码让用户在浏览器里注册或批准。
+用这一份公开文档代表用户使用这一家店。查询已上架商品始终可以。买入只是这一份说明里的可选步骤：本部署开启买入时可以下单；未开启时，下单返回 `purchase_disabled`（`40302`），不要继续购买，也不要另找第二份说明。
 
-Use this document for the buyer side of the store: query published products, compare sellable variants, place an order, hand payment to the payer, and look up the buyer's own orders. Buying is one step, not the whole skill.
+Use this one document for the user side of the store. Product query always works. Purchase is the same guide with one switch: place an order only when this deployment has purchase enabled. Otherwise the order API returns `purchase_disabled` (`40302`). Do not look for a second skill.
 
 ## 何时使用
 
@@ -29,7 +29,7 @@ Do not ask the user for a password, SMS code, or API key. Use the device authori
 1. 未登录调用 `GET /api/v1/products` 找到已上架商品。`/products/{id}.md` 与商品页是同一份事实：公开字段仍用键。只有缝提供显示名时，下一行才用 `含义：` 注明；没有显示名不是缺键。筛选和写入仍用键，不要把显示名当成字段键。字段定义仍读 `GET /api/v1/catalogs/{id}/schema`。
 2. 用 `GET /api/v1/products/{id}` 确认可售规格。有多条规格时，让用户选定一条，记下 `variants[].id`。
 3. 需要下单时，用设备码让用户在浏览器注册或批准。Agent 不收集验证码或密码。
-4. 第一次下单就带上正确的 `payment_channel`。手机付款人，包括能做 HTTPS 跳转的 Agent 内置页，传 `mobile`。电脑付款人可以不传，缺省渠道是电脑收银台。买家不选择支付实现。支付实现由服务端启动配置固定。`payment_channel` 只选择电脑或手机。
+4. 本部署未开启买入时，到这里停止。已开启时，第一次下单就带上正确的 `payment_channel`。手机付款人，包括能做 HTTPS 跳转的 Agent 内置页，传 `mobile`。电脑付款人可以不传，缺省渠道是电脑收银台。用户不选择支付实现。支付实现由服务端启动配置固定。`payment_channel` 只选择电脑或手机。
 5. 用顶层导航打开完整的 `payment.action`。不要放进 iframe，也不要截断 URL。
 6. 用保存的访问令牌调用 `GET /api/v1/orders/{id}` 查询状态。请求头是 `Authorization: Bearer` 加上这枚令牌。只有 `paid` 才告诉用户支付成功。
 
@@ -37,17 +37,17 @@ Do not ask the user for a password, SMS code, or API key. Use the device authori
 
 未登录可以查询已上架商品。没有令牌就下单时，接口返回 401，并在 `WWW-Authenticate` 里指向 `/.well-known/oauth-protected-resource`。
 
-默认使用设备码。Agent 向 `POST /oauth/device/auth` 申请短码。请求头是 `content-type: application/x-www-form-urlencoded`，不是 JSON。请求体包含 `client_id=merclink-agent` 和所需 scope。买家使用这一整串：
+默认使用设备码。Agent 向 `POST /oauth/device/auth` 申请短码。请求头是 `content-type: application/x-www-form-urlencoded`，不是 JSON。请求体包含 `client_id=merclink-agent` 和所需 scope。用户使用这一整串：
 
 ```text
 scope=order:write order:read
 ```
 
-不要申请 `field:write` 或 `product:write`。那会打开商家登录页，而不是买家注册页。
+不要申请 `field:write` 或 `product:write`。那会打开商家登录页，而不是用户注册页。
 
 自己保存返回的 `device_code`，只把 `user_code` 和 `verification_uri` 或 `verification_uri_complete` 给用户。用户在自己的浏览器打开该地址，确认短码，没有账号就在随后的页面注册，已有账号则登录并批准。Agent 不收集验证码或密码。
 
-用户完成后，Agent 轮询 `POST /oauth/token`，`grant_type` 为 `urn:ietf:params:oauth:grant-type:device_code`，并带 `client_id=merclink-agent` 和保存的 `device_code`。返回 `authorization_pending` 时继续等。响应若有 `interval`，两次轮询至少间隔这么多秒。短码几分钟后失效，失效后重新申请，不要重复提交已经确认过的短码。买家批准的权限是 `order:write` 和 `order:read`。
+用户完成后，Agent 轮询 `POST /oauth/token`，`grant_type` 为 `urn:ietf:params:oauth:grant-type:device_code`，并带 `client_id=merclink-agent` 和保存的 `device_code`。返回 `authorization_pending` 时继续等。响应若有 `interval`，两次轮询至少间隔这么多秒。短码几分钟后失效，失效后重新申请，不要重复提交已经确认过的短码。用户批准的权限是 `order:write` 和 `order:read`。
 
 不要使用公网回调地址，也不要使用授权码重定向。Agent 在内网，没有独立的公网服务。不使用密码模式，不使用隐式模式。这里没有访问令牌、刷新令牌或 API Key 的示例值。
 
@@ -79,7 +79,7 @@ GET /api/v1/orders/{id}
 
 `GET /api/v1/products/{id}` 返回该商品的公开字段和可售规格。`fields` 仍是键和值，不含显示名。规格 ID 在 `data.variants[].id`，规格选项在 `option_values`。商品 Markdown 保留这些键。只有缝提供显示名时，下一行才注明含义。显示名不是字段键。商品 ID、目录 ID、价格整数分和原始可售状态写在 `/products/{id}.md`，不单独写在给人看的商品页上。CNY 价格仍是 `¥`；其他货币的主币价格仍带货币代码。下单和筛选仍用键和整数分，不要把主币价格当成整数分。
 
-`GET /api/v1/catalogs/{id}/schema` 读取目录当前公开字段定义。买家和商家都可以调用。用它解释筛选字段，不要用它修改字段。
+`GET /api/v1/catalogs/{id}/schema` 读取目录当前公开字段定义。用户和商家都可以调用。用它解释筛选字段，不要用它修改字段。
 
 ## 下单
 
@@ -87,7 +87,7 @@ GET /api/v1/orders/{id}
 
 不要自己传价格。服务端按规格单价乘数量计算行金额，调用方改不了价。`items` 只能有一项。多于一项时 `code` 是 `40003`（`too_many_items`）。
 
-`client_order_no` 是幂等业务单号。同一买家重复提交同一个 `client_order_no`，返回原订单，不会再次扣库存。
+`client_order_no` 是幂等业务单号。同一用户重复提交同一个 `client_order_no`，返回原订单，不会再次扣库存。
 
 `POST /api/v1/orders`
 
@@ -118,11 +118,11 @@ GET /api/v1/orders/{id}
 
 ## 查询订单状态
 
-`GET /api/v1/orders/{id}` 查询订单状态。请求带保存的访问令牌。买家只能看自己的订单。订单 ID 从下单响应的 `data.id` 读取。
+`GET /api/v1/orders/{id}` 查询订单状态。请求带保存的访问令牌。用户只能看自己的订单。订单 ID 从下单响应的 `data.id` 读取。
 
 订单状态只有 `pending`、`paid`、`closed`。只有状态 `paid` 才算支付成功。`pending` 是尚未支付。`closed` 是已关闭。不要把未支付当成成功。已关闭订单上的未履约收款不是成功。A closed order with an unapplied receipt is not success. 不要支付已关闭订单的旧链接。Do not pay a closed order's old link.
 
-买家不选择支付实现。支付实现由服务端启动配置固定，请求里不要传 `payment_provider`。The buyer does not choose the payment provider. The provider is fixed by server startup configuration. `payment_channel` 只选择电脑或手机，不选择支付实现。`payment_channel` only chooses desktop or mobile.
+用户不选择支付实现。支付实现由服务端启动配置固定，请求里不要传 `payment_provider`。The user does not choose the payment provider. The provider is fixed by server startup configuration. `payment_channel` 只选择电脑或手机，不选择支付实现。`payment_channel` only chooses desktop or mobile.
 
 ## 限制
 
@@ -137,7 +137,7 @@ GET /api/v1/orders/{id}
 ## 常见错误用法
 
 - 还没登录就下单，然后向用户要令牌。应走设备码，让用户在浏览器注册或批准。
-- 申请了商家 scope，把用户送进商家登录页。买家只用 `order:write order:read`。
+- 申请了商家 scope，把用户送进商家登录页。用户只用 `order:write order:read`。
 - 商品有多条可售规格，却只传 `product_id`。先选定 `variant_id`。
 - 把 `1599` 元传成价格，或在请求里自己加 `price`。服务端不接受调用方价格。
 - 手机付款人第一次没传 `payment_channel`，之后用新的 `client_order_no` 再下一单。那会再扣库存，也不会切换原来的渠道。

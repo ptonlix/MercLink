@@ -1,8 +1,8 @@
 # 店面 Skill
 
-用这一份公开文档修改这一家店给人看的页面。它只规定改页面的边界。商品、目录、字段和店铺资料仍由商家 Skill 经 API 修改。购买仍由买家 Skill 规定。
+用这一份公开文档修改这一家店给人看的页面。它只规定改页面的边界。商品、目录、字段和店铺资料仍由商家 Skill 经 API 修改。购买仍由用户 Skill 规定。
 
-Use this document only to change the storefront a person sees. Catalog, product, and profile data still go through the merchant skill. Purchase still goes through the buyer skill.
+Use this document only to change the storefront a person sees. Catalog, product, and profile data still go through the merchant skill. Purchase still goes through the user skill.
 
 ## 何时使用
 

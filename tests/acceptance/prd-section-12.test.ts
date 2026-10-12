@@ -423,6 +423,9 @@ describe("PRD section 12", () => {
         expect(page).not.toContain("请联系管理员开通");
         expect(page).not.toContain("注册");
 
+        process.env.MERCLINK_PURCHASE = "1";
+        const { resetPurchaseModeCache } = await import("../../src/shared/purchase-mode");
+        resetPurchaseModeCache();
         const captcha = fakeCaptcha(() => false);
         const sms = fakeSms();
         const blocked = await requestBuyerSms(

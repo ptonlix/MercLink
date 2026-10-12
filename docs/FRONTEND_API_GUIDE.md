@@ -66,13 +66,13 @@ PRD 当前把日常商品管理定位为“商家 Agent 通过 API 完成”。`
 
 ## 3. 公开展示接口
 
-| 方法 | 路径                           | 用途与返回 `data`                                                                                                 |
-| ---- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| 方法 | 路径                           | 用途与返回 `data`                                                                                                                                                 |
+| ---- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | GET  | `/api/v1/store`                | 已发布店铺介绍：`display_name`、`summary`、`website_url`、`logo_url`、`area_served`、`address`、`license`、`contact`；后四项以及 `license`、`contact` 可为 `null` |
-| GET  | `/api/v1/products`             | 已上架商品列表：`{items: PublicProduct[], next_cursor}`                                                           |
-| GET  | `/api/v1/products/{id}`        | 单个 `PublicProduct`；下架、删除或没有上架规格时返回 404                                                          |
-| GET  | `/api/v1/catalogs/{id}/schema` | `{catalog_id, currency, schema_revision, system_fields, fields}`；用于字段标签和动态表单                          |
-| GET  | `/media/{id}`                  | 图片二进制；可直接赋给 `img.src`                                                                                  |
+| GET  | `/api/v1/products`             | 已上架商品列表：`{items: PublicProduct[], next_cursor}`                                                                                                           |
+| GET  | `/api/v1/products/{id}`        | 单个 `PublicProduct`；下架、删除或没有上架规格时返回 404                                                                                                          |
+| GET  | `/api/v1/catalogs/{id}/schema` | `{catalog_id, currency, schema_revision, system_fields, fields}`；用于字段标签和动态表单                                                                          |
+| GET  | `/media/{id}`                  | 图片二进制；可直接赋给 `img.src`                                                                                                                                  |
 
 这些展示读取可匿名访问。Schema 如果携带 Authorization，会验证令牌；无效令牌会失败，商家令牌的读取范围也受所属目录约束。
 
@@ -238,9 +238,9 @@ PUT 必须提交下面全部九个字段，无值的可选字段用 `null`，不
 
 资料图片上传：
 
-| 方法 | 路径                               | 权限            | 用途                                      |
-| ---- | ---------------------------------- | --------------- | ----------------------------------------- |
-| POST | `/api/v1/merchant/profile/images`  | `product:write` | 上传执照或客服二维码，不发布店铺介绍      |
+| 方法 | 路径                              | 权限            | 用途                                 |
+| ---- | --------------------------------- | --------------- | ------------------------------------ |
+| POST | `/api/v1/merchant/profile/images` | `product:write` | 上传执照或客服二维码，不发布店铺介绍 |
 
 请求是 `multipart/form-data`，文件字段名 `file`，文本字段 `purpose` 只能是 `license` 或 `contact_qr`。成功返回 `{id, url, content_type, byte_size, purpose}`。它和目录图片上传共用同一商家每 60 秒 30 次的窗口。返回的 `url` 不能当作商品封面，目录图片地址也不能当作执照或二维码。公开读取仍是 `GET /media/{id}`。
 
@@ -311,6 +311,8 @@ PUT 必须提交下面全部九个字段，无值的可选字段用 `null`，不
 
 ## 7. 下单、支付与订单查询
 
+买入不是始终开启。只有进程以 `MERCLINK_PURCHASE=1` 启动时，下面的买家下单和买家查单才可用。未设置、空字符串和 `0` 都是关闭。关闭时 `POST /api/v1/orders` 与买家 `GET /api/v1/orders/{id}` 返回 HTTP 403、业务码 `40302`（`purchase_disabled`），`data` 为 null，不创建订单，不扣库存，不查询支付。商家订单列表不受这个开关影响。
+
 | 方法 | 路径                             | 权限               | 用途                                                       |
 | ---- | -------------------------------- | ------------------ | ---------------------------------------------------------- |
 | POST | `/api/v1/orders`                 | 买家 `order:write` | 创建订单、生成支付链接；用相同业务号重试                   |
@@ -369,7 +371,7 @@ PUT 必须提交下面全部九个字段，无值的可选字段用 `null`，不
 | 路径                                                            | 用途                                           |
 | --------------------------------------------------------------- | ---------------------------------------------- |
 | `GET /api/health`                                               | 原始 `{status: "ok"}`；不是完整依赖状态检查    |
-| `GET /skill.md`                                                 | 买家 Skill                                     |
+| `GET /skill.md`                                                 | 用户 Skill                                     |
 | `GET /merchant/skill.md`                                        | 商家 Skill                                     |
 | `GET /llms.txt`、`/robots.txt`、`/sitemap.xml`                  | 发现与搜索引擎资料                             |
 | `GET /dev/pay/{paymentId}`、`POST /dev/pay/{paymentId}/confirm` | 仅本地开发模拟支付；生产不提供                 |
@@ -399,6 +401,6 @@ PUT 必须提交下面全部九个字段，无值的可选字段用 `null`，不
 - 路径与权限：[业务路由注册表](../src/shared/api-routes.ts)、[商品 HTTP 映射](../src/app-services/catalog/http.ts)、[店铺 HTTP 服务](../src/app-services/identity/profile-http.ts)。
 - 数据与规则：[商品查询](../src/app-services/catalog/query.ts)、[查询参数规则](../src/domain/catalog/query.ts)、[字段变更规则](../src/domain/catalog/fields.ts)、[错误码](../src/shared/errors.ts)、[订单输出](../src/app-services/commerce/view.ts)。
 - 授权与表单：[OAuth provider](../src/app-services/access/provider.ts)、[商家提交路由](../src/app/authorize/merchant/submit/route.ts)、[买家提交路由](../src/app/authorize/buyer/submit/route.ts)、[API Key 路由](../src/app/api/v1/api-keys/route.ts)。
-- 产品边界：[PRD](./PRD.md)、[架构](./ARCHITECTURE.md)、[生效规格](../openspec/specs/)、[买家 Skill](../src/agent-docs/skill.md)、[商家 Skill](../src/agent-docs/merchant-skill.md)。
+- 产品边界：[PRD](./PRD.md)、[架构](./ARCHITECTURE.md)、[生效规格](../openspec/specs/)、[用户 Skill](../src/agent-docs/skill.md)、[商家 Skill](../src/agent-docs/merchant-skill.md)。
 
 本次对本地服务做了只读核验：商品列表与目录 Schema 正常返回 200，未发布店铺介绍返回 404，匿名商家目录及 API Key 返回 401，OAuth 元数据和健康检查可读。现有成都夜游商品返回 `price: 15000`、`stock: 999`，可作为页面联调数据。

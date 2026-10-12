@@ -18,6 +18,7 @@ import type { SmsPort } from "../../ports/sms";
 import { createPublicId } from "../../shared/id";
 import { hashPassword, verifyPassword } from "./passwords";
 import { httpStatusFor } from "../../shared/errors";
+import { currentPurchaseEnabled, purchaseDisabledMessage } from "../../shared/purchase-mode";
 import { failure, isUniqueViolation, type Failure } from "./result";
 
 export type BuyerRecord = {
@@ -51,10 +52,21 @@ function beginBuyerPhone(activeBuyerExists: boolean): "login" | "register" {
   return buyerPhoneOutcome(activeBuyerExists);
 }
 
+function purchaseClosed(): Failure | null {
+  if (currentPurchaseEnabled()) {
+    return null;
+  }
+  return failure(403, "purchase_disabled", purchaseDisabledMessage);
+}
+
 export async function requestBuyerSms(
   flow: BuyerFlow,
   input: { phone: string; captchaVerifyParam: string },
 ): Promise<{ ok: true; mode: "login" | "register" } | Failure> {
+  const closed = purchaseClosed();
+  if (closed !== null) {
+    return closed;
+  }
   const phone = normalizePhone(input.phone);
   if (!isLoginPhone(phone)) {
     return failure(400, "validation_error", "请填写手机号。");
@@ -106,6 +118,10 @@ export async function checkBuyerSms(
   flow: BuyerFlow,
   input: { phone: string; code: string },
 ): Promise<{ ok: true; mode: "login" | "register" } | Failure> {
+  const closed = purchaseClosed();
+  if (closed !== null) {
+    return closed;
+  }
   const phone = normalizePhone(input.phone);
   const challenge = await latestChallenge(flow.sql, phone);
   if (
@@ -142,6 +158,10 @@ export async function completeBuyerRegistration(
   flow: BuyerFlow,
   input: { phone: string; password: string; email?: string | null },
 ): Promise<{ ok: true; buyerId: string; created: boolean; mode: "login" | "register" } | Failure> {
+  const closed = purchaseClosed();
+  if (closed !== null) {
+    return closed;
+  }
   const phone = normalizePhone(input.phone);
   const challenge = await latestChallenge(flow.sql, phone);
   if (challenge === null) {
@@ -210,6 +230,10 @@ export async function loginBuyerWithPassword(
   flow: BuyerFlow,
   input: { phone: string; password: string },
 ): Promise<{ ok: true; buyer: BuyerRecord } | Failure> {
+  const closed = purchaseClosed();
+  if (closed !== null) {
+    return closed;
+  }
   const buyer = await findActiveBuyerByPhone(flow.sql, normalizePhone(input.phone));
   if (buyer === null) {
     return failure(401, "unauthorized", "手机号或密码不正确。");

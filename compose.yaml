@@ -3,7 +3,8 @@
 # 不要把真实密码写进这个文件。POSTGRES_PASSWORD、REDIS_PASSWORD、MINIO_ROOT_PASSWORD
 # 使用 URL 安全字符，且 MinIO 密码至少 8 位。
 # 数据库、Redis、对象存储只在 compose 网络内。应用对外端口默认 3000。
-# 公网 HTTPS 由部署机上的反向代理提供。APP_BASE_URL 和 ALIPAY_NOTIFY_URL 必须是该公网地址。
+# 公网 HTTPS 由部署机上的反向代理提供。APP_BASE_URL 必须是该公网地址。
+# 买入默认关闭。需要下单时设置 MERCLINK_PURCHASE=1，这时 ALIPAY_NOTIFY_URL 或易支付通知地址才必须是该公网地址。
 # 应用容器固定 NODE_ENV=production，并清空 MERCLINK_DEV_STUBS，避免部署 .env 打开本地模拟。
 name: merclink
 

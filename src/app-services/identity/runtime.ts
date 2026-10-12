@@ -11,6 +11,7 @@ import type { RateLimitPort } from "../../ports/rate-limit";
 import type { SmsPort } from "../../ports/sms";
 import { devStubsEnabled } from "../../shared/dev-stubs";
 import { loadEnv, type AppEnv } from "../../shared/env";
+import { currentPurchaseEnabled } from "../../shared/purchase-mode";
 
 export type AppRuntime = {
   env: AppEnv;
@@ -19,6 +20,7 @@ export type AppRuntime = {
   captcha: CaptchaPort;
   sms: SmsPort;
   rateLimit: RateLimitPort;
+  purchaseEnabled: boolean;
 };
 
 export function appRuntime(): AppRuntime {
@@ -31,6 +33,7 @@ export function appRuntime(): AppRuntime {
     env: loaded.env,
     sql: getDatabase(loaded.env.DATABASE_URL).sql,
     clock: systemClock,
+    purchaseEnabled: currentPurchaseEnabled(),
     captcha: stubs
       ? createDevCaptcha()
       : createAliyunCaptcha({

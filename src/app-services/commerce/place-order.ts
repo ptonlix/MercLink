@@ -23,6 +23,7 @@ import {
   startupProviderReady,
   type CommerceRuntime,
 } from "./runtime";
+import { purchaseDisabledMessage } from "../../shared/purchase-mode";
 import { httpStatus } from "./view";
 
 const itemSchema = z.strictObject({
@@ -104,6 +105,14 @@ export async function placeOrder(input: {
   runtime: CommerceRuntime;
   clientAddress?: string | null;
 }): Promise<PlaceOrderResult> {
+  if (input.runtime.purchaseEnabled === false) {
+    return {
+      ok: false,
+      error: "purchase_disabled",
+      message: purchaseDisabledMessage,
+      httpStatus: httpStatus("purchase_disabled"),
+    };
+  }
   const buyer = assertBuyerPlaces(input.actor);
   if (!buyer.ok) {
     return { ...buyer, httpStatus: httpStatus(buyer.error) };

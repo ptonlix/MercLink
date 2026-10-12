@@ -24,6 +24,7 @@ export const errorCodes = [
   "invalid_signature",
   "dependency_unavailable",
   "password_change_required",
+  "purchase_disabled",
 ] as const;
 
 export type ErrorCode = (typeof errorCodes)[number];
@@ -46,6 +47,7 @@ export const errorDefinitions = {
   unauthorized: { code: 40100, status: 401 },
   forbidden: { code: 40300, status: 403 },
   password_change_required: { code: 40301, status: 403 },
+  purchase_disabled: { code: 40302, status: 403 },
   not_found: { code: 40400, status: 404 },
   conflict: { code: 40900, status: 409 },
   insufficient_stock: { code: 40901, status: 409 },
