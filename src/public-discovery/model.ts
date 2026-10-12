@@ -1,6 +1,7 @@
 import type { PublicListQuery, PublicProduct } from "../shared/seams/public-products";
 import { publicProducts } from "../shared/seams/public-products";
 import { publicStore, type PublicStoreProfile } from "../shared/seams/public-store";
+import { currentPurchaseEnabled } from "../shared/purchase-mode";
 import { isPublicProductId } from "./negotiate";
 import {
   availabilityText,
@@ -15,7 +16,7 @@ import {
   publicBaseUrl,
   siteName,
   staticSitemapEntries,
-  storeExplanation,
+  explanationFor,
   type SitemapEntry,
 } from "./site";
 
@@ -136,7 +137,9 @@ export async function loadLanding(): Promise<LandingModel> {
   ]);
   const origin = publicBaseUrl();
   const description =
-    store === null ? storeExplanation : truncateChars(store.summary, metaDescriptionLimit);
+    store === null
+      ? explanationFor(currentPurchaseEnabled())
+      : truncateChars(store.summary, metaDescriptionLimit);
   const title = store === null ? siteName : store.displayName;
   const graph: JsonLdNode[] = [];
   if (store !== null) {

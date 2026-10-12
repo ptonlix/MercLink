@@ -3,6 +3,7 @@
 import { createElement, type ReactNode } from "react";
 import { slotHtml, type SlotContext, type SlotProduct } from "../domain/storefront/slots";
 import { minorUnits } from "../shared/money";
+import { currentPurchaseEnabled } from "../shared/purchase-mode";
 import { BannerShelf, PublicImage, UsageGuides, VariantChooser } from "./interactions";
 import { bodyExampleKind, pathExample, sectionExample } from "./interface-example";
 import type { ApiField, ApiSection } from "./interface-fields";
@@ -52,7 +53,7 @@ import {
   interfaceDirectoryLabel,
   interfaceDirectoryPath,
   merchantSkillPath,
-  storeExplanation,
+  explanationFor,
   storefrontSkillPath,
   storeSlogan,
   unverifiedProfileNotice,
@@ -79,7 +80,7 @@ export function LandingTemplate({ facts = null }: { facts?: Facts }): ReactNode 
             </a>
           </div>
         </section>
-        <PlatformUsageGuide />
+        <PlatformUsageGuide facts={facts} />
         <StoreFooter />
       </div>
     </main>
@@ -91,7 +92,11 @@ export function ProductListTemplate({ facts = null }: { facts?: Facts }): ReactN
     <PublicShell>
       <header className="pageHeading">
         <h1>已上架商品</h1>
-        <p>当前已上架商品列表。把感兴趣的商品交给你的 Agent，继续了解规格与购买方式。</p>
+        <p>
+          {currentPurchaseEnabled()
+            ? "当前已上架商品列表。把感兴趣的商品交给你的 Agent，继续了解规格与购买方式。"
+            : "当前已上架商品列表。把感兴趣的商品交给你的 Agent，继续了解规格。"}
+        </p>
       </header>
       <EmptyProductState facts={facts} />
       <ol className="grid">
@@ -137,6 +142,7 @@ export function ProductTemplate({ facts = null }: { facts?: Facts }): ReactNode 
           </p>
           {facts?.product ? (
             <VariantChooser
+              purchaseEnabled={currentPurchaseEnabled()}
               productId={facts.product.id}
               variants={facts.product.variants.map((variant) => ({
                 id: variant.id ?? "",
@@ -175,7 +181,7 @@ export function ProductTemplate({ facts = null }: { facts?: Facts }): ReactNode 
             </>
           )}
           <a className="skillLink" href={buyerSkillPath}>
-            查看买家 Skill
+            查看用户 Skill
           </a>
         </div>
       </article>
@@ -447,6 +453,42 @@ function ProductCard({
   );
 }
 
+function GuideContact({ facts }: { facts: Facts }): ReactNode {
+  if (facts === null) {
+    return (
+      <>
+        <p>
+          客服电话：
+          <Slot name="store.contact_phone" facts={facts} />
+        </p>
+        <p>
+          客服二维码：
+          <Slot name="store.contact_qr" facts={facts} />
+        </p>
+      </>
+    );
+  }
+  const store = facts.store;
+  const phone = store?.contactPhone ?? null;
+  const qr = store?.contactQr == null ? null : httpUrl(store.contactQr);
+  if (phone === null && qr === null) {
+    return (
+      <span className="infoMark" tabIndex={0} aria-describedby="missing-contact-tip">
+        i
+        <span className="infoTip" id="missing-contact-tip" role="tooltip">
+          未发布联系方式
+        </span>
+      </span>
+    );
+  }
+  return (
+    <>
+      {phone === null ? null : <p>客服电话：{phone}</p>}
+      {qr === null ? null : <img src={qr} alt="客服二维码" />}
+    </>
+  );
+}
+
 function EmptyProducts(): ReactNode {
   return (
     <div className="empty">
@@ -456,43 +498,77 @@ function EmptyProducts(): ReactNode {
   );
 }
 
-function PlatformUsageGuide(): ReactNode {
+function PlatformUsageGuide({ facts }: { facts: Facts }): ReactNode {
+  const purchaseEnabled = currentPurchaseEnabled();
   return (
     <section className="usage" aria-labelledby="usage-title">
       <h2 id="usage-title">如何使用 MercLink</h2>
-      <p className="muted">从一份 Skill 开始，让 Agent 帮你购买或上架商品。</p>
+      <p className="muted">
+        {purchaseEnabled
+          ? "从一份 Skill 开始，让 Agent 帮你购买或上架商品。"
+          : "从一份 Skill 开始，让 Agent 帮你查找或上架商品。"}
+      </p>
       <UsageGuides
+        buyerTabLabel={purchaseEnabled ? "我是用户，想购买" : "我是用户，想找商品"}
         buyer={
-          <>
-            <h3 className="guideHeading">买家购买</h3>
-            <ol className="steps">
-              <li>
-                <h4>把买家 Skill 交给 Agent</h4>
-                <p>复制文档地址给你的 Agent，告诉它按这份 Skill 使用店铺。</p>
-                <a className="skillLink" href={buyerSkillPath}>
-                  查看买家 Skill
-                </a>
-              </li>
-              <li>
-                <h4>告诉 Agent 购买需求</h4>
-                <p>例如：“找一款桌灯，预算 200 元。”Agent 会查询商品和规格，查看商品无需登录。</p>
-              </li>
-              <li>
-                <h4>下单前登录并批准</h4>
-                <p>
-                  打开 Agent
-                  提供的设备码地址，在自己的浏览器登录或注册买家账号，再批准授权。密码和验证码只在浏览器输入。
-                </p>
-              </li>
-              <li>
-                <h4>确认商品，完成付款</h4>
-                <p>
-                  确认规格与数量，在支付宝收银台付款。随后让 Agent
-                  查询订单，确认已支付；打开付款链接不表示支付成功。
-                </p>
-              </li>
-            </ol>
-          </>
+          purchaseEnabled ? (
+            <>
+              <h3 className="guideHeading">用户购买</h3>
+              <ol className="steps">
+                <li>
+                  <h4>把用户 Skill 交给 Agent</h4>
+                  <p>复制文档地址给你的 Agent，告诉它按这份 Skill 使用店铺。</p>
+                  <a className="skillLink" href={buyerSkillPath}>
+                    查看用户 Skill
+                  </a>
+                </li>
+                <li>
+                  <h4>告诉 Agent 购买需求</h4>
+                  <p>例如：“找一款桌灯，预算 200 元。”Agent 会查询商品和规格，查看商品无需登录。</p>
+                </li>
+                <li>
+                  <h4>下单前登录并批准</h4>
+                  <p>
+                    打开 Agent
+                    提供的设备码地址，在自己的浏览器登录或注册买家账号，再批准授权。密码和验证码只在浏览器输入。
+                  </p>
+                </li>
+                <li>
+                  <h4>确认商品，完成付款</h4>
+                  <p>
+                    确认规格与数量，在支付宝收银台付款。随后让 Agent
+                    查询订单，确认已支付；打开付款链接不表示支付成功。
+                  </p>
+                </li>
+              </ol>
+            </>
+          ) : (
+            <>
+              <h3 className="guideHeading">查找商品</h3>
+              <ol className="steps">
+                <li>
+                  <h4>把用户 Skill 交给 Agent</h4>
+                  <p>复制文档地址给你的 Agent，告诉它按这份 Skill 查询店铺。</p>
+                  <a className="skillLink" href={buyerSkillPath}>
+                    查看用户 Skill
+                  </a>
+                </li>
+                <li>
+                  <h4>告诉 Agent 想找的商品</h4>
+                  <p>例如：“找一款桌灯，预算 200 元。”Agent 会查询已上架商品和规格，查看商品无需登录。</p>
+                </li>
+                <li>
+                  <h4>核对规格和库存</h4>
+                  <p>让 Agent 打开商品页，确认规格、价格和是否有货。这些事实和公开页相同。</p>
+                </li>
+                <li>
+                  <h4>记下商品，联系店主</h4>
+                  <p>记下商品后联系店主。已发布联系方式时，向店主获取联系方式，手机号和二维码都会展示。</p>
+                  <GuideContact facts={facts} />
+                </li>
+              </ol>
+            </>
+          )
         }
         merchant={
           <>
@@ -561,7 +637,7 @@ function StoreFooter(): ReactNode {
     <footer className="footer">
       <div>
         <p className="slogan">{storeSlogan}</p>
-        <p className="muted">{storeExplanation}</p>
+        <p className="muted">{explanationFor(currentPurchaseEnabled())}</p>
       </div>
       <nav aria-label="接口与发现文件">
         <a href={interfaceDirectoryPath}>{interfaceDirectoryLabel}</a>

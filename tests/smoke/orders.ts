@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { assertSuccess, readEnvelope, SmokeClient } from "./client";
+import { assertPurchaseEnabled, assertSuccess, readEnvelope, SmokeClient } from "./client";
 
 export type PendingOrder = {
   orderId: string;
@@ -15,6 +15,7 @@ export async function placePendingOrder(
   merchantToken: string,
   buyerToken: string,
 ): Promise<PendingOrder> {
+  assertPurchaseEnabled();
   const catalog = await jsonRequest(client, "/api/v1/catalogs", merchantToken, "POST", {
     name: "冒烟目录",
     currency: "CNY",

@@ -99,7 +99,7 @@ docker compose -p merclink down
 | --------------------- | ----------- | ------------------------------ |
 | `/`                   | 访客        | 这一家店的落地页               |
 | `/products`           | 访客、Agent | 已上架商品                     |
-| `/skill.md`           | 买家 Agent  | 怎么查商品、下单、查自己的订单 |
+| `/skill.md`           | 用户 Agent  | 默认只查商品。开启买入后才下单 |
 | `/merchant/skill.md`  | 商家 Agent  | 怎么管目录和商品               |
 | `/llms.txt`           | Agent       | 发现上述入口                   |
 | `/oauth/device/auth`  | Agent       | 申请设备码                     |
@@ -116,7 +116,7 @@ docker compose -p merclink down
 
 变量名和用途见 [.env.example](.env.example)。不要把真实密钥提交到仓库。`.env` 已被忽略。
 
-缺少任一必填变量，或启动时连不上 Redis 和对象桶，应用拒绝启动。数据库迁移在启动时执行，不在请求里改表。首次启动用 `ADMIN_PHONE` 和 `ADMIN_PASSWORD` 创建唯一超级管理员；已有超管后不再使用这两个值。
+缺少始终必填的变量，或启动时连不上 Redis 和对象桶，应用拒绝启动。`MERCLINK_PURCHASE` 默认关闭。关闭时不必填写验证码、短信和支付商户密钥。需要下单的部署必须设 `MERCLINK_PURCHASE=1`，并填写对应厂商密钥。数据库迁移在启动时执行，不在请求里改表。首次启动用 `ADMIN_PHONE` 和 `ADMIN_PASSWORD` 创建唯一超级管理员；已有超管后不再使用这两个值。
 
 日志不记录密码、短信验证码、访问令牌、刷新令牌、支付私钥和对象存储密钥。
 
@@ -144,7 +144,7 @@ pnpm run test:acceptance
 - `MINIO_ROOT_USER`
 - `MINIO_ROOT_PASSWORD`
 
-密码使用 URL 安全字符。MinIO 密码至少 8 位。`APP_BASE_URL` 和 `ALIPAY_NOTIFY_URL` 填公网地址。容器内的数据库、Redis 和对象存储地址由 Compose 覆盖，不要写成 `127.0.0.1`。
+密码使用 URL 安全字符。MinIO 密码至少 8 位。`APP_BASE_URL` 填公网地址。只有 `MERCLINK_PURCHASE=1` 时，才把支付通知地址填成同一公网地址。容器内的数据库、Redis 和对象存储地址由 Compose 覆盖，不要写成 `127.0.0.1`。
 
 ```bash
 docker compose up -d --build

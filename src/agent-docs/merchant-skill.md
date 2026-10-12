@@ -8,7 +8,7 @@ Use this document to configure the one store: obtain a merchant token, then main
 
 用户要把商品放进这家店、改字段、上下架、查自己的订单，或发布店铺介绍时，使用本文档。
 
-不要用本文档给买家查商品、下单或查询订单。买家读 `/skill.md`。不要用本文档改公开页面、注册页或支付前页面。改页面只读 `/storefront/skill.md`。本文档不讲页面上传、激活或回滚。也不要调用 `/merchants`，没有开店接口。启动时已经创建店主账号和一本名为「默认目录」的目录。店主就是管理页的同一个手机号和密码。
+不要用本文档给买家查商品、下单或查询订单。用户 Skill 在 `/skill.md`。不要用本文档改公开页面、注册页或支付前页面。改页面只读 `/storefront/skill.md`。本文档不讲页面上传、激活或回滚。也不要调用 `/merchants`，没有开店接口。启动时已经创建店主账号和一本名为「默认目录」的目录。店主就是管理页的同一个手机号和密码。
 
 Do not guide self-registration. Do not ask for a password, SMS code, or API key. The store owner account already exists and is the account created at startup. Log in with that phone and password on the merchant authorization page. Do not ask the user to open another merchant account.
 

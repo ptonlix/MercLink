@@ -15,6 +15,9 @@ export async function closeExpiredOrders(
   runtime: CommerceRuntime,
   now: Date,
 ): Promise<{ closedIds: readonly string[] }> {
+  if (runtime.purchaseEnabled === false) {
+    return { closedIds: [] };
+  }
   const due = await runtime.repo.listExpiredPending(now);
   const closedIds: string[] = [];
   for (const order of due) {

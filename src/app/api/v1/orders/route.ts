@@ -2,6 +2,7 @@ import { placeOrder } from "../../../../app-services/commerce/place-order";
 import { commerceRuntime } from "../../../../app-services/commerce/runtime";
 import { errorResponse, graphJson } from "../../../../app-services/commerce/view";
 import { apiSuccess } from "../../../../shared/errors";
+import { purchaseDisabledMessage } from "../../../../shared/purchase-mode";
 import { runOnce } from "../../../../jobs/close-expired-orders";
 import { authenticate } from "../../../../shared/seams/authenticate";
 
@@ -77,6 +78,10 @@ function keepScannerRegistered(): void {
 
 export async function POST(request: Request): Promise<Response> {
   keepScannerRegistered();
+  const runtime = commerceRuntime();
+  if (runtime.purchaseEnabled === false) {
+    return errorResponse("purchase_disabled", purchaseDisabledMessage, request);
+  }
   const auth = await authenticate(request);
   if (!auth.ok) {
     return auth.response;

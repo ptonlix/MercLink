@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { createMemoryRateLimit } from "../../adapters/redis/memory";
 import {
   registrationChallengeTtlMs,
@@ -26,8 +26,13 @@ import { hashPassword } from "./passwords";
 import { createPublicId } from "../../shared/id";
 import { withIdentityDatabase } from "./database";
 import { fakeCaptcha, fakeSms } from "./fakes";
+import { resetPurchaseModeCache } from "../../shared/purchase-mode";
 
 describe("buyer registration", () => {
+  beforeEach(() => {
+    process.env.MERCLINK_PURCHASE = "1";
+    resetPurchaseModeCache();
+  });
   it("does not call SMS when captcha verification fails", async () => {
     await withIdentityDatabase(async (sql) => {
       const sms = fakeSms();

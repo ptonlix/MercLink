@@ -9,6 +9,7 @@ import type { Actor } from "../../shared/actor";
 import type { StoredGraph, StoredReceipt } from "./repository";
 import { reconcilePending } from "./payment-sync";
 import type { CommerceRuntime } from "./runtime";
+import { purchaseDisabledMessage } from "../../shared/purchase-mode";
 import { httpStatus } from "./view";
 
 export type ReadOrderResult =
@@ -20,6 +21,14 @@ export async function readBuyerOrder(input: {
   orderId: string;
   runtime: CommerceRuntime;
 }): Promise<ReadOrderResult> {
+  if (input.runtime.purchaseEnabled === false) {
+    return {
+      ok: false,
+      error: "purchase_disabled",
+      message: purchaseDisabledMessage,
+      httpStatus: httpStatus("purchase_disabled"),
+    };
+  }
   const buyer = assertBuyerReads(input.actor);
   if (!buyer.ok) {
     return { ...buyer, httpStatus: httpStatus(buyer.error) };
@@ -66,8 +75,12 @@ export async function listMerchantOrders(input: {
     ),
   );
   const reconciled: StoredGraph[] = [];
-  for (const graph of visible) {
-    reconciled.push(await reconcilePending(input.runtime, graph));
+  if (input.runtime.purchaseEnabled === false) {
+    reconciled.push(...visible);
+  } else {
+    for (const graph of visible) {
+      reconciled.push(await reconcilePending(input.runtime, graph));
+    }
   }
   const receipts = new Map<string, StoredReceipt>();
   for (const graph of reconciled) {

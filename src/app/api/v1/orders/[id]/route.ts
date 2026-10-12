@@ -2,12 +2,17 @@ import { readBuyerOrder } from "../../../../../app-services/commerce/read-order"
 import { commerceRuntime } from "../../../../../app-services/commerce/runtime";
 import { errorResponse, graphJson } from "../../../../../app-services/commerce/view";
 import { apiSuccess } from "../../../../../shared/errors";
+import { purchaseDisabledMessage } from "../../../../../shared/purchase-mode";
 import { authenticate } from "../../../../../shared/seams/authenticate";
 
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> | { id: string } },
 ): Promise<Response> {
+  const runtime = commerceRuntime();
+  if (runtime.purchaseEnabled === false) {
+    return errorResponse("purchase_disabled", purchaseDisabledMessage, request);
+  }
   const auth = await authenticate(request);
   if (!auth.ok) {
     return auth.response;

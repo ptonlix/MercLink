@@ -9,6 +9,7 @@ import {
   type PublicProduct,
 } from "../shared/seams/public-products";
 import { publicStore, resetPublicStore } from "../shared/seams/public-store";
+import { resetPurchaseModeCache } from "../shared/purchase-mode";
 import { disallowedPaths, llmsText, publicPagePaths } from "./site";
 
 const origin = "https://merclink.example";
@@ -121,6 +122,31 @@ describe("discovery files", () => {
     expect(body).not.toContain("prd_llms");
   });
 
+  it("describes the user skill without an order when purchase is disabled and with one line when enabled", async () => {
+    delete process.env.MERCLINK_PURCHASE;
+    resetPurchaseModeCache();
+    const disabled = await (await llms()).text();
+    expect(disabled).toContain("用户 Skill");
+    expect(disabled).not.toContain("买家 Skill");
+    expect(disabled).not.toContain("下一笔只有一行的订单");
+    expect(disabled).toContain("用于查找已上架商品");
+    expect(skillLine(disabled)).not.toContain("下单");
+    expect(skillLine(disabled)).not.toContain("打开支付");
+    expect(storefrontLine(disabled)).not.toContain("购买");
+    expect(storefrontLine(disabled)).not.toContain("下单");
+    expect(disabled).not.toContain("完成购买");
+
+    process.env.MERCLINK_PURCHASE = "1";
+    resetPurchaseModeCache();
+    const enabled = await (await llms()).text();
+    expect(enabled).toContain("用户 Skill");
+    expect(enabled).toContain("下一笔只有一行的订单");
+    expect(enabled).toContain("随后查询该订单");
+    expect(enabled).not.toContain("买家 Skill");
+    delete process.env.MERCLINK_PURCHASE;
+    resetPurchaseModeCache();
+  });
+
   it("quotes the published store name and summary without embedding the catalog", async () => {
     const hiddenTitle = "不该出现在llms的哨兵商品";
     publicProducts.register({
@@ -216,6 +242,16 @@ describe("discovery files", () => {
     expect(entries.map((entry) => entry.url)).not.toContain(`${origin}/products/prd_map.md`);
   });
 });
+
+function skillLine(directory: string): string {
+  return directory.split("\n").find((line) => line.includes("用户 Skill（/skill.md）")) ?? "";
+}
+
+function storefrontLine(directory: string): string {
+  return (
+    directory.split("\n").find((line) => line.includes("店面 Skill（/storefront/skill.md）")) ?? ""
+  );
+}
 
 function product(id: string, title: string): PublicProduct {
   return {

@@ -75,6 +75,9 @@ describe("errors", () => {
       expect(errorCodes).toContain(code);
     }
     expect(errorCodes).toContain("password_change_required");
+    expect(errorCodes).toContain("purchase_disabled");
+    expect(businessCode("purchase_disabled")).toBe(40302);
+    expect(httpStatusFor("purchase_disabled")).toBe(403);
     expect(errorCodes).toContain("rate_limited");
     expect(errorCodes).toContain("sms_rate_limited");
     expect(Object.keys(errorDefinitions).sort()).toEqual([...errorCodes].sort());
@@ -84,6 +87,20 @@ describe("errors", () => {
     expect(httpStatusFor("sms_rate_limited")).toBe(400);
     expect(httpStatusFor("conflict")).toBe(409);
     expect(businessCode("conflict")).toBe(40900);
+
+    const disabled = apiFailure("purchase_disabled", "本部署未开启买入。");
+    const disabledBody = JSON.parse(await disabled.text()) as {
+      code: number;
+      message: string;
+      data: unknown;
+      error?: unknown;
+    };
+    expect(disabled.status).toBe(403);
+    expect(disabledBody.code).toBe(40302);
+    expect(disabledBody.message).toBe("本部署未开启买入。");
+    expect(disabledBody.data).toBeNull();
+    expect(disabledBody.error).toBeUndefined();
+    expect(disabled.status).not.toBe(503);
 
     const response = apiFailure("validation_error", "Invalid JSON body\n    at secret line");
     const text = await response.text();

@@ -5,6 +5,7 @@ import { findBuyerById, safeBuyerPhone } from "../../../app-services/identity/bu
 import { appRuntime } from "../../../app-services/identity/runtime";
 import { accountCookie, readSession } from "../../../app-services/identity/session";
 import { devStubsEnabled } from "../../../shared/dev-stubs";
+import { currentPurchaseEnabled } from "../../../shared/purchase-mode";
 import { buyerCaptchaMarkup } from "../captcha-markup";
 import { AuthorizeAppearance, BuyerAuthorizeView, type BuyerAuthorizeStep } from "../views";
 import "../authorize.css";
@@ -12,11 +13,23 @@ import "../authorize.css";
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false, follow: false }, title: "买家授权" };
 
+export function purchaseDisabledBuyerPage(): ReactNode {
+  return (
+    <main>
+      <h1>买入未开启</h1>
+      <p>本部署未开启买入。</p>
+    </main>
+  );
+}
+
 export default async function BuyerAuthorizePage({
   searchParams,
 }: {
   searchParams: Promise<{ notice?: string; mode?: string; step?: string; phone?: string }>;
 }): Promise<ReactNode> {
+  if (!currentPurchaseEnabled()) {
+    return purchaseDisabledBuyerPage();
+  }
   const params = await searchParams;
   const runtime = appRuntime();
   const { cookies } = await import("next/headers");

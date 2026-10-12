@@ -275,6 +275,44 @@
   overflow: hidden;
   clip-path: inset(50%);
 }
+.infoMark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 8px;
+  border: 1px solid var(--ml-muted);
+  border-radius: 50%;
+  color: var(--ml-muted);
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1;
+  cursor: help;
+}
+.infoTip {
+  display: none;
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: max-content;
+  padding: 6px 8px;
+  border: 1px solid var(--ml-line);
+  border-radius: 6px;
+  background: var(--ml-paper, #f7f4ee);
+  color: var(--ml-ink, #26332b);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.infoMark:hover .infoTip,
+.infoMark:focus .infoTip,
+.infoMark:focus-visible .infoTip {
+  display: block;
+}
 .steps {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

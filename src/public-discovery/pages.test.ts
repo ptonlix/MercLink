@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { sectionExample } from "./interface-example";
 import { interfaceContract, interfaceContractsMatchRegistry } from "./interface-fields";
-import { interfaceDocsMatchRegistry, interfaceSlug } from "./interface-docs";
+import { interfaceDocsMatchRegistry, interfaceOperationDoc, interfaceSlug } from "./interface-docs";
 import { default as InterfacesPage } from "../app/interfaces/page";
 import { default as InterfaceSlugPage } from "../app/interfaces/[slug]/page";
 import { InterfaceOperationPage } from "./views";
@@ -14,6 +14,7 @@ import {
 } from "../app/products/[id]/page";
 import { generateMetadata as listMetadata, default as ProductsPage } from "../app/products/page";
 import { apiRoutes } from "../shared/api-routes";
+import { resetPurchaseModeCache } from "../shared/purchase-mode";
 import { minorUnits } from "../shared/money";
 import {
   publicProducts,
@@ -40,6 +41,8 @@ const origin = "https://merclink.example";
 describe("public pages", () => {
   beforeEach(() => {
     process.env.APP_BASE_URL = origin;
+    delete process.env.MERCLINK_PURCHASE;
+    resetPurchaseModeCache();
     resetPublicProducts();
     resetPublicStore();
   });
@@ -48,6 +51,8 @@ describe("public pages", () => {
     resetPublicProducts();
     resetPublicStore();
     delete process.env.APP_BASE_URL;
+    delete process.env.MERCLINK_PURCHASE;
+    resetPurchaseModeCache();
   });
 
   it("renders the landing page without executing script", async () => {
@@ -442,10 +447,30 @@ describe("public pages", () => {
     expect(landingGraph(html).find((node) => node["@type"] === "OnlineStore")).toBeUndefined();
   });
   it("keeps both ordered role guides and the more link in server HTML even without products", async () => {
+    const disabled = visibleHtml(renderToStaticMarkup(await HomePage()));
+    expect(disabled).not.toContain("完成购买");
+    expect(disabled).not.toContain("复制购买需求");
+    expect(disabled).not.toContain("下单前登录并批准");
+    expect(disabled).not.toContain("完成付款");
+    expect(disabled).toContain("我是用户，想找商品");
+    expect(disabled).toContain("查找商品");
+    expect(disabled).toContain("把用户 Skill 交给 Agent");
+    expect(disabled).toContain("告诉 Agent 想找的商品");
+    expect(disabled).toContain("记下商品，联系店主");
+    expect(disabled).toContain(
+      "记下商品后联系店主。已发布联系方式时，向店主获取联系方式，手机号和二维码都会展示。",
+    );
+    expect(disabled).toContain('class="infoMark"');
+    expect(disabled).toContain('class="infoTip"');
+    expect(disabled).toContain("未发布联系方式");
+    expect(disabled).not.toContain("<p>店主还没有发布联系方式。</p>");
+    expect(disabled).toContain("我是店主，想上架");
+    process.env.MERCLINK_PURCHASE = "1";
+    resetPurchaseModeCache();
     const visible = visibleHtml(renderToStaticMarkup(await HomePage()));
     expect(visible).toContain(viewAllProductsLabel);
     expect(visible).toContain("如何使用 MercLink");
-    expect(visible).toContain("把买家 Skill 交给 Agent");
+    expect(visible).toContain("把用户 Skill 交给 Agent");
     expect(visible).toContain("把商家 Skill 交给 Agent");
     expect(visible).toContain("首次登录先修改初始密码");
     expect(visible).toContain("打开付款链接不表示支付成功");
@@ -457,10 +482,12 @@ describe("public pages", () => {
     expect(visible).toContain('href="/skill.md"');
     expect(visible).toContain('href="/merchant/skill.md"');
     expect(visible).toContain('href="/storefront/skill.md"');
-    expect(visible).toContain("我是买家，想购买");
+    expect(visible).toContain("我是用户，想购买");
     expect(visible).toContain("我是店主，想上架");
     expect(visible).not.toContain(`${origin}/skill.md`);
     expect(visible).not.toContain("prd_demo");
+    delete process.env.MERCLINK_PURCHASE;
+    resetPurchaseModeCache();
   });
 
   it("shows all variant facts without script and does not submit a display price", async () => {
@@ -542,7 +569,7 @@ describe("public pages", () => {
     expect(html).not.toContain('href="/api/v1"');
     expect(html).toContain('<p class="groupTitle">独立调用</p>');
     expect(html).not.toMatch(/<a[^>]*>独立调用<\/a>/);
-    expect(html).toContain('<a href="/skill.md">买家 Skill</a>');
+    expect(html).toContain('<a href="/skill.md">用户 Skill</a>');
     expect(html).toContain('<a href="/merchant/skill.md">商家 Skill</a>');
     expect(html).toContain('<a href="/storefront/skill.md">店面 Skill</a>');
     expect(html).not.toContain("不由 Skill 教调用");
@@ -566,6 +593,39 @@ describe("public pages", () => {
     expect(order).toContain(">认证<");
     expect(order).toContain(">权限<");
     expect(order).toContain("order:write");
+  });
+
+  it("describes a closed order read as order:read and a closed create as order:write", () => {
+    delete process.env.MERCLINK_PURCHASE;
+    resetPurchaseModeCache();
+    const read = interfaceOperationDoc("GET", "/api/v1/orders/{id}");
+    expect(read.permission).toContain("order:read");
+    expect(read.permission).not.toContain("order:write");
+    expect(read.summary).toContain("40302");
+    expect(read.summary).toContain("不查询支付");
+    expect(read.summary).not.toContain("不能创建订单");
+    expect(read.summary).not.toContain("不扣库存");
+
+    const write = interfaceOperationDoc("POST", "/api/v1/orders");
+    expect(write.permission).toContain("order:write");
+    expect(write.summary).toContain("40302");
+    expect(write.summary).toContain("不能创建订单");
+    expect(write.summary).toContain("不扣库存");
+    expect(write.summary).not.toContain("不查询支付");
+
+    const readPage = renderToStaticMarkup(
+      createElement(InterfaceOperationPage, { method: "GET", path: "/api/v1/orders/{id}" }),
+    );
+    expect(readPage).toContain(read.permission);
+    expect(readPage).toContain(read.summary);
+
+    process.env.MERCLINK_PURCHASE = "1";
+    resetPurchaseModeCache();
+    expect(interfaceOperationDoc("GET", "/api/v1/orders/{id}").permission).toBe(
+      "买家，需要 order:read，只能查询自己的订单",
+    );
+    delete process.env.MERCLINK_PURCHASE;
+    resetPurchaseModeCache();
   });
 
   it("shows breaking on the field change page", () => {

@@ -44,9 +44,7 @@ export class SmokeClient {
 
   private storeCookies(response: Response): void {
     const lines =
-      typeof response.headers.getSetCookie === "function"
-        ? response.headers.getSetCookie()
-        : [];
+      typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [];
     for (const line of lines) {
       const [pair] = line.split(";");
       const eq = pair?.indexOf("=") ?? -1;
@@ -84,7 +82,9 @@ export async function readEnvelope(response: Response): Promise<Envelope> {
     throw new Error(`expected envelope, got HTTP ${String(response.status)} ${text.slice(0, 180)}`);
   }
   if (!isEnvelope(body)) {
-    throw new Error(`expected envelope, got HTTP ${String(response.status)} ${JSON.stringify(body)}`);
+    throw new Error(
+      `expected envelope, got HTTP ${String(response.status)} ${JSON.stringify(body)}`,
+    );
   }
   if (response.headers.get("x-request-id") !== body.request_id) {
     throw new Error("X-Request-Id does not match body request_id");
@@ -110,6 +110,14 @@ export function assertSuccess(body: Envelope, status: number): void {
 export function assertDevStubs(): void {
   if (process.env.SMOKE_DEV_STUBS !== "1") {
     throw new Error("SMOKE_DEV_STUBS=1 is required before payment, SMS, or captcha flows");
+  }
+}
+
+export function assertPurchaseEnabled(): void {
+  if (process.env.SMOKE_PURCHASE !== "1") {
+    throw new Error(
+      "SMOKE_PURCHASE=1 is required, and the server must start with MERCLINK_PURCHASE=1",
+    );
   }
 }
 

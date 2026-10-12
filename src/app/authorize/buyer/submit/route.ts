@@ -1,4 +1,4 @@
-import { approveAgent } from "../../../../app-services/access/grants";
+import { approveBuyerAgent } from "../../../../app-services/access/device-gate";
 import { missingInteraction } from "../../../../app-services/access/provider";
 import { getAccessProvider } from "../../../../app-services/access/runtime";
 import {
@@ -112,16 +112,16 @@ export async function POST(request: Request): Promise<Response> {
     if (session === null || session.kind !== "account" || session.ownerType !== "buyer") {
       return redirectTo(buyerPath({ step: "phone", notice: "请先登录。" }));
     }
-    const provider = await getAccessProvider();
     try {
-      const approved = await approveAgent({
-        provider,
+      const approved = await approveBuyerAgent({
         sql: runtime.sql,
         cookieHeader: request.headers.get("cookie") ?? "",
-        page: "buyer",
-        ownerType: "buyer",
         ownerId: session.ownerId,
+        provider: () => getAccessProvider(),
       });
+      if (!approved.ok) {
+        return redirectTo(buyerPath({ step: "phone", notice: approved.notice }));
+      }
       return redirectTo(approved.returnTo);
     } catch (error: unknown) {
       if (!missingInteraction(error)) {

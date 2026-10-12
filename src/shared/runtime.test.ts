@@ -30,8 +30,27 @@ describe("startup refusal", () => {
     }
   });
 
-  it("exits non-zero without ALIPAY_PRIVATE_KEY and does not print secrets", async () => {
+  it("starts without captcha, SMS, or payment merchant credentials when purchase is disabled", () => {
+    const source = filledEnv();
+    delete source.ALIPAY_PRIVATE_KEY;
+    delete source.ALIPAY_APP_ID;
+    delete source.ALIPAY_PUBLIC_KEY;
+    delete source.ALIPAY_NOTIFY_URL;
+    delete source.ALIYUN_CAPTCHA_ACCESS_KEY_ID;
+    delete source.ALIYUN_CAPTCHA_ACCESS_KEY_SECRET;
+    delete source.ALIYUN_CAPTCHA_SCENE_ID;
+    delete source.ALIYUN_CAPTCHA_PREFIX;
+    delete source.ALIYUN_SMS_ACCESS_KEY_ID;
+    delete source.ALIYUN_SMS_ACCESS_KEY_SECRET;
+    delete source.ALIYUN_SMS_SIGN_NAME;
+    delete source.ALIYUN_SMS_TEMPLATE_CODE;
+    delete source.MERCLINK_PURCHASE;
+    expect(loadEnv(source).ok).toBe(true);
+  });
+
+  it("exits non-zero without ALIPAY_PRIVATE_KEY when purchase is enabled and does not print secrets", async () => {
     const env = filledEnv();
+    env.MERCLINK_PURCHASE = "1";
     delete env.ALIPAY_PRIVATE_KEY;
 
     const result = await runStartup(env);
@@ -49,6 +68,7 @@ describe("startup refusal", () => {
     delete source.ALIPAY_PUBLIC_KEY;
     delete source.ALIPAY_NOTIFY_URL;
     source.MERCLINK_PAYMENT_PROVIDER = "easypay";
+    source.MERCLINK_PURCHASE = "1";
     expect(loadEnv(source).ok).toBe(true);
   });
 
