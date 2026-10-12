@@ -56,6 +56,7 @@ describe("discovery", () => {
     expect(order.status).toBe(200);
     const orderHtml = await order.text();
     expect(orderHtml).toContain("<h2>请求体</h2>");
+    expect(orderHtml).toContain("<h3>请求示例</h3>");
     expect(orderHtml).toContain("client_order_no");
     expect(orderHtml).toContain("items[].product_id");
     expect(orderHtml).toContain("<h2>响应</h2>");

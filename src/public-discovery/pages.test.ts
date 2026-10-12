@@ -1,7 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { interfaceContractsMatchRegistry } from "./interface-fields";
+import { sectionExample } from "./interface-example";
+import { interfaceContract, interfaceContractsMatchRegistry } from "./interface-fields";
 import { interfaceDocsMatchRegistry, interfaceSlug } from "./interface-docs";
 import { default as InterfacesPage } from "../app/interfaces/page";
 import { default as InterfaceSlugPage } from "../app/interfaces/[slug]/page";
@@ -557,6 +558,7 @@ describe("public pages", () => {
       createElement(InterfaceOperationPage, { method: "POST", path: "/api/v1/orders" }),
     );
     expect(order).toContain("<h2>请求体</h2>");
+    expect(order).toContain("<h3>请求示例</h3>");
     expect(order).toContain("application/json");
     expect(order).toContain("client_order_no");
     expect(order).toContain("必填");
@@ -575,6 +577,32 @@ describe("public pages", () => {
     );
     expect(change).toContain("<code>breaking</code>");
     expect(fieldBlock(change, "breaking")).toContain("未确认的破坏性变更时为 true");
+    const generated = sectionExample(
+      interfaceContract("POST", "/api/v1/catalogs/{id}/fields/changes").responses[0]?.section ?? {
+        contentType: "application/json",
+        description: "",
+        fields: [],
+      },
+      "json",
+    );
+    expect(generated).toContain('"breaking"');
+    expect(change).toContain((generated ?? "").replaceAll('"', "&quot;"));
+  });
+
+  it("renders the catalogs request example from the field table", () => {
+    const body = interfaceContract("POST", "/api/v1/catalogs").body;
+    const generated = sectionExample(
+      body ?? { contentType: "application/json", description: "", fields: [] },
+      "json",
+    );
+    const html = renderToStaticMarkup(
+      createElement(InterfaceOperationPage, { method: "POST", path: "/api/v1/catalogs" }),
+    );
+    expect(generated).toContain('"name"');
+    expect(generated).toContain('"currency"');
+    expect(html).toContain("<h3>请求示例</h3>");
+    expect(html).toContain((generated ?? "").replaceAll('"', "&quot;"));
+    expect(html).toContain("<h3>响应示例</h3>");
   });
 
   it("documents order product_id as optional and does not require variant_id alone", () => {

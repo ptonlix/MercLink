@@ -561,6 +561,26 @@
 .apiDocsMain > section {
   margin-top: 28px;
 }
+.apiExample {
+  margin-top: 16px;
+}
+.apiExample h3 {
+  font-size: 14px;
+  font-weight: 650;
+}
+.apiExample pre {
+  overflow-x: auto;
+  margin: 8px 0 0;
+  padding: 12px 16px;
+  background: var(--ml-surface);
+  border-radius: 8px;
+  font:
+    13px/1.6 ui-monospace,
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+  white-space: pre;
+}
 .grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
