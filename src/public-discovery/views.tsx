@@ -555,7 +555,10 @@ function PlatformUsageGuide({ facts }: { facts: Facts }): ReactNode {
                 </li>
                 <li>
                   <h4>告诉 Agent 想找的商品</h4>
-                  <p>例如：“找一款桌灯，预算 200 元。”Agent 会查询已上架商品和规格，查看商品无需登录。</p>
+                  <p>
+                    例如：“找一款桌灯，预算 200 元。”Agent
+                    会查询已上架商品和规格，查看商品无需登录。
+                  </p>
                 </li>
                 <li>
                   <h4>核对规格和库存</h4>
@@ -563,7 +566,9 @@ function PlatformUsageGuide({ facts }: { facts: Facts }): ReactNode {
                 </li>
                 <li>
                   <h4>记下商品，联系店主</h4>
-                  <p>记下商品后联系店主。已发布联系方式时，向店主获取联系方式，手机号和二维码都会展示。</p>
+                  <p>
+                    记下商品后联系店主。已发布联系方式时，向店主获取联系方式，手机号和二维码都会展示。
+                  </p>
                   <GuideContact facts={facts} />
                 </li>
               </ol>
