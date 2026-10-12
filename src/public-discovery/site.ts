@@ -191,7 +191,8 @@ export function llmsText(
     `- [店铺 JSON（/api/v1/store）](${absoluteUrl("/api/v1/store", origin)}): 已发布介绍的机器读取，不需要令牌。字段始终都在；没有的网站、标识、license、contact 是 null，不是省略。未发布时 404，不回显草稿。不要从 Markdown 猜测缺了哪一项。`,
     `- [商家 Skill（/merchant/skill.md）](${absoluteUrl(merchantSkillPath, origin)}): 商家 Agent 的调用说明，不含这家店的资料或令牌。用它管理目录、目录字段、商品、规格、上下架，以及整店一份的介绍。介绍不是每本目录一份。客服和执照是推荐录入，不是上架条件；写入执照前必须先向用户读出四项并得到同意。不要用它给买家下单。`,
     `- [店面 Skill（/storefront/skill.md）](${absoluteUrl(storefrontSkillPath, origin)}): 只讲怎么改给人看的页面。${storefrontSkill}不能改 /llms.txt、三份 Skill、/api、授权页协议和支付结果判断。页面上的客服和执照必须用槽位，不能写死。`,
-    `- [API（/api/v1）](${absoluteUrl(apiRootPath, origin)}): HTTP API 根地址。具体路径在三份 Skill 里，不要猜。${apiSkill}robots.txt 禁止 /api 只约束爬虫，不禁止已批准的 Agent。`,
+    `- [接口文档（/interfaces）](${absoluteUrl(interfaceDirectoryPath, origin)}): 给人看的已登记路径、字段、认证和权限。不是调用说明，也不能代替三份 Skill。不要从这里猜未登记的路径。`,
+    `- [API（/api/v1）](${absoluteUrl(apiRootPath, origin)}): HTTP API 根地址，不是文档。已登记路径见接口文档。具体怎么调用仍以三份 Skill 为准，不要猜。${apiSkill}robots.txt 禁止 /api 只约束爬虫，不禁止已批准的 Agent。`,
     "",
   ];
   return lines.join("\n");

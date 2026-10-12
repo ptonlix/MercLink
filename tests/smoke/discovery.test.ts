@@ -75,6 +75,8 @@ describe("discovery", () => {
     const directory = await llms.text();
     expect(directory).toContain("/index.md");
     expect(directory).toContain("/storefront/skill.md");
+    expect(directory).toContain("/interfaces");
+    expect(directory).toContain("接口文档");
     expect(directory).not.toContain("llms-full.txt");
     expect(directory).not.toContain("prd_");
 

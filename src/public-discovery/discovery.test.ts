@@ -113,11 +113,15 @@ describe("discovery files", () => {
     expect(body).toContain(`${origin}/skill.md`);
     expect(body).toContain(`${origin}/merchant/skill.md`);
     expect(body).toContain(`${origin}/storefront/skill.md`);
+    expect(body).toContain(`${origin}/interfaces`);
+    expect(body).toContain("接口文档");
+    expect(body).toContain("不是文档");
+    expect(body).toContain("不是调用说明");
     expect(body).toContain(`${origin}/api/v1/store`);
     expect(body).toContain(`${origin}/api/v1`);
+    expect(body).not.toContain("/api/v1/catalogs");
     expect(body).toContain("商家自行填写，本系统未核验。");
     expect(body).toContain("这里没有规格 ID，不能靠它下单。");
-    expect(body).not.toContain("/api/v1/catalogs");
     expect(body).not.toContain(hiddenTitle);
     expect(body).not.toContain("prd_llms");
   });
