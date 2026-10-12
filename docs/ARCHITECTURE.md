@@ -303,7 +303,11 @@ pnpm audit --audit-level=high
 
 一个应用容器监听一个端口。数据库迁移在启动前执行，不在请求里改表。
 
-本地只启动依赖：`docker compose -f compose.dev.yaml up -d`。正式部署用 `compose.yaml`，包含应用、PostgreSQL、Redis 和 MinIO。密钥只放部署机的 `.env`，不进仓库。
+本地只启动依赖：`docker compose -f compose.dev.yaml up -d`。正式部署用 `compose.yaml`，包含应用、PostgreSQL、Redis 和 MinIO。应用镜像在版本 tag 发布到 `docker.io/${DOCKERHUB_USERNAME}/merclink` 之后，由部署机执行 `docker compose pull && docker compose up -d` 拉取。正式命令不带 `--build`，不在部署机编译应用。Postgres、Redis 和 MinIO 仍用 compose 里的固定镜像，不打进应用镜像。密钥只放部署机的 `.env`，不进仓库，也不作为镜像构建参数。
+
+生产 `MERCLINK_IMAGE` 必须是带版本号的已发布镜像，例如 `docker.io/<DOCKERHUB_USERNAME>/merclink:1.2.3`。正式 tag `v1.2.3` 同时推 `1.2.3` 和 `latest`；预发布 tag 只推版本标签，不移动 `latest`。`latest` 会被下一个正式版覆盖。回滚应把 `MERCLINK_IMAGE` 改回版本号标签再 pull，不要假定 `latest` 可逆。
+
+本地没有远程镜像时，用 `docker compose -f compose.yaml -f compose.build.yaml up -d --build` 构建 `merclink:local`。这不是正式部署命令。
 
 必须来自环境变量：
 

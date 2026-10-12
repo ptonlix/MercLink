@@ -1,0 +1,100 @@
+name: release-image
+
+# GitHub tag 过滤是 glob，不是正则。+ 不会表示“一位或多位”，写成 v[0-9]+ 会匹配不到 v1.2.3。
+# 这里只负责让版本形标签进入工作流。真正的形状检查在登录前的脚本里，不匹配就不登录、不推送。
+on:
+  push:
+    tags:
+      - "v[0-9]*.[0-9]*.[0-9]*"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: merclink
+          POSTGRES_PASSWORD: merclink
+          POSTGRES_DB: merclink
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U merclink -d merclink"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://merclink:merclink@localhost:5432/merclink
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.1"
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@12.9.1 --activate
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Check
+        run: pnpm run check
+
+  publish:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve image tags
+        id: tags
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Refusing non-version tag: ${tag}" >&2
+            exit 1
+          fi
+          if [[ -z "${DOCKERHUB_USERNAME}" || "${DOCKERHUB_USERNAME}" =~ [/[:space:]@:] ]]; then
+            echo "DOCKERHUB_USERNAME must be a single Docker Hub namespace" >&2
+            exit 1
+          fi
+          if [[ -z "${DOCKERHUB_TOKEN}" ]]; then
+            echo "DOCKERHUB_TOKEN is not set" >&2
+            exit 1
+          fi
+          version="${tag#v}"
+          image="docker.io/${DOCKERHUB_USERNAME}/merclink"
+          tags="${image}:${version}"
+          if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            tags="${tags}"$'\n'"${image}:latest"
+            echo "Stable release ${image}:${version} and ${image}:latest"
+          else
+            echo "Prerelease ${image}:${version}; latest will not move"
+          fi
+          {
+            echo "tags<<EOF"
+            echo "${tags}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # 不传 build-args，不挂载 secret。支付密钥、MERCLINK_PURCHASE、APP_BASE_URL 和 .env 不进构建。
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          sbom: false
+          tags: ${{ steps.tags.outputs.tags }}

@@ -1,0 +1,19 @@
+# 不要排除 src/db/migrations。镜像启动要执行这些 SQL。
+.git
+.env
+.env.*
+node_modules
+.next
+coverage
+.nyc_output
+*.lcov
+.vitest
+playwright-report
+test-results
+blob-report
+.idea
+.vscode
+*.pem
+*.key
+credentials.json
+secrets
