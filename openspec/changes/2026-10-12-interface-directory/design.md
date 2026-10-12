@@ -26,7 +26,7 @@
 - 页脚不再链接 `/api/v1`。正文可以提到这个前缀，但不能把它做成文档链接。
 - `/interfaces` 加入 `publicPagePaths`，从而进入站点地图和 robots allow。不提供 Markdown。
 - 精确保留 `/interfaces`。店面 Skill 的保留地址清单同步加上这一条，否则 Agent 会以为可以覆盖。
-- 字段页必须和序列化/Skill 一致，不能再手写一份会漂移的协议。请求和响应字段只维护一份字段表。
+- 字段页必须和序列化/Skill 一致，不能再手写一份会漂移的协议。请求和响应字段只维护一份字段表。示例从这张表生成，不另写 JSON。
 
 ## Risks / Trade-offs
 

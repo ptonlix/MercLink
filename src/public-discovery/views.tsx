@@ -4,6 +4,7 @@ import { createElement, type ReactNode } from "react";
 import { slotHtml, type SlotContext, type SlotProduct } from "../domain/storefront/slots";
 import { minorUnits } from "../shared/money";
 import { BannerShelf, PublicImage, UsageGuides, VariantChooser } from "./interactions";
+import { bodyExampleKind, pathExample, sectionExample } from "./interface-example";
 import type { ApiField, ApiSection } from "./interface-fields";
 import { interfaceContract } from "./interface-fields";
 import { interfaceOperationDoc, interfaceSlug } from "./interface-docs";
@@ -659,10 +660,14 @@ function PayloadSection({
   title,
   section,
   prefix,
+  exampleTitle,
+  example,
 }: {
   title: string;
   section: ApiSection;
   prefix: string;
+  exampleTitle: string;
+  example: string | null;
 }): ReactNode {
   return (
     <section>
@@ -672,7 +677,22 @@ function PayloadSection({
       {section.fields.map((item) => (
         <FieldBlock key={`${prefix}-${item.name}`} field={item} prefix={prefix} />
       ))}
+      <ExampleBlock title={exampleTitle} text={example} />
     </section>
+  );
+}
+
+function ExampleBlock({ title, text }: { title: string; text: string | null }): ReactNode {
+  if (text === null || text.length === 0) {
+    return null;
+  }
+  return (
+    <div className="apiExample">
+      <h3>{title}</h3>
+      <pre>
+        <code>{text}</code>
+      </pre>
+    </div>
   );
 }
 
@@ -719,14 +739,28 @@ export function InterfaceOperationPage({
         <PayloadSection
           title="路径参数"
           prefix="path"
+          exampleTitle="路径示例"
+          example={pathExample(path, contract.pathParams)}
           section={{ contentType: "path", description: "", fields: contract.pathParams }}
         />
       ) : null}
       {contract.query !== null ? (
-        <PayloadSection title="查询参数" prefix="query" section={contract.query} />
+        <PayloadSection
+          title="查询参数"
+          prefix="query"
+          exampleTitle="查询示例"
+          example={sectionExample(contract.query, "query")}
+          section={contract.query}
+        />
       ) : null}
       {contract.body !== null ? (
-        <PayloadSection title="请求体" prefix="body" section={contract.body} />
+        <PayloadSection
+          title="请求体"
+          prefix="body"
+          exampleTitle="请求示例"
+          example={sectionExample(contract.body, bodyExampleKind(contract.body))}
+          section={contract.body}
+        />
       ) : null}
       {contract.responses.map((response) => (
         <section key={response.status}>
@@ -737,13 +771,49 @@ export function InterfaceOperationPage({
           {response.section.fields.map((item) => (
             <FieldBlock key={`${response.status}-${item.name}`} field={item} prefix="response" />
           ))}
+          <ExampleBlock title="响应示例" text={sectionExample(response.section, "json")} />
         </section>
       ))}
     </ApiDocsFrame>
   );
 }
 
+function responseShapeSection(): ApiSection {
+  return {
+    contentType: "application/json",
+    description: "",
+    fields: [
+      {
+        name: "code",
+        type: "integer",
+        required: true,
+        description: "成功是 200，不是 HTTP 状态本身",
+      },
+      {
+        name: "message",
+        type: "string",
+        required: true,
+        description: "成功时是成功，不要用它分支",
+      },
+      {
+        name: "data",
+        type: "object | null",
+        required: true,
+        description: "资源在这里，失败时为 null",
+      },
+      { name: "timestamp", type: "integer", required: true, description: "Unix 毫秒" },
+      {
+        name: "request_id",
+        type: "string",
+        required: true,
+        description: "请求号，以 req_ 开头",
+      },
+    ],
+  };
+}
+
 export function InterfaceResponseShapePage(): ReactNode {
+  const shape = responseShapeSection();
   return (
     <ApiDocsFrame currentSlug="response-shape">
       <header className="pageHeading">
@@ -752,48 +822,12 @@ export function InterfaceResponseShapePage(): ReactNode {
       <section>
         <h2>响应</h2>
         <p className="statusCode">200</p>
-        <p className="contentType">application/json</p>
+        <p className="contentType">{shape.contentType}</p>
         <p>失败时 data 为 null，比较数字 code，创建成功时 HTTP 可以是 201，code 仍是 200</p>
-        <FieldBlock
-          prefix="response"
-          field={{
-            name: "code",
-            type: "integer",
-            required: true,
-            description: "成功是 200，不是 HTTP 状态本身",
-          }}
-        />
-        <FieldBlock
-          prefix="response"
-          field={{
-            name: "message",
-            type: "string",
-            required: true,
-            description: "成功时是成功，不要用它分支",
-          }}
-        />
-        <FieldBlock
-          prefix="response"
-          field={{
-            name: "data",
-            type: "object | null",
-            required: true,
-            description: "资源在这里，失败时为 null",
-          }}
-        />
-        <FieldBlock
-          prefix="response"
-          field={{ name: "timestamp", type: "integer", required: true, description: "Unix 毫秒" }}
-        />
-        <FieldBlock
-          prefix="response"
-          field={{
-            name: "request_id",
-            type: "string",
-            required: true,
-            description: "请求号，以 req_ 开头",
-          }}
-        />
+        {shape.fields.map((field) => (
+          <FieldBlock key={field.name} prefix="response" field={field} />
+        ))}
+        <ExampleBlock title="响应示例" text={sectionExample(shape, "json")} />
       </section>
     </ApiDocsFrame>
   );
