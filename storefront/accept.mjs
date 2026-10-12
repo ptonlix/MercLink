@@ -1,7 +1,15 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-const reservedPrefixes = ["/api", "/authorize", "/oauth", "/admin", "/media", "/.well-known"];
+const reservedPrefixes = [
+  "/api",
+  "/authorize",
+  "/oauth",
+  "/admin",
+  "/media",
+  "/.well-known",
+  "/interfaces",
+];
 const reservedExact = new Set([
   "/skill.md",
   "/merchant/skill.md",
@@ -10,12 +18,7 @@ const reservedExact = new Set([
   "/sitemap.xml",
   "/robots.txt",
 ]);
-const productSlots = [
-  "product.name",
-  "product.cover",
-  "product.price",
-  "product.availability",
-];
+const productSlots = ["product.name", "product.cover", "product.price", "product.availability"];
 const pricePattern =
   /[¥￥]\s*\d|\d+(?:\.\d{1,2})?\s*元|(?:价格|售价|单价|标价)\s*[:：]?\s*\d|price\s*[:=]\s*\d/i;
 const stockPattern = /库存\s*[:：]?\s*\d|stock\s*[:=]\s*\d/i;
@@ -107,10 +110,16 @@ function inspect(filePath, html) {
       }
     }
   }
-  if (filePath === "products/item.html" && !declaresRepeat(html, "product.fields", "product.field")) {
+  if (
+    filePath === "products/item.html" &&
+    !declaresRepeat(html, "product.fields", "product.field")
+  ) {
     fail("missing_slot", `${filePath} 缺少 product.fields`);
   }
-  if (filePath === "products/item.html" && !declaresRepeat(html, "product.variants", "product.variant")) {
+  if (
+    filePath === "products/item.html" &&
+    !declaresRepeat(html, "product.variants", "product.variant")
+  ) {
     fail("missing_slot", `${filePath} 缺少 product.variants`);
   }
   if (
@@ -133,7 +142,9 @@ function inspect(filePath, html) {
   ) {
     fail("missing_slot", `${filePath} 展示订单事实却没有订单槽位。`);
   }
-  const visible = stripSlots(withoutPaid).replaceAll("不表示支付成功", "").replaceAll("预算 200 元", "");
+  const visible = stripSlots(withoutPaid)
+    .replaceAll("不表示支付成功", "")
+    .replaceAll("预算 200 元", "");
   if (
     pricePattern.test(visible) ||
     stockPattern.test(visible) ||
@@ -279,7 +290,6 @@ function skipWhitespace(html, index) {
   }
   return cursor;
 }
-
 
 function isReserved(filePath) {
   const urlPath = `/${filePath}`;

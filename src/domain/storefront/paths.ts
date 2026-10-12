@@ -5,6 +5,7 @@ const reservedPrefixes = [
   "/admin",
   "/media",
   "/.well-known",
+  "/interfaces",
 ] as const;
 
 const reservedExact = [

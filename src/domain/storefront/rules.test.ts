@@ -35,6 +35,10 @@ describe("storefront rules", () => {
     expect(storefrontRewritePath("/admin", true)).toBeNull();
     expect(storefrontRewritePath("/media/img_1", true)).toBeNull();
     expect(storefrontRewritePath("/skill.md", true)).toBeNull();
+    expect(storefrontRewritePath("/interfaces", true)).toBeNull();
+    expect(isReservedPath("/interfaces")).toBe(true);
+    expect(isReservedPath("/interfaces/post-api-v1-orders")).toBe(true);
+    expect(storefrontRewritePath("/interfaces/post-api-v1-orders", true)).toBeNull();
     expect(storefrontRewritePath("/storefront/skill.md", true)).toBeNull();
     expect(isReservedPath("/products/prd_1")).toBe(false);
     expect(storefrontRewritePath("/about", false)).toBeNull();
@@ -62,6 +66,12 @@ describe("storefront rules", () => {
       ]),
     ).toMatchObject({ ok: false, error: "validation_error" });
     expect(validateStaticEntries([{ path: "index.html", bytes: text("<p>hi</p>") }]).ok).toBe(true);
+    expect(
+      validateStaticEntries([
+        { path: "index.html", bytes: text("<p>hi</p>") },
+        { path: "interfaces/index.html", bytes: text("<p>docs</p>") },
+      ]),
+    ).toMatchObject({ ok: false, error: "validation_error" });
   });
 
   it("blocks hardcoded facts and renders the next fact without another activation", () => {

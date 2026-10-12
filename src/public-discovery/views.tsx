@@ -4,6 +4,9 @@ import { createElement, type ReactNode } from "react";
 import { slotHtml, type SlotContext, type SlotProduct } from "../domain/storefront/slots";
 import { minorUnits } from "../shared/money";
 import { BannerShelf, PublicImage, UsageGuides, VariantChooser } from "./interactions";
+import type { ApiField, ApiSection } from "./interface-fields";
+import { interfaceContract } from "./interface-fields";
+import { interfaceOperationDoc, interfaceSlug } from "./interface-docs";
 
 type Facts = SlotContext | null;
 
@@ -42,9 +45,11 @@ function Slot({
 }
 
 import {
-  apiRootPath,
   buyerSkillPath,
   emptyProductsNote,
+  interfaceDirectoryGroups,
+  interfaceDirectoryLabel,
+  interfaceDirectoryPath,
   merchantSkillPath,
   storeExplanation,
   storefrontSkillPath,
@@ -558,10 +563,238 @@ function StoreFooter(): ReactNode {
         <p className="muted">{storeExplanation}</p>
       </div>
       <nav aria-label="接口与发现文件">
-        <a href={apiRootPath}>API 根地址</a>
+        <a href={interfaceDirectoryPath}>{interfaceDirectoryLabel}</a>
         <a href="/llms.txt">llms.txt</a>
         <a href="/sitemap.xml">sitemap.xml</a>
       </nav>
     </footer>
+  );
+}
+
+function ApiDocsFrame({
+  currentSlug,
+  children,
+}: {
+  currentSlug?: string;
+  children: ReactNode;
+}): ReactNode {
+  const groups = interfaceDirectoryGroups();
+  return (
+    <main className="page apiDocs">
+      <nav className="siteNav" aria-label="站点导航">
+        <a href="/" className="wordmark">
+          MercLink
+        </a>
+        <a href="/">店铺首页</a>
+        <a href="/products">商品列表</a>
+        <a href="/interfaces">{interfaceDirectoryLabel}</a>
+      </nav>
+      <div className="apiDocsFrame">
+        <nav className="apiDocsNav" aria-label="接口文档">
+          {groups.map((group) => (
+            <div key={group.title}>
+              <p className="groupTitle">
+                {group.href === null ? group.title : <a href={group.href}>{group.title}</a>}
+              </p>
+              {group.routes.map((route) => {
+                const doc = interfaceOperationDoc(route.method, route.path);
+                const slug = interfaceSlug(route.method, route.path);
+                return (
+                  <a
+                    key={slug}
+                    href={`/interfaces/${slug}`}
+                    aria-current={currentSlug === slug ? "page" : undefined}
+                  >
+                    <span className={`methodBadge ${doc.method}`}>{doc.method}</span>
+                    <span className="navCopy">
+                      <code className="navPath">{route.path}</code>
+                      <span className="navLabel">{doc.summary}</span>
+                    </span>
+                  </a>
+                );
+              })}
+            </div>
+          ))}
+          <a
+            href="/interfaces/response-shape"
+            aria-current={currentSlug === "response-shape" ? "page" : undefined}
+          >
+            响应结构
+          </a>
+        </nav>
+        <div className="apiDocsMain">{children}</div>
+      </div>
+      <StoreFooter />
+    </main>
+  );
+}
+
+function FieldBlock({ field, prefix }: { field: ApiField; prefix: string }): ReactNode {
+  return (
+    <div className="apiField" id={`${prefix}-${field.name}`}>
+      <div className="apiFieldHead">
+        <code>{field.name}</code>
+        <span className="apiType">{field.type}</span>
+        {field.required ? <span className="apiRequired">必填</span> : null}
+      </div>
+      <p>{field.description}</p>
+      {field.options !== undefined ? (
+        <p className="apiFieldMeta">
+          可选值:{" "}
+          {field.options.map((option) => (
+            <code key={option}>{option}</code>
+          ))}
+        </p>
+      ) : null}
+      {field.range !== undefined ? (
+        <p className="apiFieldMeta">
+          取值范围: <code>{field.range}</code>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function PayloadSection({
+  title,
+  section,
+  prefix,
+}: {
+  title: string;
+  section: ApiSection;
+  prefix: string;
+}): ReactNode {
+  return (
+    <section>
+      <h2>{title}</h2>
+      <p className="contentType">{section.contentType}</p>
+      {section.description.length > 0 ? <p>{section.description}</p> : null}
+      {section.fields.map((item) => (
+        <FieldBlock key={`${prefix}-${item.name}`} field={item} prefix={prefix} />
+      ))}
+    </section>
+  );
+}
+
+export function InterfaceDirectory(): ReactNode {
+  const first = interfaceDirectoryGroups()[0]?.routes[0];
+  if (first === undefined) {
+    return null;
+  }
+  return <InterfaceOperationPage method={first.method} path={first.path} />;
+}
+
+export function InterfaceOperationPage({
+  method,
+  path,
+}: {
+  method: string;
+  path: string;
+}): ReactNode {
+  const doc = interfaceOperationDoc(method, path);
+  const contract = interfaceContract(method, path);
+  const slug = interfaceSlug(method, path);
+  return (
+    <ApiDocsFrame currentSlug={slug}>
+      <header className="pageHeading">
+        <h1>{doc.summary}</h1>
+        <p>
+          <span className={`methodBadge ${doc.method}`}>{doc.method}</span>
+          <code>{doc.path}</code>
+        </p>
+      </header>
+      <table className="factsTable">
+        <tbody>
+          <tr>
+            <th>认证</th>
+            <td>{doc.auth}</td>
+          </tr>
+          <tr>
+            <th>权限</th>
+            <td>{doc.permission}</td>
+          </tr>
+        </tbody>
+      </table>
+      {contract.pathParams.length > 0 ? (
+        <PayloadSection
+          title="路径参数"
+          prefix="path"
+          section={{ contentType: "path", description: "", fields: contract.pathParams }}
+        />
+      ) : null}
+      {contract.query !== null ? (
+        <PayloadSection title="查询参数" prefix="query" section={contract.query} />
+      ) : null}
+      {contract.body !== null ? (
+        <PayloadSection title="请求体" prefix="body" section={contract.body} />
+      ) : null}
+      {contract.responses.map((response) => (
+        <section key={response.status}>
+          <h2>响应</h2>
+          <p className="statusCode">{response.status}</p>
+          <p className="contentType">{response.section.contentType}</p>
+          <p>{response.section.description}</p>
+          {response.section.fields.map((item) => (
+            <FieldBlock key={`${response.status}-${item.name}`} field={item} prefix="response" />
+          ))}
+        </section>
+      ))}
+    </ApiDocsFrame>
+  );
+}
+
+export function InterfaceResponseShapePage(): ReactNode {
+  return (
+    <ApiDocsFrame currentSlug="response-shape">
+      <header className="pageHeading">
+        <h1>响应结构</h1>
+      </header>
+      <section>
+        <h2>响应</h2>
+        <p className="statusCode">200</p>
+        <p className="contentType">application/json</p>
+        <p>失败时 data 为 null，比较数字 code，创建成功时 HTTP 可以是 201，code 仍是 200</p>
+        <FieldBlock
+          prefix="response"
+          field={{
+            name: "code",
+            type: "integer",
+            required: true,
+            description: "成功是 200，不是 HTTP 状态本身",
+          }}
+        />
+        <FieldBlock
+          prefix="response"
+          field={{
+            name: "message",
+            type: "string",
+            required: true,
+            description: "成功时是成功，不要用它分支",
+          }}
+        />
+        <FieldBlock
+          prefix="response"
+          field={{
+            name: "data",
+            type: "object | null",
+            required: true,
+            description: "资源在这里，失败时为 null",
+          }}
+        />
+        <FieldBlock
+          prefix="response"
+          field={{ name: "timestamp", type: "integer", required: true, description: "Unix 毫秒" }}
+        />
+        <FieldBlock
+          prefix="response"
+          field={{
+            name: "request_id",
+            type: "string",
+            required: true,
+            description: "请求号，以 req_ 开头",
+          }}
+        />
+      </section>
+    </ApiDocsFrame>
   );
 }

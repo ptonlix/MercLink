@@ -1,3 +1,5 @@
+import { apiRoutes, type ApiAudience } from "../shared/api-routes";
+
 const localOrigin = "http://localhost:3000";
 
 export const storeSlogan = "在 AI 时代，让天下没有难做的生意";
@@ -18,7 +20,11 @@ export const merchantSkillPath = "/merchant/skill.md";
 
 export const storefrontSkillPath = "/storefront/skill.md";
 
-export const apiRootPath = "/api/v1";
+const apiRootPath = "/api/v1";
+
+export const interfaceDirectoryPath = "/interfaces";
+
+export const interfaceDirectoryLabel = "接口文档";
 
 export const publicPagePaths = [
   "/",
@@ -26,6 +32,7 @@ export const publicPagePaths = [
   buyerSkillPath,
   merchantSkillPath,
   storefrontSkillPath,
+  interfaceDirectoryPath,
 ] as const;
 
 export const disallowedPaths = ["/authorize", "/admin", "/oauth", "/api", "/dev"] as const;
@@ -69,6 +76,7 @@ export function publicRobots(origin = publicBaseUrl()): RobotsPolicy {
         buyerSkillPath,
         merchantSkillPath,
         storefrontSkillPath,
+        interfaceDirectoryPath,
       ],
       disallow: [...disallowedPaths, "/markdown"],
     },
@@ -86,6 +94,51 @@ export function staticSitemapEntries(origin = publicBaseUrl()): SitemapEntry[] {
 
 export function productSitemapEntry(id: string, origin = publicBaseUrl()): SitemapEntry {
   return { url: absoluteUrl(`/products/${id}`, origin) };
+}
+
+type InterfaceDirectoryRoute = {
+  method: string;
+  path: string;
+};
+
+export type InterfaceDirectoryGroup = {
+  title: string;
+  href: string | null;
+  routes: readonly InterfaceDirectoryRoute[];
+};
+
+const directorySkills = [
+  { audience: "buyer", title: "买家 Skill", href: buyerSkillPath },
+  { audience: "merchant", title: "商家 Skill", href: merchantSkillPath },
+  { audience: "storefront", title: "店面 Skill", href: storefrontSkillPath },
+] as const satisfies readonly {
+  audience: ApiAudience;
+  title: string;
+  href: string;
+}[];
+
+// audiences 表示哪份 Skill 必须写到这条路径，不是登录要求。
+export function interfaceDirectoryGroups(): readonly InterfaceDirectoryGroup[] {
+  const skillGroups = directorySkills.map((skill) => ({
+    title: skill.title,
+    href: skill.href,
+    routes: apiRoutes
+      .filter((route) => {
+        const audiences: readonly string[] = route.audiences;
+        return audiences.includes(skill.audience);
+      })
+      .map((route) => ({ method: route.method, path: route.path })),
+  }));
+  return [
+    ...skillGroups,
+    {
+      title: "独立调用",
+      href: null,
+      routes: apiRoutes
+        .filter((route) => route.audiences.length === 0)
+        .map((route) => ({ method: route.method, path: route.path })),
+    },
+  ];
 }
 
 export type StoreQuote = {

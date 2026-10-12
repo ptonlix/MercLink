@@ -106,10 +106,11 @@ docker compose -p merclink down
 | `/authorize/buyer`    | 买家        | 注册、登录、批准               |
 | `/authorize/merchant` | 商家        | 登录、批准。没有注册           |
 | `/admin`              | 店主        | 修改店主密码                   |
-| `/api/v1`             | Agent、脚本 | HTTP API                       |
+| `/interfaces`         | 人          | 接口文档。默认展示第一条接口   |
+| `/api/v1`             | Agent、脚本 | 机器接口前缀，不是文档页       |
 | `/api/health`         | 部署检查    | 健康检查                       |
 
-查已上架商品不需要登录。下单和管理接口使用 `Authorization: Bearer <访问令牌>`。错误体是 `{ "error": "<code>", "message": "<可读说明>" }`。路径以 `src/shared/api-routes.ts` 为准，说明以两份 Skill 为准。
+查已上架商品不需要登录。下单和管理接口使用 `Authorization: Bearer <访问令牌>`。错误体是 `{ "code", "message", "data", "timestamp", "request_id" }`。路径以 `src/shared/api-routes.ts` 为准。公开字段页展示字段、认证和权限；Skill 必须与它对齐，不能另写一份覆盖它的协议。
 
 ## 配置
 
