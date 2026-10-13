@@ -175,7 +175,7 @@ docker compose pull && docker compose up -d
 docker compose -f compose.yaml -f compose.build.yaml up -d --build
 ```
 
-公网 HTTPS 由 `compose.yaml` 的 Caddy 提供。部署机 `.env` 设置 `COMPOSE_PROFILES=caddy`、`APP_DOMAIN` 和 `ACME_EMAIL`，并把 `APP_BIND` 设为 `127.0.0.1`。`APP_BASE_URL` 填 `https://` 加同一个主机名。域名要先解析到这台机器，安全组放行 TCP 80 和 443。证书由 Caddy 向 Let's Encrypt 申请并自动续期，保存在 `caddy_data` 卷，不写进仓库。未设置该 profile 时不启动 Caddy。可选 `APEX_DOMAIN` 也会拿到证书，但只 301 到 `https://APP_DOMAIN`，避免授权和支付通知落到另一个主机。
+公网 HTTPS 由 `compose.yaml` 的 Caddy 提供。部署机 `.env` 设置 `COMPOSE_PROFILES=caddy`、`APP_DOMAIN` 和 `ACME_EMAIL`，并把 `APP_BIND` 设为 `127.0.0.1`。`APP_BASE_URL` 填 `https://` 加同一个主机名。域名要先解析到这台机器，安全组放行 TCP 80 和 443。证书由 Caddy 向 Let's Encrypt 申请并自动续期，保存在 `caddy_data` 卷，不写进仓库。Caddy 只压缩文本和 SVG，不压缩已经是 WebP 或 PNG 的商品图。未设置该 profile 时不启动 Caddy。可选 `APEX_DOMAIN` 也会拿到证书，但只 301 到 `https://APP_DOMAIN`，避免授权和支付通知落到另一个主机。
 
 ## 目录
 

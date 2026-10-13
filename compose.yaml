@@ -187,6 +187,13 @@ services:
           }
         }
         ${APP_DOMAIN:-} {
+          encode {
+            match {
+              header Content-Type text/* application/json* application/javascript* application/xml* image/svg+xml*
+            }
+            gzip
+            zstd
+          }
           reverse_proxy app:3000 {
             header_up X-Real-IP {remote_host}
           }

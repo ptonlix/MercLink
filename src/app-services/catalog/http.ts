@@ -6,6 +6,7 @@ import type { FieldFilterInput } from "../../domain/catalog/query";
 import { systemFieldKeys } from "../../domain/catalog/fields";
 import { authenticate } from "../../shared/seams/authenticate";
 import { apiFailure, apiSuccess } from "../../shared/errors";
+import { entityTag, ifNoneMatch } from "../../shared/representation";
 import type { Scope } from "../../shared/actor";
 import { addField, changeFields, listFields, readSchema } from "./fields";
 import { createCatalog, listCatalogs } from "./catalogs";
@@ -24,8 +25,10 @@ import {
 import {
   imageResponse,
   mediaFailure,
+  publicImageContentType,
   publicImageResponse,
   readPublicImage,
+  unchangedPublicImage,
   uploadCatalogImage,
   uploadProfileImage,
 } from "./images";
@@ -337,13 +340,20 @@ export async function postProfileImage(request: Request): Promise<Response> {
   );
 }
 
-export async function getMedia(id: string): Promise<Response> {
+export async function getMedia(id: string, request?: Request): Promise<Response> {
   const runtime = mediaRuntime();
   if (runtime === undefined) {
     return mediaFailure("dependency_unavailable", "图片暂时无法读取。");
   }
   const sql = ensureCatalogRegistered();
-  return publicImageResponse(await readPublicImage(sql, runtime.objectStorage, id));
+  if (request !== undefined && ifNoneMatch(request.headers.get("if-none-match"), entityTag(id))) {
+    const contentType = await publicImageContentType(sql, id);
+    if (contentType === null) {
+      return mediaFailure("not_found", "没有找到图片。");
+    }
+    return unchangedPublicImage(id);
+  }
+  return publicImageResponse(id, await readPublicImage(sql, runtime.objectStorage, id));
 }
 
 export async function postProduct(request: Request, catalogId: string): Promise<Response> {

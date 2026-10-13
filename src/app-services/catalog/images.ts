@@ -12,6 +12,7 @@ import type { ObjectStoragePort } from "../../ports/object-storage";
 import type { RateLimitPort } from "../../ports/rate-limit";
 import { apiFailure, apiSuccess, httpStatusFor } from "../../shared/errors";
 import { lockCatalog, ownedCatalog, type Db, type Sql } from "./db";
+import { entityTag } from "../../shared/representation";
 import { mediaRuntime } from "./media-runtime";
 
 export type StoredImage = {
@@ -198,11 +199,7 @@ export async function uploadProfileImage(
   };
 }
 
-export async function readPublicImage(
-  sql: Sql,
-  storage: ObjectStoragePort,
-  id: string,
-): Promise<ImageResult<{ bytes: Uint8Array; contentType: string }>> {
+export async function publicImageContentType(sql: Sql, id: string): Promise<string | null> {
   const productRows = await sql<{ content_type: string }[]>`
     SELECT content_type FROM product_images WHERE id = ${id}
   `;
@@ -212,8 +209,16 @@ export async function readPublicImage(
           SELECT content_type FROM merchant_profile_images WHERE id = ${id}
         `
       : [];
-  const row = productRows[0] ?? profileRows[0];
-  if (row === undefined) {
+  return productRows[0]?.content_type ?? profileRows[0]?.content_type ?? null;
+}
+
+export async function readPublicImage(
+  sql: Sql,
+  storage: ObjectStoragePort,
+  id: string,
+): Promise<ImageResult<{ bytes: Uint8Array; contentType: string }>> {
+  const contentType = await publicImageContentType(sql, id);
+  if (contentType === null) {
     return imageFail("not_found", "没有找到图片。");
   }
   try {
@@ -221,13 +226,16 @@ export async function readPublicImage(
     if (object === null) {
       return imageFail("dependency_unavailable", "图片暂时无法读取。");
     }
-    return { ok: true, value: { bytes: object.bytes, contentType: row.content_type } };
+    return { ok: true, value: { bytes: object.bytes, contentType } };
   } catch {
     return imageFail("dependency_unavailable", "图片暂时无法读取。");
   }
 }
 
+const mediaCacheControl = "public, max-age=31536000, immutable";
+
 export function publicImageResponse(
+  id: string,
   result: ImageResult<{ bytes: Uint8Array; contentType: string }>,
 ): Response {
   if (!result.ok) {
@@ -237,8 +245,21 @@ export function publicImageResponse(
     status: 200,
     headers: {
       "content-type": result.value.contentType,
+      "cache-control": mediaCacheControl,
+      etag: entityTag(id),
       "x-content-type-options": "nosniff",
       "content-disposition": "inline",
+    },
+  });
+}
+
+export function unchangedPublicImage(id: string): Response {
+  return new Response(null, {
+    status: 304,
+    headers: {
+      "cache-control": mediaCacheControl,
+      etag: entityTag(id),
+      "x-content-type-options": "nosniff",
     },
   });
 }
