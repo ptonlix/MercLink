@@ -8,10 +8,12 @@ on:
       - "v[0-9]*.[0-9]*.[0-9]*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   check:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -98,3 +100,38 @@ jobs:
           provenance: false
           sbom: false
           tags: ${{ steps.tags.outputs.tags }}
+      - name: Publish install script
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+        run: |
+          set -eu
+          set -o pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          asset="${RUNNER_TEMP}/install.sh"
+          scripts/stamp-install.sh > "${asset}"
+          chmod 755 "${asset}"
+          grep -q "^STAMPED_TAG=\"${tag}\"" "${asset}"
+          if [[ "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            grep -q "^STAMPED_IMAGE=\"docker.io/${DOCKERHUB_USERNAME}/merclink:latest\"" "${asset}"
+          else
+            grep -q "^STAMPED_IMAGE=\"docker.io/${DOCKERHUB_USERNAME}/merclink:${version}\"" "${asset}"
+          fi
+          if grep -q '^STAMPED_TAG="__MERCLINK_RELEASE_TAG__"' "${asset}"; then
+            echo "install.sh was not stamped" >&2
+            exit 1
+          fi
+          notes="${RUNNER_TEMP}/release-notes.txt"
+          if [[ "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'MercLink %s\n\n一键安装使用 merclink:latest，不用填写版本号。\n' "${tag}" > "${notes}"
+          else
+            printf 'MercLink %s\n\n这是预发布。安装脚本使用版本号镜像，不使用 latest。\n' "${tag}" > "${notes}"
+          fi
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            gh release upload "${tag}" "${asset}" --clobber
+          elif [[ "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            gh release create "${tag}" "${asset}" --target "${GITHUB_SHA}" --title "${tag}" --notes-file "${notes}"
+          else
+            gh release create "${tag}" "${asset}" --prerelease --target "${GITHUB_SHA}" --title "${tag}" --notes-file "${notes}"
+          fi
