@@ -16,6 +16,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json next.config.ts ./
 COPY src ./src
+# next build typechecks src/**/*.test.ts. oauth.test.ts imports tests/support.
+COPY tests ./tests
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm run build
 

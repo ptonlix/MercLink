@@ -135,10 +135,13 @@ pnpm run test:acceptance
 
 ## 部署
 
-正式环境使用 `compose.yaml`。它包含应用、PostgreSQL、Redis 和 MinIO。数据库、Redis 和对象存储只在 Compose 网络内，数据放在命名卷。应用默认监听 `3000`。
+正式环境使用 `compose.yaml`。它包含应用、PostgreSQL、Redis 和 MinIO。应用使用已发布镜像，不在部署机编译。数据库、Redis 和对象存储只在 Compose 网络内，数据放在命名卷，并仍用 Compose 里的固定镜像。应用默认监听 `3000`。
+
+版本 tag 由 GitHub Actions 推送镜像。仓库名是 `docker.io/${DOCKERHUB_USERNAME}/merclink`。用户名是 Actions variable `DOCKERHUB_USERNAME`，令牌是 secret `DOCKERHUB_TOKEN`。不要把真实用户名或令牌写进仓库。正式 tag `v1.2.3` 推 `1.2.3` 和 `latest`。预发布 tag 如 `v1.2.3-rc.1` 只推 `1.2.3-rc.1`，不移动 `latest`。`latest` 会被下一个正式版覆盖，不能当作可逆的回滚点。生产回滚把 `MERCLINK_IMAGE` 改回旧的版本号标签，再执行下面的命令。
 
 在部署机准备 `.env`，并额外提供：
 
+- `MERCLINK_IMAGE`，例如 `docker.io/<DOCKERHUB_USERNAME>/merclink:1.2.3`
 - `POSTGRES_PASSWORD`
 - `REDIS_PASSWORD`
 - `MINIO_ROOT_USER`
@@ -147,7 +150,13 @@ pnpm run test:acceptance
 密码使用 URL 安全字符。MinIO 密码至少 8 位。`APP_BASE_URL` 填公网地址。只有 `MERCLINK_PURCHASE=1` 时，才把支付通知地址填成同一公网地址。容器内的数据库、Redis 和对象存储地址由 Compose 覆盖，不要写成 `127.0.0.1`。
 
 ```bash
-docker compose up -d --build
+docker compose pull && docker compose up -d
+```
+
+本地没有远程镜像、需要在本机构建应用时，使用明确的本地命令。这不是正式部署：
+
+```bash
+docker compose -f compose.yaml -f compose.build.yaml up -d --build
 ```
 
 公网 HTTPS 由部署机上的反向代理提供。本文件不包含证书或域名配置。
@@ -162,7 +171,8 @@ src/adapters       支付宝、阿里云、S3、Redis
 src/db             表和迁移
 docs               需求和架构
 compose.dev.yaml   本地 Postgres、Redis、MinIO
-compose.yaml       正式环境应用和依赖
+compose.yaml       正式环境。应用拉已发布镜像
+compose.build.yaml 仅本地构建应用镜像
 ```
 
 ## 文档

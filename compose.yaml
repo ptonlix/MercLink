@@ -1,8 +1,13 @@
-# 正式环境。在部署机准备 .env 后执行：docker compose up -d --build
+# 正式环境。在部署机 .env 设置 MERCLINK_IMAGE 为已发布的版本号镜像后执行：
+# docker compose pull && docker compose up -d
+# 这条命令只拉镜像，不在部署机编译应用。不要加 --build。
+# 本地没有远程镜像时才用：docker compose -f compose.yaml -f compose.build.yaml up -d --build
+# latest 会被新的正式版覆盖。生产回滚改回版本号标签再 pull，不要假定 latest 可逆。
 # Compose 用项目目录的 .env 做变量替换；应用容器也读取同一份 .env。
 # 不要把真实密码写进这个文件。POSTGRES_PASSWORD、REDIS_PASSWORD、MINIO_ROOT_PASSWORD
 # 使用 URL 安全字符，且 MinIO 密码至少 8 位。
-# 数据库、Redis、对象存储只在 compose 网络内。应用对外端口默认 3000。
+# 数据库、Redis、对象存储只在 compose 网络内，并使用下面的固定镜像，不打进应用镜像。
+# 应用对外端口默认 3000。
 # 公网 HTTPS 由部署机上的反向代理提供。APP_BASE_URL 必须是该公网地址。
 # 买入默认关闭。需要下单时设置 MERCLINK_PURCHASE=1，这时 ALIPAY_NOTIFY_URL 或易支付通知地址才必须是该公网地址。
 # 应用容器固定 NODE_ENV=production，并清空 MERCLINK_DEV_STUBS，避免部署 .env 打开本地模拟。
@@ -10,7 +15,6 @@ name: merclink
 
 services:
   app:
-    build: .
     image: ${MERCLINK_IMAGE:-merclink:local}
     env_file:
       - path: .env

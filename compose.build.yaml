@@ -1,0 +1,5 @@
+# 只给本机构建应用镜像。正式部署不要加 -f compose.build.yaml，也不要加 --build。
+# docker compose -f compose.yaml -f compose.build.yaml up -d --build
+services:
+  app:
+    build: .
