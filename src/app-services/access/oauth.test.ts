@@ -17,7 +17,7 @@ import {
 import { createApiKey, revokeApiKey } from "./keys";
 import { protectedResourceMetadata } from "./metadata";
 import { issueDeviceTokens } from "../../../tests/support/device-tokens";
-import { agentClientId, startAuthorizationServer } from "./provider";
+import { agentClientId, createAccessProvider, startAuthorizationServer } from "./provider";
 import { tokenHash } from "../../domain/access/tokens";
 import { dispatchOidc } from "./dispatch";
 
@@ -151,6 +151,68 @@ describe("oauth 2.1", () => {
       } finally {
         await started.close();
       }
+    });
+  });
+
+  it("builds device and discovery URLs from the issuer, not the bind address", async () => {
+    await withIdentityDatabase(async (sql) => {
+      const issuer = "https://www.eileenpeng.com/oauth";
+      const provider = await createAccessProvider({
+        issuer,
+        cookieSecret: "oauth-signing-secret-value",
+        sql,
+        accounts: { isActive: () => Promise.resolve(true) },
+      });
+      const bindHeaders = {
+        "x-forwarded-host": "0.0.0.0:3000",
+        "x-forwarded-proto": "https",
+      };
+      const discovery = await dispatchOidc(
+        provider,
+        new Request("https://0.0.0.0:3000/oauth/.well-known/openid-configuration", {
+          headers: bindHeaders,
+        }),
+      );
+      expect(discovery.status).toBe(200);
+      const metadata = (await discovery.json()) as {
+        issuer?: string;
+        device_authorization_endpoint?: string;
+        jwks_uri?: string;
+      };
+      expect(metadata.issuer).toBe(issuer);
+      expect(metadata.device_authorization_endpoint).toBe(`${issuer}/device/auth`);
+      expect(metadata.jwks_uri).toBe(`${issuer}/jwks`);
+      expect(JSON.stringify(metadata)).not.toContain("0.0.0.0");
+
+      const started = await dispatchOidc(
+        provider,
+        new Request("https://0.0.0.0:3000/oauth/device/auth", {
+          method: "POST",
+          headers: { ...bindHeaders, "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ client_id: agentClientId, scope: "product:read" }),
+        }),
+      );
+      expect(started.status).toBe(200);
+      const device = (await started.json()) as {
+        verification_uri?: string;
+        verification_uri_complete?: string;
+        user_code?: string;
+      };
+      expect(device.verification_uri).toBe(`${issuer}/device`);
+      expect(device.verification_uri_complete).toBe(
+        `${issuer}/device?user_code=${device.user_code}`,
+      );
+
+      const page = await dispatchOidc(
+        provider,
+        new Request(`https://0.0.0.0:3000/oauth/device?user_code=${device.user_code}`, {
+          headers: bindHeaders,
+        }),
+      );
+      expect(page.status).toBe(200);
+      const html = await page.text();
+      expect(html).toContain(`action="${issuer}/device"`);
+      expect(html).not.toContain("0.0.0.0");
     });
   });
 

@@ -3,8 +3,9 @@ import { Socket } from "node:net";
 import Provider from "oidc-provider";
 
 export async function dispatchOidc(provider: Provider, request: Request): Promise<Response> {
-  const url = new URL(request.url);
+  const url = issuerRequestUrl(provider, request);
   const originalUrl = `${url.pathname}${url.search}`;
+
   let pathname = url.pathname;
   if (pathname === "/oauth" || pathname.startsWith("/oauth/")) {
     pathname = pathname.slice("/oauth".length) || "/";
@@ -19,7 +20,10 @@ export async function dispatchOidc(provider: Provider, request: Request): Promis
   req.method = request.method;
   req.url = `${pathname}${url.search}`;
   req.headers = Object.fromEntries(request.headers.entries());
+  // Next standalone uses HOSTNAME=0.0.0.0 for request.url. OAuth links must follow the issuer.
   req.headers.host = url.host;
+  delete req.headers["x-forwarded-host"];
+  delete req.headers["x-forwarded-proto"];
   req.headers["content-length"] = String(body.length);
   Object.assign(req, { originalUrl, socket });
   if (body.length > 0) {
@@ -69,6 +73,11 @@ export async function dispatchOidc(provider: Provider, request: Request): Promis
     status: res.statusCode,
     headers,
   });
+}
+
+function issuerRequestUrl(provider: Provider, request: Request): URL {
+  const incoming = new URL(request.url);
+  return new URL(`${incoming.pathname}${incoming.search}`, provider.issuer);
 }
 
 function headerText(value: string | number): string {
