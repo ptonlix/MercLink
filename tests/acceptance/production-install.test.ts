@@ -9,11 +9,17 @@ const installScript = path.join(root, "scripts/install.sh");
 const stampScript = path.join(root, "scripts/stamp-install.sh");
 
 function run(command: string, args: string[], env: Record<string, string>) {
-  return spawnSync(command, args, {
+  return spawnSync(command === "bash" ? "/bin/bash" : command, args, {
     cwd: root,
     env: { ...process.env, ...env },
     encoding: "utf8",
   });
+}
+
+function pathWithoutDocker(dir: string) {
+  const bin = path.join(dir, "no-docker");
+  mkdirSync(bin, { recursive: true });
+  return bin;
 }
 
 function fakeBin(dir: string, name: string, body: string) {
@@ -68,7 +74,7 @@ describe("production install script", () => {
       ACME_EMAIL: "ops@example.com",
       ADMIN_PHONE: "13800138000",
       MERCLINK_ASSUME_YES: "1",
-      PATH: "/bin:/usr/bin",
+      PATH: pathWithoutDocker(dir),
     });
     expect(refused.status).not.toBe(0);
     expect(refused.stderr).toContain("没有找到 Docker");
@@ -104,7 +110,7 @@ describe("production install script", () => {
       ACME_EMAIL: "ops@example.com",
       ADMIN_PHONE: "13800138000",
       MERCLINK_ASSUME_YES: "1",
-      PATH: "/bin:/usr/bin",
+      PATH: pathWithoutDocker(dir),
     };
     const latest = run("bash", [installScript], {
       ...base,
@@ -236,7 +242,7 @@ describe("production install script", () => {
       ACME_EMAIL: "ops@example.com",
       ADMIN_PHONE: "13800138000",
       MERCLINK_ASSUME_YES: "1",
-      PATH: "/bin:/usr/bin",
+      PATH: pathWithoutDocker(dir),
     });
     expect(missing.status).not.toBe(0);
     expect(missing.stderr).toContain("没有找到 Docker");
