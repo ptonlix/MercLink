@@ -33,14 +33,14 @@ API Key 不是 Agent 的登录方式。它只给没有浏览器的服务器脚�
 
 ## 技术栈
 
-| 部分   | 选择                                    |
-| ------ | --------------------------------------- |
-| 应用   | Next.js 16、TypeScript、一个进程        |
-| 数据   | PostgreSQL 18、Drizzle                  |
-| 限流   | Redis 8。只记次数，不做缓存             |
-| 图片   | S3 兼容存储。本地用 MinIO，不写应用磁盘 |
-| 授权   | OAuth 2.1 设备码，`node-oidc-provider`  |
-| 包管理 | pnpm 12.9.1                             |
+| 部分   | 选择                                             |
+| ------ | ------------------------------------------------ |
+| 应用   | Next.js 16、TypeScript、一个进程                 |
+| 数据   | PostgreSQL 18、Drizzle                           |
+| 限流   | Redis 8。只记次数，不做缓存                      |
+| 图片   | S3 兼容存储。本地用固定版本 RustFS，不写应用磁盘 |
+| 授权   | OAuth 2.1 设备码，`node-oidc-provider`           |
+| 包管理 | pnpm 12.9.1                                      |
 
 实现约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。人和 AI Coding 助手改代码前先读 [AGENTS.md](AGENTS.md)。
 
@@ -135,7 +135,7 @@ pnpm run test:acceptance
 
 ## 部署
 
-正式环境使用 `compose.yaml`。它包含应用、PostgreSQL、Redis 和 MinIO。应用使用已发布镜像，不在部署机编译。数据库、Redis 和对象存储只在 Compose 网络内，数据放在命名卷，并仍用 Compose 里的固定镜像。应用默认监听 `3000`。
+正式环境使用 `compose.yaml`。它包含应用、PostgreSQL、Redis 和 RustFS。应用使用已发布镜像，不在部署机编译。数据库、Redis 和对象存储只在 Compose 网络内，数据放在命名卷，并仍用 Compose 里的固定镜像。对象存储镜像是单盘 `rustfs/rustfs:1.0.1`，不使用 `latest`。控制台端口 `9001` 不发布，图片仍由应用的媒体路由提供。应用默认监听 `3000`。
 
 版本 tag 由 GitHub Actions 推送镜像。仓库名是 `docker.io/${DOCKERHUB_USERNAME}/merclink`。用户名是 Actions variable `DOCKERHUB_USERNAME`，令牌是 secret `DOCKERHUB_TOKEN`。不要把真实用户名或令牌写进仓库。正式 tag `v1.2.3` 推 `1.2.3` 和 `latest`。预发布 tag 如 `v1.2.3-rc.1` 只推 `1.2.3-rc.1`，不移动 `latest`。`latest` 会被下一个正式版覆盖，不能当作可逆的回滚点。生产回滚把 `MERCLINK_IMAGE` 改回旧的版本号标签，再执行下面的命令。
 
@@ -144,10 +144,12 @@ pnpm run test:acceptance
 - `MERCLINK_IMAGE`，例如 `docker.io/<DOCKERHUB_USERNAME>/merclink:1.2.3`
 - `POSTGRES_PASSWORD`
 - `REDIS_PASSWORD`
-- `MINIO_ROOT_USER`
-- `MINIO_ROOT_PASSWORD`
+- `RUSTFS_ACCESS_KEY`
+- `RUSTFS_SECRET_KEY`
 
-密码使用 URL 安全字符。MinIO 密码至少 8 位。`APP_BASE_URL` 填公网地址。只有 `MERCLINK_PURCHASE=1` 时，才把支付通知地址填成同一公网地址。容器内的数据库、Redis 和对象存储地址由 Compose 覆盖，不要写成 `127.0.0.1`。
+已有部署要把 `.env` 里的 `MINIO_ROOT_USER` 和 `MINIO_ROOT_PASSWORD` 改成这两个名字。Compose 会把它们注入应用已有的 `OBJECT_STORAGE_ACCESS_KEY_ID` 和 `OBJECT_STORAGE_SECRET_ACCESS_KEY`，不要再加一套对象存储变量。密码使用 URL 安全字符。`APP_BASE_URL` 填公网地址。只有 `MERCLINK_PURCHASE=1` 时，才把支付通知地址填成同一公网地址。容器内的数据库、Redis 和对象存储地址由 Compose 覆盖，不要写成 `127.0.0.1`。
+
+不要把旧的 `minio_data` 卷挂给 `rustfs`。旧卷不是受支持的迁移。没有图片的新部署使用新的空卷 `rustfs_data`。单盘以后不能原地扩成多盘。
 
 ```bash
 docker compose pull && docker compose up -d
@@ -170,7 +172,7 @@ src/app-services   用例
 src/adapters       支付宝、阿里云、S3、Redis
 src/db             表和迁移
 docs               需求和架构
-compose.dev.yaml   本地 Postgres、Redis、MinIO
+compose.dev.yaml   本地 Postgres、Redis、RustFS
 compose.yaml       正式环境。应用拉已发布镜像
 compose.build.yaml 仅本地构建应用镜像
 ```

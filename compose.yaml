@@ -4,9 +4,10 @@
 # 本地没有远程镜像时才用：docker compose -f compose.yaml -f compose.build.yaml up -d --build
 # latest 会被新的正式版覆盖。生产回滚改回版本号标签再 pull，不要假定 latest 可逆。
 # Compose 用项目目录的 .env 做变量替换；应用容器也读取同一份 .env。
-# 不要把真实密码写进这个文件。POSTGRES_PASSWORD、REDIS_PASSWORD、MINIO_ROOT_PASSWORD
-# 使用 URL 安全字符，且 MinIO 密码至少 8 位。
+# 不要把真实密码写进这个文件。POSTGRES_PASSWORD、REDIS_PASSWORD、RUSTFS_SECRET_KEY
+# 使用 URL 安全字符。
 # 数据库、Redis、对象存储只在 compose 网络内，并使用下面的固定镜像，不打进应用镜像。
+# 对象存储是单盘 rustfs/rustfs:1.0.1。控制台端口 9001 不发布。不要把旧 minio_data 卷挂给 rustfs。
 # 应用对外端口默认 3000。
 # 公网 HTTPS 由部署机上的反向代理提供。APP_BASE_URL 必须是该公网地址。
 # 买入默认关闭。需要下单时设置 MERCLINK_PURCHASE=1，这时 ALIPAY_NOTIFY_URL 或易支付通知地址才必须是该公网地址。
@@ -24,11 +25,11 @@ services:
       MERCLINK_DEV_STUBS: ""
       DATABASE_URL: postgres://merclink:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/merclink
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD}@redis:6379
-      OBJECT_STORAGE_ENDPOINT: http://minio:9000
+      OBJECT_STORAGE_ENDPOINT: http://rustfs:9000
       OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-us-east-1}
       OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-merclink}
-      OBJECT_STORAGE_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
-      OBJECT_STORAGE_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+      OBJECT_STORAGE_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY}
+      OBJECT_STORAGE_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY}
     ports:
       - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000"
     depends_on:
@@ -36,7 +37,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio-init:
+      rustfs-init:
         condition: service_completed_successfully
     healthcheck:
       test:
@@ -88,39 +89,55 @@ services:
       retries: 30
     restart: unless-stopped
 
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
-    command: ["server", "/data", "--console-address", ":9001"]
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+  # 命名卷默认属于 root。RustFS 以 10001:10001 运行，启动前先交给这个用户。
+  rustfs-volume:
+    image: rustfs/rustfs:1.0.1
+    user: "0:0"
+    entrypoint: ["chown", "10001:10001", "/data"]
     volumes:
-      - minio_data:/data
+      - rustfs_data:/data
+    restart: "no"
+
+  rustfs:
+    image: rustfs/rustfs:1.0.1
+    user: "10001:10001"
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY}
+    volumes:
+      - rustfs_data:/data
+    depends_on:
+      rustfs-volume:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/health"]
       interval: 5s
       timeout: 5s
       retries: 30
     restart: unless-stopped
 
-  minio-init:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+  rustfs-init:
+    image: amazon/aws-cli:2.27.49
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY}
+      AWS_DEFAULT_REGION: ${OBJECT_STORAGE_REGION:-us-east-1}
+      AWS_EC2_METADATA_DISABLED: "true"
       OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-merclink}
     depends_on:
-      minio:
+      rustfs:
         condition: service_healthy
     entrypoint:
       [
         "/bin/sh",
         "-c",
-        'mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" && mc mb --ignore-existing "local/$$OBJECT_STORAGE_BUCKET"',
+        'aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket "$$OBJECT_STORAGE_BUCKET" || aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket "$$OBJECT_STORAGE_BUCKET"',
       ]
     restart: "no"
 
 volumes:
   postgres_data:
   redis_data:
-  minio_data:
+  rustfs_data:

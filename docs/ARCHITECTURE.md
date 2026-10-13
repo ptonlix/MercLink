@@ -69,8 +69,8 @@ Agent 不直连数据库、Redis、对象存储，也不直连支付宝或阿里
 | 安全扫描 | GitHub CodeQL、Dependabot、Gitleaks、`pnpm audit`           | 分别覆盖代码漏洞、依赖漏洞和密钥泄漏。不叠多套同类扫描                                                                          |
 | 定时任务 | 进程内每分钟扫描                                            | 只用于关闭超时未支付订单。不引入队列                                                                                            |
 | 限流     | Redis 8.10.2                                                | 只存过期计数。不存账号、订单、验证码或图片字节                                                                                  |
-| 商品图片 | S3 兼容对象存储                                             | AWS S3 或 MinIO。本地 MinIO 镜像为 `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z`。不把图片写到应用磁盘，也没有本地目录兜底 |
-| 部署     | 一个应用容器 + PostgreSQL + Redis + S3 或 MinIO             | 仍不拆微服务。缺任一依赖，或启动时连不上 Redis 或对象桶，应用拒绝启动                                                           |
+| 商品图片 | S3 兼容对象存储                                 | 应用只通过现有 S3 适配器访问。捆绑镜像是单盘 `rustfs/rustfs:1.0.1`，控制台端口不发布。不把图片写到应用磁盘，也没有本地目录兜底。旧 MinIO 卷不能原地挂给 RustFS |
+| 部署     | 一个应用容器 + PostgreSQL + Redis + RustFS      | 仍不拆微服务。缺任一依赖，或启动时连不上 Redis 或对象桶，应用拒绝启动                                                                                         |
 
 不引入 Kafka、Elasticsearch、Neo4j、微服务和独立 MCP 进程。Redis 只做限流计数，不做缓存层，也不替代 PostgreSQL。设备码、授权记录、注册挑战和验证码参数消费仍在 PostgreSQL。图片字节只进 S3 或 MinIO，没有本地目录兜底。
 
@@ -184,13 +184,13 @@ Agent 调用下单接口
 | 短信     | 号码认证服务 `SendSmsVerifyCode`、`CheckSmsVerifyCode` | 已发送或核验通过。验证码不进本地库                  |
 | 支付     | 支付宝官方 AI 支付接口                                 | 支付动作、已支付、已关闭                            |
 | 限流     | Redis 滑动窗口                                         | 允许或拒绝。Redis 不可用时拒绝，不降级到 PostgreSQL |
-| 对象存储 | AWS S3 或 MinIO，`@aws-sdk/client-s3`                  | 已写入或不存在。桶不可达时拒绝启动                  |
+| 对象存储 | S3 兼容端点，`@aws-sdk/client-s3`                      | 已写入或不存在。桶不可达时拒绝启动                  |
 
 适配器负责签名、重试和厂商错误码转换。应用层只处理自己的错误：验证未通过、短信过于频繁、支付创建失败、对象存储不可用。
 
 短信发送前必须先通过人机验证，并通过 Redis 频率限制。同一手机号 60 秒内只能发一次，24 小时内不超过 10 次。频率限制失败或 Redis 不可用时不调用阿里云。上传限流同样使用 Redis。Redis 不可用时拒绝上传，不写对象，也不降级到 PostgreSQL 或本地磁盘。
 
-商品图片只写入配置的 S3 或 MinIO 桶。没有本地目录适配器，也不在对象存储缺失时改写本地磁盘。公开读取由应用从桶中取对象，不读本地文件，也不把桶公开到互联网。
+商品图片只写入配置的 S3 兼容桶。捆绑部署使用单盘 RustFS，不使用 MinIO 或 AIStor。没有本地目录适配器，也不在对象存储缺失时改写本地磁盘。公开读取由应用从桶中取对象，不读本地文件，也不把桶或 RustFS 控制台公开到互联网。
 
 ---
 
@@ -303,7 +303,7 @@ pnpm audit --audit-level=high
 
 一个应用容器监听一个端口。数据库迁移在启动前执行，不在请求里改表。
 
-本地只启动依赖：`docker compose -f compose.dev.yaml up -d`。正式部署用 `compose.yaml`，包含应用、PostgreSQL、Redis 和 MinIO。应用镜像在版本 tag 发布到 `docker.io/${DOCKERHUB_USERNAME}/merclink` 之后，由部署机执行 `docker compose pull && docker compose up -d` 拉取。正式命令不带 `--build`，不在部署机编译应用。Postgres、Redis 和 MinIO 仍用 compose 里的固定镜像，不打进应用镜像。密钥只放部署机的 `.env`，不进仓库，也不作为镜像构建参数。
+本地只启动依赖：`docker compose -f compose.dev.yaml up -d`。正式部署用 `compose.yaml`，包含应用、PostgreSQL、Redis 和 RustFS。应用镜像在版本 tag 发布到 `docker.io/${DOCKERHUB_USERNAME}/merclink` 之后，由部署机执行 `docker compose pull && docker compose up -d` 拉取。正式命令不带 `--build`，不在部署机编译应用。Postgres、Redis 和 RustFS 仍用 compose 里的固定镜像，不打进应用镜像。对象存储钉 `rustfs/rustfs:1.0.1`，数据目录只有 `/data`，不能以后原地扩成多盘。控制台端口 `9001` 不发布。命名卷在 RustFS 启动前属于 `10001:10001`。桶由只跑一次的 `amazon/aws-cli:2.27.49` 调用 S3 CreateBucket 创建，桶名来自 `OBJECT_STORAGE_BUCKET`，默认 `merclink`；不使用 MinIO `mc`。应用仍在启动时 HeadBucket，桶不可达就拒绝启动。不要把旧 `minio_data` 卷挂给 RustFS。部署机 `.env` 使用 `RUSTFS_ACCESS_KEY` 和 `RUSTFS_SECRET_KEY`，Compose 只注入现有的 `OBJECT_STORAGE_ACCESS_KEY_ID` 和 `OBJECT_STORAGE_SECRET_ACCESS_KEY`。密钥只放部署机的 `.env`，不进仓库，也不作为镜像构建参数。
 
 生产 `MERCLINK_IMAGE` 必须是带版本号的已发布镜像，例如 `docker.io/<DOCKERHUB_USERNAME>/merclink:1.2.3`。正式 tag `v1.2.3` 同时推 `1.2.3` 和 `latest`；预发布 tag 只推版本标签，不移动 `latest`。`latest` 会被下一个正式版覆盖。回滚应把 `MERCLINK_IMAGE` 改回版本号标签再 pull，不要假定 `latest` 可逆。
 

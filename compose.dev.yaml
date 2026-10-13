@@ -1,5 +1,7 @@
 # 本地依赖。应用在宿主机用 pnpm dev 跑，不进这个文件。
 # docker compose -f compose.dev.yaml up -d
+# 对象存储是单盘 rustfs/rustfs:1.0.1。只发布 9000，不发布控制台 9001。
+# 下面的访问密钥只给本机。不要拿去当生产配置，也不要挂旧的 MinIO 数据卷。
 name: merclink-dev
 
 services:
@@ -27,29 +29,53 @@ services:
       timeout: 5s
       retries: 30
 
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
-    command: ["server", "/data", "--console-address", ":9001"]
+  rustfs-volume:
+    image: rustfs/rustfs:1.0.1
+    user: "0:0"
+    entrypoint: ["chown", "10001:10001", "/data"]
+    volumes:
+      - rustfs_data:/data
+    restart: "no"
+
+  rustfs:
+    image: rustfs/rustfs:1.0.1
+    user: "10001:10001"
     environment:
-      MINIO_ROOT_USER: merclink
-      MINIO_ROOT_PASSWORD: merclinkminio
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_ACCESS_KEY: merclink
+      RUSTFS_SECRET_KEY: merclinkminio
     ports:
       - "9000:9000"
+    volumes:
+      - rustfs_data:/data
+    depends_on:
+      rustfs-volume:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/health"]
       interval: 2s
       timeout: 5s
       retries: 30
 
-  minio-init:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+  rustfs-init:
+    image: amazon/aws-cli:2.27.49
+    environment:
+      AWS_ACCESS_KEY_ID: merclink
+      AWS_SECRET_ACCESS_KEY: merclinkminio
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-merclink}
     depends_on:
-      minio:
+      rustfs:
         condition: service_healthy
     entrypoint:
       [
         "/bin/sh",
         "-c",
-        "mc alias set local http://minio:9000 merclink merclinkminio && mc mb --ignore-existing local/merclink",
+        'aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket "$$OBJECT_STORAGE_BUCKET" || aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket "$$OBJECT_STORAGE_BUCKET"',
       ]
     restart: "no"
+
+volumes:
+  rustfs_data:
