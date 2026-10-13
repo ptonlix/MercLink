@@ -137,6 +137,20 @@ pnpm run test:acceptance
 
 正式环境使用 `compose.yaml`。它包含应用、PostgreSQL、Redis 和 RustFS。设置 `COMPOSE_PROFILES=caddy` 后还会启动 Caddy。应用使用已发布镜像，不在部署机编译。数据库、Redis 和对象存储只在 Compose 网络内，数据放在命名卷，并仍用 Compose 里的固定镜像。对象存储镜像是单盘 `rustfs/rustfs:1.0.1`，不使用 `latest`。控制台端口 `9001` 不发布，图片仍由应用的媒体路由提供。应用默认监听 `3000`。
 
+新机器可以一条命令安装。脚本会在这台机器的 `/opt/merclink` 写下配置和密码，拉取已经发布的镜像并启动。它不会在机器上编译，也不会把域名或密码写进仓库。
+
+```bash
+curl -fsSL -o /tmp/merclink-install.sh https://github.com/ptonlix/MercLink/releases/latest/download/install.sh && bash /tmp/merclink-install.sh
+```
+
+这条地址始终是当前正式版，不会装到预发布版。脚本把应用镜像写成 `merclink:latest`，不用填写版本号，拉取的就是当前最新正式版。域名要先解析到这台机器，并放行 80 和 443 端口。如果这两个端口已被占用，或机器上还没有 Docker，脚本会停下来，不会自动安装软件，也不会关掉现有网站。
+
+已经安装过就不要再跑上面的命令。它会因为已有配置而停止，这是为了避免覆盖密码。以后要换成更新的正式版，再执行升级。升级会重新拉取 `latest`，不重新生成密码：
+
+```bash
+curl -fsSL -o /tmp/merclink-install.sh https://github.com/ptonlix/MercLink/releases/latest/download/install.sh && bash /tmp/merclink-install.sh upgrade
+```
+
 版本 tag 由 GitHub Actions 推送镜像。仓库名是 `docker.io/${DOCKERHUB_USERNAME}/merclink`。用户名是 Actions variable `DOCKERHUB_USERNAME`，令牌是 secret `DOCKERHUB_TOKEN`。不要把真实用户名或令牌写进仓库。正式 tag `v1.2.3` 推 `1.2.3` 和 `latest`。预发布 tag 如 `v1.2.3-rc.1` 只推 `1.2.3-rc.1`，不移动 `latest`。`latest` 会被下一个正式版覆盖，不能当作可逆的回滚点。生产回滚把 `MERCLINK_IMAGE` 改回旧的版本号标签，再执行下面的命令。
 
 在部署机准备 `.env`，并额外提供：
@@ -175,6 +189,7 @@ docs               需求和架构
 compose.dev.yaml   本地 Postgres、Redis、RustFS
 compose.yaml       正式环境。应用拉已发布镜像，可选 Caddy
 compose.build.yaml 仅本地构建应用镜像
+scripts/install.sh 正式版一键安装。仓库里不带镜像用户名
 ```
 
 ## 文档
