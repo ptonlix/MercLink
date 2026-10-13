@@ -52,9 +52,9 @@ describe("released asset delivery", () => {
       }),
     );
     expect(compressed?.headers.get("content-encoding")).toBe("gzip");
-    expect(
-      new TextDecoder().decode(gunzipSync(new Uint8Array(await compressed!.arrayBuffer()))),
-    ).toBe(new TextDecoder().decode(css));
+    expect(new TextDecoder().decode(gunzipSync(new Uint8Array(await bodyOf(compressed))))).toBe(
+      new TextDecoder().decode(css),
+    );
 
     const image = await serveStorefront(
       "/cover.png",
@@ -62,7 +62,7 @@ describe("released asset delivery", () => {
       new Request("https://shop.example/cover.png", { headers: { "accept-encoding": "gzip" } }),
     );
     expect(image?.headers.get("content-encoding")).toBeNull();
-    expect(new Uint8Array(await image!.arrayBuffer())).toEqual(png);
+    expect(new Uint8Array(await bodyOf(image))).toEqual(png);
 
     const page = await serveStorefront(
       "/",
@@ -71,9 +71,7 @@ describe("released asset delivery", () => {
     );
     expect(page?.headers.get("cache-control")).toBe("no-store");
     expect(page?.headers.get("content-encoding")).toBe("gzip");
-    const pageText = new TextDecoder().decode(
-      gunzipSync(new Uint8Array(await page!.arrayBuffer())),
-    );
+    const pageText = new TextDecoder().decode(gunzipSync(new Uint8Array(await bodyOf(page))));
     expect(pageText).toContain("店铺介绍");
     expect(pageText).toContain('rel="canonical"');
 
@@ -82,6 +80,13 @@ describe("released asset delivery", () => {
     expect(upper?.headers.get("etag")).toBeNull();
   });
 });
+
+async function bodyOf(response: Response | null): Promise<ArrayBuffer> {
+  if (response === null) {
+    throw new Error("missing response");
+  }
+  return response.arrayBuffer();
+}
 
 function bind(storage: ObjectStoragePort): void {
   const files = new Map<string, FileRow>([

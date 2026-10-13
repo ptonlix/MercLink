@@ -106,13 +106,21 @@ function etagList(header: string): string[] {
     }
     index += 1;
     let token = "";
-    while (index < header.length && header[index] !== '"') {
-      if (header[index] === "\\" && index + 1 < header.length) {
-        token += header[index + 1];
+    while (index < header.length) {
+      const current = header[index];
+      if (current === undefined || current === '"') {
+        break;
+      }
+      if (current === "\\") {
+        const escaped = header[index + 1];
+        if (escaped === undefined) {
+          break;
+        }
+        token += escaped;
         index += 2;
         continue;
       }
-      token += header[index];
+      token += current;
       index += 1;
     }
     if (header[index] === '"') {
