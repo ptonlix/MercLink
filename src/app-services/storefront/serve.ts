@@ -32,10 +32,13 @@ import { publicBaseUrl } from "../../public-discovery/site";
 import type { PublicProduct } from "../../shared/seams/public-products";
 import { publicProducts } from "../../shared/seams/public-products";
 import { publicStore, type PublicStoreProfile } from "../../shared/seams/public-store";
+import { compressible, encodeBody, entityTag, ifNoneMatch } from "../../shared/representation";
 import { storefrontRuntime } from "./runtime";
 import type { FileRow } from "./store";
 
 const hiddenBody = "没有找到。";
+// 同一个 URL 在下一次激活时会换对象键。短缓存避免每次都重下，又不把旧主题留到永久。
+const staticAssetCacheControl = "public, max-age=600, stale-while-revalidate=86400";
 
 type ReleaseGate = "builtin" | "active" | "unavailable";
 
@@ -193,6 +196,11 @@ async function serveFile(
   if (runtime === undefined) {
     return textResponse(hiddenBody, 503, true);
   }
+  const html = isHtmlRelease(file);
+  const tag = entityTag(file.objectKey);
+  if (!html && ifNoneMatch(request.headers.get("if-none-match"), tag)) {
+    return staticNotModified(tag, file.contentType);
+  }
   let object;
   try {
     object = await runtime.objectStorage.open(file.objectKey);
@@ -202,9 +210,8 @@ async function serveFile(
   if (object === null) {
     return textResponse(hiddenBody, 503, true);
   }
-  const html = file.path.endsWith(".html");
   if (!html) {
-    return byteResponse(object.bytes, file.contentType);
+    return byteResponse(object.bytes, file.contentType, request, tag);
   }
   const text = new TextDecoder().decode(object.bytes);
   const stripped = stripMerchantJsonLd(text);
@@ -384,16 +391,18 @@ function htmlResponse(
   nextCursor: string | null,
   contentType: string,
 ): Response {
+  const encoded = encodedBytes(new TextEncoder().encode(html), contentType, request);
   const headers = new Headers({
     "content-type": contentType,
     "cache-control": "no-store",
     "x-content-type-options": "nosniff",
   });
+  applyEncoding(headers, contentType, encoded.encoding);
   const link = discoveryLinkHeader(pathname, request, nextCursor);
   if (link !== null) {
     headers.set("link", link);
   }
-  return new Response(html, { status: 200, headers });
+  return new Response(encoded.body, { status: 200, headers });
 }
 
 function discoveryLinkHeader(
@@ -465,15 +474,54 @@ function escapeAttr(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 }
 
-function byteResponse(bytes: Uint8Array, contentType: string): Response {
-  return new Response(binaryBody(bytes), {
-    status: 200,
-    headers: {
-      "content-type": contentType,
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff",
-    },
+function isHtmlRelease(file: FileRow): boolean {
+  const type = file.contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+  return type === "text/html";
+}
+
+function byteResponse(
+  bytes: Uint8Array,
+  contentType: string,
+  request: Request,
+  tag: string,
+): Response {
+  const encoded = encodedBytes(bytes, contentType, request);
+  const headers = new Headers({
+    "content-type": contentType,
+    "cache-control": staticAssetCacheControl,
+    etag: tag,
+    "x-content-type-options": "nosniff",
   });
+  applyEncoding(headers, contentType, encoded.encoding);
+  return new Response(encoded.body, { status: 200, headers });
+}
+
+function staticNotModified(tag: string, contentType: string): Response {
+  const headers = new Headers({
+    "cache-control": staticAssetCacheControl,
+    etag: tag,
+    "x-content-type-options": "nosniff",
+  });
+  applyEncoding(headers, contentType, null);
+  return new Response(null, { status: 304, headers });
+}
+
+function encodedBytes(
+  bytes: Uint8Array,
+  contentType: string,
+  request: Request,
+): { body: ArrayBuffer; encoding: "gzip" | null } {
+  const encoded = encodeBody(bytes, contentType, request.headers.get("accept-encoding"));
+  return { body: binaryBody(encoded.bytes), encoding: encoded.encoding };
+}
+
+function applyEncoding(headers: Headers, contentType: string, encoding: "gzip" | null): void {
+  if (compressible(contentType)) {
+    headers.set("vary", "Accept-Encoding");
+  }
+  if (encoding !== null) {
+    headers.set("content-encoding", encoding);
+  }
 }
 
 function textResponse(body: string, status: number, hidden: boolean): Response {

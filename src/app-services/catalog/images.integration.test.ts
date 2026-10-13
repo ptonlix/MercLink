@@ -195,8 +195,19 @@ describe("product images", () => {
       expect(response.headers.get("content-type")).toBe("image/png");
       expect(response.headers.get("x-content-type-options")).toBe("nosniff");
       expect(response.headers.get("content-disposition")).toBe("inline");
+      expect(response.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+      expect(response.headers.get("etag")).toBeTruthy();
       expect(new Uint8Array(await response.arrayBuffer())).toEqual(png);
       expect(limiter.consumes).toBe(consumesBeforeRead);
+      const opensBeforeRevalidation = storage.opens;
+      const revalidated = await mediaRoute(
+        new Request(`${origin}/media/${body.id}`, {
+          headers: { "if-none-match": response.headers.get("etag") ?? "" },
+        }),
+        { params: Promise.resolve({ id: body.id }) },
+      );
+      expect(revalidated.status).toBe(304);
+      expect(storage.opens).toBe(opensBeforeRevalidation);
 
       const missing = await mediaRoute(new Request(`${origin}/media/img_missing`), {
         params: Promise.resolve({ id: "img_missing" }),
@@ -204,6 +215,12 @@ describe("product images", () => {
       expect(missing.status).toBe(404);
       const missingBody = await missing.text();
       expect(missingBody).not.toContain(body.id);
+      const starred = await mediaRoute(
+        new Request(`${origin}/media/img_missing`, { headers: { "if-none-match": "*" } }),
+        { params: Promise.resolve({ id: "img_missing" }) },
+      );
+      expect(starred.status).toBe(404);
+      expect(await starred.text()).not.toContain(body.id);
       expect(limiter.consumes).toBe(consumesBeforeRead);
     });
   });
@@ -583,14 +600,19 @@ function memoryStorage(): {
   puts: string[];
   deletes: string[];
   objects: Map<string, Uint8Array>;
+  opens: number;
 } {
   const objects = new Map<string, Uint8Array>();
   const puts: string[] = [];
   const deletes: string[] = [];
+  const state = { opens: 0 };
   return {
     puts,
     deletes,
     objects,
+    get opens() {
+      return state.opens;
+    },
     port: {
       put: (input) => {
         puts.push(input.key);
@@ -598,6 +620,7 @@ function memoryStorage(): {
         return Promise.resolve();
       },
       open: (key) => {
+        state.opens += 1;
         const bytes = objects.get(key);
         return Promise.resolve(bytes === undefined ? null : { bytes, contentType: "image/png" });
       },
