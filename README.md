@@ -135,7 +135,7 @@ pnpm run test:acceptance
 
 ## 部署
 
-正式环境使用 `compose.yaml`。它包含应用、PostgreSQL、Redis 和 RustFS。应用使用已发布镜像，不在部署机编译。数据库、Redis 和对象存储只在 Compose 网络内，数据放在命名卷，并仍用 Compose 里的固定镜像。对象存储镜像是单盘 `rustfs/rustfs:1.0.1`，不使用 `latest`。控制台端口 `9001` 不发布，图片仍由应用的媒体路由提供。应用默认监听 `3000`。
+正式环境使用 `compose.yaml`。它包含应用、PostgreSQL、Redis 和 RustFS。设置 `COMPOSE_PROFILES=caddy` 后还会启动 Caddy。应用使用已发布镜像，不在部署机编译。数据库、Redis 和对象存储只在 Compose 网络内，数据放在命名卷，并仍用 Compose 里的固定镜像。对象存储镜像是单盘 `rustfs/rustfs:1.0.1`，不使用 `latest`。控制台端口 `9001` 不发布，图片仍由应用的媒体路由提供。应用默认监听 `3000`。
 
 版本 tag 由 GitHub Actions 推送镜像。仓库名是 `docker.io/${DOCKERHUB_USERNAME}/merclink`。用户名是 Actions variable `DOCKERHUB_USERNAME`，令牌是 secret `DOCKERHUB_TOKEN`。不要把真实用户名或令牌写进仓库。正式 tag `v1.2.3` 推 `1.2.3` 和 `latest`。预发布 tag 如 `v1.2.3-rc.1` 只推 `1.2.3-rc.1`，不移动 `latest`。`latest` 会被下一个正式版覆盖，不能当作可逆的回滚点。生产回滚把 `MERCLINK_IMAGE` 改回旧的版本号标签，再执行下面的命令。
 
@@ -161,7 +161,7 @@ docker compose pull && docker compose up -d
 docker compose -f compose.yaml -f compose.build.yaml up -d --build
 ```
 
-公网 HTTPS 由部署机上的反向代理提供。本文件不包含证书或域名配置。
+公网 HTTPS 由 `compose.yaml` 的 Caddy 提供。部署机 `.env` 设置 `COMPOSE_PROFILES=caddy`、`APP_DOMAIN` 和 `ACME_EMAIL`，并把 `APP_BIND` 设为 `127.0.0.1`。`APP_BASE_URL` 填 `https://` 加同一个主机名。域名要先解析到这台机器，安全组放行 TCP 80 和 443。证书由 Caddy 向 Let's Encrypt 申请并自动续期，保存在 `caddy_data` 卷，不写进仓库。未设置该 profile 时不启动 Caddy。可选 `APEX_DOMAIN` 也会拿到证书，但只 301 到 `https://APP_DOMAIN`，避免授权和支付通知落到另一个主机。
 
 ## 目录
 
@@ -173,7 +173,7 @@ src/adapters       支付宝、阿里云、S3、Redis
 src/db             表和迁移
 docs               需求和架构
 compose.dev.yaml   本地 Postgres、Redis、RustFS
-compose.yaml       正式环境。应用拉已发布镜像
+compose.yaml       正式环境。应用拉已发布镜像，可选 Caddy
 compose.build.yaml 仅本地构建应用镜像
 ```
 

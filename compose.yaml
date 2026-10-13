@@ -9,7 +9,11 @@
 # 数据库、Redis、对象存储只在 compose 网络内，并使用下面的固定镜像，不打进应用镜像。
 # 对象存储是单盘 rustfs/rustfs:1.0.1。控制台端口 9001 不发布。不要把旧 minio_data 卷挂给 rustfs。
 # 应用对外端口默认 3000。
-# 公网 HTTPS 由部署机上的反向代理提供。APP_BASE_URL 必须是该公网地址。
+# 公网 HTTPS 由同一份 Compose 里的 Caddy 提供。部署机 .env 设置 COMPOSE_PROFILES=caddy、
+# APP_DOMAIN 和 ACME_EMAIL 后，仍执行 docker compose pull && docker compose up -d。
+# 域名和证书不写进仓库。APP_BASE_URL 必须是 https://APP_DOMAIN。
+# 可选 APEX_DOMAIN 只做 301，不作为第二个公开地址。
+# 启用后把 APP_BIND 设为 127.0.0.1，避免公网绕过 443 直接访问 3000。
 # 买入默认关闭。需要下单时设置 MERCLINK_PURCHASE=1，这时 ALIPAY_NOTIFY_URL 或易支付通知地址才必须是该公网地址。
 # 应用容器固定 NODE_ENV=production，并清空 MERCLINK_DEV_STUBS，避免部署 .env 打开本地模拟。
 name: merclink
@@ -137,7 +141,72 @@ services:
       ]
     restart: "no"
 
+  # 只在 COMPOSE_PROFILES=caddy 时启动。证书在命名卷里，由 Caddy 向 Let's Encrypt 申请并续期。
+  # 不要删 caddy_data。公网安全组必须放行 TCP 80 和 443，域名要先解析到这台机器。
+  caddy:
+    image: caddy:2.11.7-alpine
+    profiles: ["caddy"]
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-}
+      APEX_DOMAIN: ${APEX_DOMAIN:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        if [ -z "${APP_DOMAIN:-}" ] || [ -z "${ACME_EMAIL:-}" ]; then
+          echo "caddy profile requires APP_DOMAIN and ACME_EMAIL" >&2
+          exit 1
+        fi
+        case "${APP_DOMAIN:-}" in
+          *[!A-Za-z0-9.-]*) echo "APP_DOMAIN must be a hostname" >&2; exit 1 ;;
+        esac
+        case "${ACME_EMAIL:-}" in
+          *[!A-Za-z0-9._%+-@]*) echo "ACME_EMAIL has unsupported characters" >&2; exit 1 ;;
+        esac
+        if [ -n "${APEX_DOMAIN:-}" ]; then
+          case "${APEX_DOMAIN:-}" in
+            *[!A-Za-z0-9.-]*) echo "APEX_DOMAIN must be a hostname" >&2; exit 1 ;;
+          esac
+          if [ "${APEX_DOMAIN:-}" = "${APP_DOMAIN:-}" ]; then
+            echo "APEX_DOMAIN must differ from APP_DOMAIN" >&2
+            exit 1
+          fi
+        fi
+        cat > /tmp/Caddyfile <<EOF
+        {
+          email ${ACME_EMAIL:-}
+          servers {
+            protocols h1 h2
+          }
+        }
+        ${APP_DOMAIN:-} {
+          reverse_proxy app:3000 {
+            header_up X-Real-IP {remote_host}
+          }
+        }
+        EOF
+        if [ -n "${APEX_DOMAIN:-}" ]; then
+          cat >> /tmp/Caddyfile <<EOF
+        ${APEX_DOMAIN:-} {
+          redir https://${APP_DOMAIN:-}{uri} permanent
+        }
+        EOF
+        fi
+        exec caddy run --config /tmp/Caddyfile --adapter caddyfile
+    depends_on:
+      - app
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
   rustfs_data:
+  caddy_data:
+  caddy_config:
