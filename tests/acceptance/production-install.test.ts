@@ -1,5 +1,13 @@
-import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -33,6 +41,79 @@ function composeFixture(dir: string) {
   const file = path.join(dir, "compose.yaml");
   writeFileSync(file, "name: merclink\nservices: {}\n");
   return file;
+}
+
+function signalGroup(child: ChildProcess, signal: NodeJS.Signals) {
+  if (child.pid === undefined) {
+    throw new Error("installer did not start");
+  }
+  process.kill(-child.pid, signal);
+}
+
+function waitForClose(child: ChildProcess) {
+  return new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+    });
+    child.on("error", reject);
+    // A foreground sleep can keep the stdio pipes open after the shell exits.
+    child.on("exit", () => {
+      if (child.pid !== undefined) {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch {
+          // The process group already exited.
+        }
+      }
+    });
+    child.on("close", (code) => resolve({ code, stdout, stderr }));
+  });
+}
+
+function waitForText(child: ChildProcess, text: string, timeoutMs = 4000) {
+  return new Promise<void>((resolve, reject) => {
+    let stderr = "";
+    let settled = false;
+    const finish = (ok: boolean, error?: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      if (ok) {
+        resolve();
+      } else {
+        reject(error);
+      }
+    };
+    const timer = setTimeout(() => {
+      finish(false, new Error(`timed out waiting for ${text}: ${stderr}`));
+    }, timeoutMs);
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+      if (stderr.includes(text)) {
+        finish(true);
+      }
+    });
+    child.on("close", () => {
+      finish(false, new Error(`installer exited before ${text}: ${stderr}`));
+    });
+  });
+}
+
+function stopInstaller(child: ChildProcess) {
+  if (child.exitCode === null && child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, "SIGKILL");
+    } catch {
+      // The process group already exited.
+    }
+  }
 }
 
 describe("production install script", () => {
@@ -288,6 +369,210 @@ describe("production install script", () => {
     expect(result.stdout).not.toContain("keep-me");
     expect(readFileSync(log, "utf8")).not.toContain("--build");
   });
+
+  it("restores the previous release when upgrade does not finish", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "merclink-install-"));
+    const bin = path.join(dir, "bin");
+    mkdirSync(bin);
+    fakeBin(
+      bin,
+      "docker",
+      '#!/bin/sh\ncase "$*" in *version*|info) exit 0 ;; esac\nexit 1\n',
+    );
+    const opt = path.join(dir, "opt");
+    mkdirSync(opt);
+    const previous = "name: merclink\nprevious: true\n";
+    const previousEnv = [
+      "MERCLINK_IMAGE=docker.io/examplehub/merclink:1.2.2",
+      "MERCLINK_RELEASE_TAG=v1.2.2",
+      "POSTGRES_PASSWORD=keep-me",
+      "MERCLINK_PURCHASE=1",
+      "",
+    ].join("\n");
+    writeFileSync(path.join(opt, "compose.yaml"), previous);
+    writeFileSync(path.join(opt, ".env"), previousEnv, { mode: 0o600 });
+    const result = run("bash", [installScript, "upgrade"], {
+      MERCLINK_INSTALL_DIR: opt,
+      MERCLINK_RELEASE_TAG: "v1.2.3",
+      MERCLINK_IMAGE: "docker.io/examplehub/merclink:latest",
+      MERCLINK_COMPOSE_FILE: composeFixture(dir),
+      PATH: `${bin}:/bin:/usr/bin`,
+    });
+    expect(result.status, result.stderr).not.toBe(0);
+    expect(result.stderr).toContain("已还原");
+    expect(result.stderr).toContain("不会自动退回");
+    expect(readFileSync(path.join(opt, "compose.yaml"), "utf8")).toBe(previous);
+    const env = readFileSync(path.join(opt, ".env"), "utf8");
+    expect(env).toContain("MERCLINK_IMAGE=docker.io/examplehub/merclink:1.2.2");
+    expect(env).toContain("MERCLINK_RELEASE_TAG=v1.2.2");
+    expect(env).toContain("POSTGRES_PASSWORD=keep-me");
+    expect(env).toContain("MERCLINK_PURCHASE=1");
+    expect(env).not.toContain("merclink:latest");
+    expect(result.stdout).not.toContain("keep-me");
+    expect(readdirSync(opt).some((name) => name.startsWith("compose.yaml.next"))).toBe(false);
+
+    const missing = path.join(dir, "missing.yaml");
+    const downloaded = run("bash", [installScript, "upgrade"], {
+      MERCLINK_INSTALL_DIR: opt,
+      MERCLINK_RELEASE_TAG: "v1.2.3",
+      MERCLINK_IMAGE: "docker.io/examplehub/merclink:latest",
+      MERCLINK_COMPOSE_FILE: missing,
+      PATH: `${bin}:/bin:/usr/bin`,
+    });
+    expect(downloaded.status, downloaded.stderr).not.toBe(0);
+    expect(downloaded.stderr).toContain("已还原");
+    expect(readFileSync(path.join(opt, "compose.yaml"), "utf8")).toBe(previous);
+    expect(readFileSync(path.join(opt, ".env"), "utf8")).toBe(env);
+    expect(readdirSync(opt).some((name) => name.startsWith("compose.yaml.next"))).toBe(false);
+  });
+
+  it("clears an unfinished install on interrupt and keeps a committed env", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "merclink-install-"));
+    const bin = path.join(dir, "bin");
+    mkdirSync(bin);
+    fakeBin(bin, "docker", "#!/bin/sh\nexit 0\n");
+    fakeBin(bin, "ss", "#!/bin/sh\nexit 0\n");
+    fakeBin(bin, "openssl", "#!/bin/sh\necho READY >&2\nsleep 30\n");
+    const asking = path.join(dir, "asking");
+    const asked = spawn("/bin/bash", [installScript], {
+      cwd: root,
+      detached: true,
+      env: {
+        ...process.env,
+        MERCLINK_INSTALL_DIR: asking,
+        MERCLINK_RELEASE_TAG: "v1.2.3",
+        MERCLINK_IMAGE: "docker.io/examplehub/merclink:latest",
+        APP_DOMAIN: "shop.example",
+        ACME_EMAIL: "ops@example.com",
+        ADMIN_PHONE: "13800138000",
+        MERCLINK_ASSUME_YES: "1",
+        PATH: `${bin}:/bin:/usr/bin`,
+      },
+    });
+    const askedDone = waitForClose(asked);
+    try {
+      await waitForText(asked, "READY");
+      signalGroup(asked, "SIGINT");
+      const askedResult = await askedDone;
+      expect(askedResult.code).toBe(130);
+      expect(askedResult.stderr).toContain("已取消，没有留下配置");
+      expect(statSync(asking, { throwIfNoEntry: false })).toBeUndefined();
+    } finally {
+      stopInstaller(asked);
+    }
+
+    const log = path.join(dir, "docker.log");
+    fakeBin(
+      bin,
+      "openssl",
+      "#!/bin/sh\nprintf '%s\\n' 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'\n",
+    );
+    fakeBin(
+      bin,
+      "docker",
+      `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\ncase "$*" in *pull*|*up*) sleep 30 ;; esac\nexit 0\n`,
+    );
+    const opt = path.join(dir, "opt");
+    const fixture = composeFixture(dir);
+    const committed = spawn("/bin/bash", [installScript], {
+      cwd: root,
+      detached: true,
+      env: {
+        ...process.env,
+        MERCLINK_INSTALL_DIR: opt,
+        MERCLINK_RELEASE_TAG: "v1.2.3",
+        MERCLINK_IMAGE: "docker.io/examplehub/merclink:latest",
+        MERCLINK_COMPOSE_FILE: fixture,
+        APP_DOMAIN: "shop.example",
+        ACME_EMAIL: "ops@example.com",
+        ADMIN_PHONE: "13800138000",
+        MERCLINK_ASSUME_YES: "1",
+        PATH: `${bin}:/bin:/usr/bin`,
+      },
+    });
+    const committedDone = waitForClose(committed);
+    try {
+      const envFile = path.join(opt, ".env");
+      const started = Date.now();
+      while (!statSync(envFile, { throwIfNoEntry: false }) && Date.now() - started < 4000) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(statSync(envFile, { throwIfNoEntry: false })).toBeDefined();
+      signalGroup(committed, "SIGINT");
+      const committedResult = await committedDone;
+      expect(committedResult.code).toBe(130);
+      expect(committedResult.stderr).toContain("不要删除");
+      expect(readFileSync(envFile, "utf8")).toContain("APP_BASE_URL=https://shop.example");
+      expect(readFileSync(path.join(opt, "compose.yaml"), "utf8")).toBe(
+        readFileSync(fixture, "utf8"),
+      );
+      expect(readFileSync(log, "utf8")).not.toContain("down");
+    } finally {
+      stopInstaller(committed);
+    }
+  }, 15000);
+
+  it("restores the release pin when upgrade is cancelled after recreate", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "merclink-install-"));
+    const bin = path.join(dir, "bin");
+    mkdirSync(bin);
+    const log = path.join(dir, "docker.log");
+    fakeBin(
+      bin,
+      "docker",
+      `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\ncase "$*" in *"up -d"*) echo UP_STARTED >&2; sleep 30 ;; esac\nexit 0\n`,
+    );
+    const opt = path.join(dir, "opt");
+    mkdirSync(opt);
+    const previous = "name: merclink\nprevious: true\n";
+    writeFileSync(path.join(opt, "compose.yaml"), previous);
+    writeFileSync(
+      path.join(opt, ".env"),
+      [
+        "MERCLINK_IMAGE=docker.io/examplehub/merclink:1.2.2",
+        "MERCLINK_RELEASE_TAG=v1.2.2",
+        "POSTGRES_PASSWORD=keep-me",
+        "MERCLINK_PURCHASE=1",
+        "",
+      ].join("\n"),
+      { mode: 0o600 },
+    );
+    const child = spawn("/bin/bash", [installScript, "upgrade"], {
+      cwd: root,
+      detached: true,
+      env: {
+        ...process.env,
+        MERCLINK_INSTALL_DIR: opt,
+        MERCLINK_RELEASE_TAG: "v1.2.3",
+        MERCLINK_IMAGE: "docker.io/examplehub/merclink:latest",
+        MERCLINK_COMPOSE_FILE: composeFixture(dir),
+        PATH: `${bin}:/bin:/usr/bin`,
+      },
+    });
+    const done = waitForClose(child);
+    try {
+      await waitForText(child, "UP_STARTED");
+      signalGroup(child, "SIGINT");
+      const result = await done;
+      expect(result.code).toBe(130);
+      expect(result.stderr).toContain("已还原");
+      expect(result.stderr).toContain("不会自动退回");
+      expect(readFileSync(path.join(opt, "compose.yaml"), "utf8")).toBe(previous);
+      const env = readFileSync(path.join(opt, ".env"), "utf8");
+      expect(env).toContain("MERCLINK_IMAGE=docker.io/examplehub/merclink:1.2.2");
+      expect(env).toContain("MERCLINK_RELEASE_TAG=v1.2.2");
+      expect(env).toContain("POSTGRES_PASSWORD=keep-me");
+      expect(env).toContain("MERCLINK_PURCHASE=1");
+      expect(env).not.toContain("merclink:latest");
+      expect(result.stdout).not.toContain("keep-me");
+      const commands = readFileSync(log, "utf8");
+      expect(commands.match(/up -d/g)?.length).toBe(1);
+      expect(commands).not.toContain("down");
+      expect(readdirSync(opt).some((name) => name.startsWith("compose.yaml.next"))).toBe(false);
+    } finally {
+      stopInstaller(child);
+    }
+  }, 15000);
 });
 
 describe("release workflow", () => {

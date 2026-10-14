@@ -13,6 +13,14 @@ STAMPED_IMAGE="__MERCLINK_IMAGE__"
 INSTALL_DIR="${MERCLINK_INSTALL_DIR:-/opt/merclink}"
 REPO_RAW="https://raw.githubusercontent.com/ptonlix/MercLink"
 ACTION="install"
+WORK=""
+CREATED_DIR=0
+WROTE_COMPOSE=0
+COMMITTED=0
+INSTALL_DONE=0
+UPGRADE_ARMED=0
+UPGRADE_DONE=0
+UPGRADE_BACKUP=""
 
 usage() {
   cat <<'EOF'
@@ -197,10 +205,16 @@ download_compose() {
   dest="$1"
   tmp="$(mktemp "${dest}.XXXXXX")"
   if [ -n "${MERCLINK_COMPOSE_FILE:-}" ]; then
-    cp "$MERCLINK_COMPOSE_FILE" "$tmp"
+    if ! cp "$MERCLINK_COMPOSE_FILE" "$tmp"; then
+      rm -f "$tmp"
+      return 1
+    fi
   else
     need_cmd curl
-    curl -fsSL -o "$tmp" "$COMPOSE_URL"
+    if ! curl -fsSL -o "$tmp" "$COMPOSE_URL"; then
+      rm -f "$tmp"
+      return 1
+    fi
   fi
   if ! grep -q '^name: merclink$' "$tmp"; then
     rm -f "$tmp"
@@ -210,13 +224,14 @@ download_compose() {
 }
 
 write_env() {
-  admin_password="$1"
-  oauth_secret="$2"
-  postgres_password="$3"
-  redis_password="$4"
-  rustfs_access="$5"
-  rustfs_secret="$6"
-  tmp="$(mktemp "${INSTALL_DIR}/.env.XXXXXX")"
+  dest="$1"
+  admin_password="$2"
+  oauth_secret="$3"
+  postgres_password="$4"
+  redis_password="$5"
+  rustfs_access="$6"
+  rustfs_secret="$7"
+  tmp="$(mktemp "${dest}.XXXXXX")"
   {
     printf '%s\n' "# Generated on the deploy host. Do not commit."
     printf 'MERCLINK_IMAGE=%s\n' "$IMAGE"
@@ -238,7 +253,123 @@ write_env() {
     printf 'RUSTFS_SECRET_KEY=%s\n' "$rustfs_secret"
   } >"$tmp"
   chmod 600 "$tmp"
-  mv "$tmp" "${INSTALL_DIR}/.env"
+  mv "$tmp" "$dest"
+}
+
+delete_env_key() {
+  key="$1"
+  file="${INSTALL_DIR}/.env"
+  tmp="$(mktemp "${file}.XXXXXX")"
+  awk -v k="$key" 'index($0, k "=") != 1 { print }' "$file" >"$tmp"
+  chmod 600 "$tmp"
+  mv "$tmp" "$file"
+}
+
+rollback_uncommitted() {
+  if [ -f "${INSTALL_DIR}/.env" ]; then
+    COMMITTED=1
+    return 0
+  fi
+  if [ "$WROTE_COMPOSE" = 1 ]; then
+    if [ -n "$WORK" ] && [ -f "${WORK}/previous-compose.yaml" ]; then
+      mv "${WORK}/previous-compose.yaml" "${INSTALL_DIR}/compose.yaml"
+    else
+      rm -f "${INSTALL_DIR}/compose.yaml"
+    fi
+    WROTE_COMPOSE=0
+  fi
+  if [ "$CREATED_DIR" = 1 ]; then
+    rmdir "$INSTALL_DIR" 2>/dev/null || true
+  fi
+}
+
+restore_upgrade() {
+  if [ "$UPGRADE_ARMED" != 1 ] || [ "$UPGRADE_DONE" = 1 ]; then
+    return 0
+  fi
+  UPGRADE_ARMED=0
+  if [ -z "$UPGRADE_BACKUP" ] || [ ! -d "$UPGRADE_BACKUP" ]; then
+    return 0
+  fi
+  rm -f "${INSTALL_DIR}/compose.yaml.next" "${INSTALL_DIR}/compose.yaml.next."*
+  if [ -f "${UPGRADE_BACKUP}/compose.yaml" ]; then
+    cp "${UPGRADE_BACKUP}/compose.yaml" "${INSTALL_DIR}/compose.yaml"
+  else
+    rm -f "${INSTALL_DIR}/compose.yaml"
+  fi
+  image=""
+  tag=""
+  if [ -f "${UPGRADE_BACKUP}/image" ]; then
+    image="$(cat "${UPGRADE_BACKUP}/image")"
+  fi
+  if [ -f "${UPGRADE_BACKUP}/tag" ]; then
+    tag="$(cat "${UPGRADE_BACKUP}/tag")"
+  fi
+  if [ -n "$image" ]; then
+    update_env_key MERCLINK_IMAGE "$image"
+  else
+    delete_env_key MERCLINK_IMAGE
+  fi
+  if [ -n "$tag" ]; then
+    update_env_key MERCLINK_RELEASE_TAG "$tag"
+  else
+    delete_env_key MERCLINK_RELEASE_TAG
+  fi
+  rm -rf "$UPGRADE_BACKUP"
+  UPGRADE_BACKUP=""
+}
+
+backup_upgrade() {
+  UPGRADE_BACKUP="$(mktemp -d "${TMPDIR:-/tmp}/merclink-rollback.XXXXXX")"
+  chmod 700 "$UPGRADE_BACKUP"
+  if [ -f "${INSTALL_DIR}/compose.yaml" ]; then
+    cp "${INSTALL_DIR}/compose.yaml" "${UPGRADE_BACKUP}/compose.yaml"
+  fi
+  : >"${UPGRADE_BACKUP}/image"
+  : >"${UPGRADE_BACKUP}/tag"
+  if [ -f "${INSTALL_DIR}/.env" ]; then
+    awk 'index($0, "MERCLINK_IMAGE=") == 1 { sub(/^MERCLINK_IMAGE=/, ""); print; exit }' "${INSTALL_DIR}/.env" >"${UPGRADE_BACKUP}/image"
+    awk 'index($0, "MERCLINK_RELEASE_TAG=") == 1 { sub(/^MERCLINK_RELEASE_TAG=/, ""); print; exit }' "${INSTALL_DIR}/.env" >"${UPGRADE_BACKUP}/tag"
+  fi
+  UPGRADE_ARMED=1
+}
+
+upgrade_failed() {
+  restore_upgrade
+  printf '%s\n' "$1" >&2
+  exit 1
+}
+
+on_interrupt() {
+  trap - INT
+  if [ "$INSTALL_DONE" = 1 ] || [ "$UPGRADE_DONE" = 1 ]; then
+    exit 130
+  fi
+  if [ "$ACTION" = "upgrade" ] && [ "$UPGRADE_ARMED" = 1 ]; then
+    restore_upgrade
+    printf '已取消。部署文件和版本号已还原。已经换上的容器不会自动退回。\n' >&2
+    exit 130
+  fi
+  if [ -f "${INSTALL_DIR}/.env" ]; then
+    printf '已取消。配置已经写在 %s/.env，不要删除。\n' "$INSTALL_DIR" >&2
+    exit 130
+  fi
+  rollback_uncommitted
+  printf '已取消，没有留下配置。\n' >&2
+  exit 130
+}
+
+on_exit() {
+  status=$?
+  if [ "$ACTION" = "upgrade" ]; then
+    restore_upgrade
+  elif [ "$COMMITTED" != 1 ]; then
+    rollback_uncommitted
+  fi
+  if [ -n "$WORK" ] && [ -d "$WORK" ]; then
+    rm -rf "$WORK"
+  fi
+  exit "$status"
 }
 
 update_env_key() {
@@ -327,7 +458,6 @@ cmd_install() {
   fi
   collect_identity
   confirm_install
-  ensure_dir
   need_cmd openssl
   admin_password="$(url_secret 24)" || exit 1
   oauth_secret="$(url_secret 32)" || exit 1
@@ -335,15 +465,32 @@ cmd_install() {
   redis_password="$(url_secret 32)" || exit 1
   rustfs_access="$(url_secret 20)" || exit 1
   rustfs_secret="$(url_secret 32)" || exit 1
-  download_compose "${INSTALL_DIR}/compose.yaml"
-  write_env \
+  WORK="$(mktemp -d "${TMPDIR:-/tmp}/merclink-install.XXXXXX")"
+  chmod 700 "$WORK"
+  download_compose "${WORK}/compose.yaml"
+  write_env "${WORK}/.env" \
     "$admin_password" \
     "$oauth_secret" \
     "$postgres_password" \
     "$redis_password" \
     "$rustfs_access" \
     "$rustfs_secret"
+  if [ -d "$INSTALL_DIR" ]; then
+    CREATED_DIR=0
+  else
+    CREATED_DIR=1
+  fi
+  if [ -f "${INSTALL_DIR}/compose.yaml" ]; then
+    cp "${INSTALL_DIR}/compose.yaml" "${WORK}/previous-compose.yaml"
+  fi
+  ensure_dir
+  # 移动和中断可能交错。先记下来，取消时才能删掉这次写进安装目录的部署文件。
+  WROTE_COMPOSE=1
+  mv "${WORK}/compose.yaml" "${INSTALL_DIR}/compose.yaml"
+  mv "${WORK}/.env" "${INSTALL_DIR}/.env"
+  COMMITTED=1
   start_stack
+  INSTALL_DONE=1
   printf '安装完成。\n站点地址：https://%s\n管理员手机号：%s\n管理员初始密码：%s\n请登录后马上修改密码。这个密码不会再显示。\n买家下单默认关闭。需要收款时，再编辑 %s/.env，设置 MERCLINK_PURCHASE=1 并填写支付密钥。\n应用镜像：%s\n' \
     "$APP_DOMAIN" "$ADMIN_PHONE" "$admin_password" "$INSTALL_DIR" "$IMAGE"
 }
@@ -354,11 +501,21 @@ cmd_upgrade() {
   fi
   require_docker
   ensure_dir
-  download_compose "${INSTALL_DIR}/compose.yaml.next"
+  backup_upgrade
+  if ! download_compose "${INSTALL_DIR}/compose.yaml.next"; then
+    upgrade_failed "下载部署文件失败，已还原。"
+  fi
   mv "${INSTALL_DIR}/compose.yaml.next" "${INSTALL_DIR}/compose.yaml"
   update_env_key MERCLINK_IMAGE "$IMAGE"
   update_env_key MERCLINK_RELEASE_TAG "$TAG"
-  start_stack
+  if ! compose pull || ! compose up -d; then
+    upgrade_failed "没有完成升级，已还原部署文件和版本号。已经换上的容器不会自动退回。要让容器和文件一致，请再执行 docker compose up -d。"
+  fi
+  UPGRADE_DONE=1
+  UPGRADE_ARMED=0
+  if [ -n "$UPGRADE_BACKUP" ]; then
+    rm -rf "$UPGRADE_BACKUP"
+  fi
   printf '已升级。应用镜像：%s。\n密码和已有配置没有改动。\n' "$IMAGE"
 }
 
@@ -373,6 +530,8 @@ elif [ -n "${1:-}" ] && [ "${1:-}" != "install" ]; then
   die "不认识的命令：$1。可以用 install 或 upgrade。"
 fi
 
+trap on_interrupt INT
+trap on_exit EXIT
 resolve_release
 case "$ACTION" in
   install) cmd_install ;;

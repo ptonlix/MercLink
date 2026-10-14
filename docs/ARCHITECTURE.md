@@ -307,7 +307,7 @@ pnpm audit --audit-level=high
 
 正式 tag `v1.2.3` 同时推 `1.2.3` 和 `latest`；预发布 tag 只推版本标签，不移动 `latest`。一键安装使用 `docker.io/<DOCKERHUB_USERNAME>/merclink:latest`，不用填写版本号。`latest` 会被下一个正式版覆盖，不能当作回滚点。要回到旧版，把 `MERCLINK_IMAGE` 改成版本号标签，例如 `docker.io/<DOCKERHUB_USERNAME>/merclink:1.2.3`，再 pull。
 
-新机器可以运行正式版发布页附带的 `install.sh`。固定地址是 `https://github.com/ptonlix/MercLink/releases/latest/download/install.sh`，只会选中正式版，不会选中预发布版。脚本在部署机生成 `.env`，下载该正式版的 `compose.yaml`，再执行 `docker compose pull && docker compose up -d`。一键安装写入 `merclink:latest`，不用填写版本号。`latest` 会被下一个正式版覆盖，不能当作回滚点；要回到旧版，再把 `MERCLINK_IMAGE` 改成版本号标签后 pull。Docker Hub 用户名只在发布时写入这个脚本，不进仓库。已有 `.env` 不会被覆盖。
+新机器可以运行正式版发布页附带的 `install.sh`。固定地址是 `https://github.com/ptonlix/MercLink/releases/latest/download/install.sh`，只会选中正式版，不会选中预发布版。脚本在部署机生成 `.env`，下载该正式版的 `compose.yaml`，再执行 `docker compose pull && docker compose up -d`。一键安装写入 `merclink:latest`，不用填写版本号。`latest` 会被下一个正式版覆盖，不能当作回滚点；要回到旧版，再把 `MERCLINK_IMAGE` 改成版本号标签后 pull。Docker Hub 用户名只在发布时写入这个脚本，不进仓库。已有 `.env` 不会被覆盖。写出 `.env` 之前取消安装不会留下配置；写出之后不再删除它。升级失败或取消只还原 `compose.yaml` 和版本号，不自动把已经换上的容器退回旧镜像。
 
 本地没有远程镜像时，用 `docker compose -f compose.yaml -f compose.build.yaml up -d --build` 构建 `merclink:local`。这不是正式部署命令。
 
