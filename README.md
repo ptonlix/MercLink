@@ -145,7 +145,7 @@ curl -fsSL -o /tmp/merclink-install.sh https://github.com/ptonlix/MercLink/relea
 
 这条地址始终是当前正式版，不会装到预发布版。脚本把应用镜像写成 `merclink:latest`，不用填写版本号，拉取的就是当前最新正式版。域名要先解析到这台机器，并放行 80 和 443 端口。如果这两个端口已被占用，或机器上还没有 Docker，脚本会停下来，不会自动安装软件，也不会关掉现有网站。
 
-已经安装过就不要再跑上面的命令。它会因为已有配置而停止，这是为了避免覆盖密码。以后要换成更新的正式版，再执行升级。升级会重新拉取 `latest`，不重新生成密码：
+已经安装过就不要再跑上面的命令。它会因为已有配置而停止，这是为了避免覆盖密码。写出 `.env` 之前按 Ctrl+C，不会留下配置。写出之后再取消，配置和数据都保留，不要手工删除 `.env`。以后要换成更新的正式版，再执行升级。升级会重新拉取 `latest`，不重新生成密码。升级没有完成或中途取消时，会把 `compose.yaml` 和版本号还原；已经换成新镜像的容器不会自动退回。
 
 ```bash
 curl -fsSL -o /tmp/merclink-install.sh https://github.com/ptonlix/MercLink/releases/latest/download/install.sh && bash /tmp/merclink-install.sh upgrade
