@@ -30,5 +30,7 @@ ENV PORT=3000
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/src/db/migrations ./src/db/migrations
+# 没有已接受的发布时，下载会打包工作目录下的 storefront。standalone 追踪不包括它。
+COPY storefront ./storefront
 EXPOSE 3000
 CMD ["node", "server.js"]

@@ -69,6 +69,14 @@ describe("foundation files", () => {
     expect(dockerfile).toContain("pnpm install --frozen-lockfile");
     expect(dockerfile).not.toMatch(/\bnpm install\b|\bnpx\b|\byarn\b/);
 
+    const runner = dockerfile.slice(dockerfile.indexOf("FROM base AS runner"));
+    const workdir = runner.indexOf("WORKDIR /app");
+    const shipped = runner.indexOf("COPY storefront ./storefront");
+    expect(workdir).toBeGreaterThanOrEqual(0);
+    expect(shipped).toBeGreaterThan(workdir);
+    const ignored = await readFile(".dockerignore", "utf8");
+    expect(ignored).not.toMatch(/^\s*storefront(?:\/|\s|$)/m);
+
     const workflow = await readFile(".github/workflows/ci.yml", "utf8");
     expect(workflow).toContain("pnpm run check");
     expect(workflow).toContain("pnpm audit --audit-level=high");

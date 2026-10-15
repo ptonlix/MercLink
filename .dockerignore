@@ -1,4 +1,5 @@
 # 不要排除 src/db/migrations。镜像启动要执行这些 SQL。
+# 不要排除 storefront。没有已接受的发布时，下载接口会打包这个目录。
 .git
 .env
 .env.*
