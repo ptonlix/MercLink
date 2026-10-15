@@ -29,6 +29,8 @@ import {
 import { landingMarkdownResponse } from "./markdown";
 import {
   emptyProductsNote,
+  poweredByLabel,
+  productShelfHeading,
   storeExplanation,
   storeSlogan,
   unverifiedProfileNotice,
@@ -76,8 +78,11 @@ describe("public pages", () => {
     expect(visible).not.toContain('href="/api/v1"');
     expect(visible).toContain('href="/llms.txt"');
     expect(visible).toContain('href="/sitemap.xml"');
+    expect(visible).toContain(poweredByLabel);
+    expect(visible).not.toContain('class="wordmark"');
     expect(visible.indexOf(product.title)).toBeLessThan(visible.indexOf(storeSlogan));
     expect(visible.indexOf(product.title)).toBeLessThan(visible.indexOf('href="/skill.md"'));
+    expect(visible).toContain(`>${productShelfHeading}<`);
     expect(visible).toContain(storeExplanation);
     expect(visible).not.toContain("查询已上架商品并下单");
     expect(visible).not.toContain("不能自助注册");
@@ -120,9 +125,14 @@ describe("public pages", () => {
     expect(visibleProduct).not.toContain("目录 ID");
     expect(visibleProduct).not.toContain("查看结构化商品信息");
     expect(visibleProduct).not.toContain(product.catalogId);
+    expect(visibleProduct).toContain("商品信息");
+    expect(visibleProduct).not.toContain("公开字段");
     expect(visibleProduct).toContain("weight_g");
     expect(visibleProduct).toContain("480");
     expect(visibleProduct).toContain("size=42");
+    expect(visibleProduct).toContain('class="wordmark">MercLink');
+    expect(visibleProduct).toContain(poweredByLabel);
+    expect(visibleHtml(listHtml)).toContain('class="wordmark">MercLink');
     expect(visibleProduct).not.toContain("规格 ID：");
     expect(visibleProduct).not.toContain("var_sentinel");
     expect(visibleProduct).not.toContain(String(product.offer.price));
@@ -322,8 +332,17 @@ describe("public pages", () => {
     expect(visible).toContain("91310000MA1FL0000N");
     expect(visible).toContain("例某");
     expect(visible).toContain("示例市注册路 1 号");
-    expect(visible).toContain(unverifiedProfileNotice);
-    expect(visible.indexOf(unverifiedProfileNotice)).toBeLessThan(visible.indexOf(storeSlogan));
+    expect(visible).toContain('class="licenseImage"');
+    expect(visible).toContain("https://cdn.example/license.png");
+    expect(visible).toContain(">主体</h2>");
+    expect(visible).not.toContain(">联系</h2>");
+    expect(visible).not.toContain(unverifiedProfileNotice);
+    expect(visible).not.toContain('class="recordNotice"');
+    expect(visible.indexOf("南风商店")).toBeLessThan(visible.indexOf(`>${productShelfHeading}<`));
+    expect(visible.indexOf(`>${productShelfHeading}<`)).toBeLessThan(
+      visible.indexOf('class="profileFacts"'),
+    );
+    expect(visible.indexOf('class="profileFacts"')).toBeLessThan(visible.indexOf(storeSlogan));
     expect(onlineStore).toMatchObject({
       address: { "@type": "PostalAddress", streetAddress: "西湖区某某路 88 号" },
       identifier: [
@@ -346,15 +365,34 @@ describe("public pages", () => {
         Promise.resolve(
           publishedStore({
             license: null,
-            contact: { phone: "010-00000000", label: "白天", qrUrl: null },
+            contact: {
+              phone: "010-00000000",
+              label: "白天",
+              qrUrl: "https://cdn.example/qr.png",
+            },
           }),
         ),
     });
     const phoneHtml = renderToStaticMarkup(await HomePage());
     const phoneMarkdown = await (await landingMarkdownResponse()).text();
-    expect(visibleHtml(phoneHtml)).toContain("010-00000000");
-    expect(visibleHtml(phoneHtml)).toContain(unverifiedProfileNotice);
-    expect(visibleHtml(phoneHtml)).not.toContain("统一社会信用代码");
+    const phoneVisible = visibleHtml(phoneHtml);
+    expect(phoneVisible).toContain("010-00000000");
+    expect(phoneVisible).toContain("白天");
+    expect(phoneVisible).toContain('class="contactQr"');
+    expect(phoneVisible.match(/class="contactQr"/g)).toHaveLength(1);
+    expect(phoneVisible).toContain("https://cdn.example/qr.png");
+    expect(phoneVisible).toContain(">联系</h2>");
+    expect(phoneVisible).not.toContain(">主体</h2>");
+    expect(phoneVisible).not.toContain(unverifiedProfileNotice);
+    expect(phoneVisible.indexOf("南风商店")).toBeLessThan(
+      phoneVisible.indexOf(`>${productShelfHeading}<`),
+    );
+    expect(phoneVisible.indexOf(`>${productShelfHeading}<`)).toBeLessThan(
+      phoneVisible.indexOf('class="profileFacts"'),
+    );
+    expect(guidePanel(phoneVisible, "guide-panel-0")).not.toContain("010-00000000");
+    expect(guidePanel(phoneVisible, "guide-panel-0")).not.toContain("https://cdn.example/qr.png");
+    expect(phoneVisible).not.toContain("统一社会信用代码");
     expect(phoneMarkdown).toContain("010-00000000");
     expect(phoneMarkdown).toContain(unverifiedProfileNotice);
     expect(phoneMarkdown).not.toContain("91310000MA1FL0000N");
@@ -457,9 +495,7 @@ describe("public pages", () => {
     expect(disabled).toContain("把用户 Skill 交给 Agent");
     expect(disabled).toContain("告诉 Agent 想找的商品");
     expect(disabled).toContain("记下商品，联系店主");
-    expect(disabled).toContain(
-      "记下商品后联系店主。已发布联系方式时，向店主获取联系方式，手机号和二维码都会展示。",
-    );
+    expect(disabled).toContain("记下商品后联系店主。已发布的电话和二维码在商品货架下方。");
     expect(disabled).toContain('class="infoMark"');
     expect(disabled).toContain('class="infoTip"');
     expect(disabled).toContain("未发布联系方式");
@@ -550,6 +586,18 @@ describe("public pages", () => {
     expect(visible).toContain("未填写");
   });
 
+  it("shows an axis label to people and hides the axis key when the seam provides one", async () => {
+    const product = publishedProduct();
+    product.axisLabels = { size: "尺码" };
+    registerProducts([product]);
+    const visible = visibleHtml(
+      renderToStaticMarkup(await ProductPage({ params: Promise.resolve({ id: product.id }) })),
+    );
+    expect(visible).toContain("尺码 42");
+    expect(visible).not.toContain("size=42");
+    expect(visible).not.toContain(">size<");
+  });
+
   it("formats CNY minor units for people while preserving the structured offer", async () => {
     const product = publishedProduct();
     product.offer = { price: minorUnits(15900), currency: "CNY", availability: "in_stock" };
@@ -578,10 +626,32 @@ describe("public pages", () => {
     expect(visible).toContain("下一页商品");
   });
 
-  it("lists registered paths with request and response shapes", () => {
+  it("uses the published store name in the nav and credits MercLink in the footer", async () => {
+    const product = publishedProduct();
+    registerProducts([product]);
+    publicStore.register({ get: () => Promise.resolve(publishedStore()) });
+    const pages = [
+      visibleHtml(renderToStaticMarkup(await ProductsPage({}))),
+      visibleHtml(
+        renderToStaticMarkup(await ProductPage({ params: Promise.resolve({ id: product.id }) })),
+      ),
+      visibleHtml(renderToStaticMarkup(await InterfacesPage())),
+    ];
+    for (const html of pages) {
+      expect(html).toContain('class="wordmark">南风商店');
+      expect(html).not.toContain('class="wordmark">MercLink');
+      expect(html).toContain(poweredByLabel);
+    }
+    const home = visibleHtml(renderToStaticMarkup(await HomePage()));
+    expect(home).toMatch(/<h1[^>]*>南风商店<\/h1>/);
+    expect(home).not.toContain('class="wordmark"');
+    expect(home).toContain(poweredByLabel);
+  });
+
+  it("lists registered paths with request and response shapes", async () => {
     expect(interfaceDocsMatchRegistry()).toEqual([]);
     expect(interfaceContractsMatchRegistry()).toEqual([]);
-    const html = renderToStaticMarkup(InterfacesPage());
+    const html = renderToStaticMarkup(await InterfacesPage());
     const visible = elementText(html);
     expect(html).toContain("<h2>查询参数</h2>");
     expect(html).toContain("查询已上架且有可售规格的商品");

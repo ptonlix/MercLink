@@ -11,6 +11,7 @@ export function slotProductFromPublic(product: PublicProduct): SlotProduct {
     cover: product.cover,
     fields: product.fields,
     fieldLabels: product.fieldLabels,
+    axisLabels: product.axisLabels ?? {},
     variants: product.variants.map((variant) => ({
       id: variant.id,
       sku: variant.sku,

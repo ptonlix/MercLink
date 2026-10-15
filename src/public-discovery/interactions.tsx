@@ -51,72 +51,6 @@ export function PublicImage({
   );
 }
 
-export function BannerShelf({ children }: { children: ReactNode }): ReactNode {
-  const ref = useRef<HTMLDivElement>(null);
-  const hydrated = useHydrated();
-  const [bounds, setBounds] = useState({ start: true, end: true });
-  useEffect(() => {
-    const shelf = ref.current;
-    if (shelf === null) return;
-    const measure = (): void => {
-      setBounds({
-        start: shelf.scrollLeft <= 2,
-        end: shelf.scrollLeft + shelf.clientWidth >= shelf.scrollWidth - 2,
-      });
-    };
-    measure();
-    shelf.addEventListener("scroll", measure, { passive: true });
-    const observer = new ResizeObserver(measure);
-    observer.observe(shelf);
-    return () => {
-      observer.disconnect();
-      shelf.removeEventListener("scroll", measure);
-    };
-  }, []);
-  function scroll(direction: number): void {
-    const shelf = ref.current;
-    if (shelf === null) return;
-    const card = shelf.firstElementChild;
-    const width = card?.getBoundingClientRect().width ?? shelf.clientWidth;
-    const gap = Number.parseFloat(getComputedStyle(shelf).columnGap) || 0;
-    shelf.scrollBy({ left: direction * (width + gap), behavior: "auto" });
-  }
-  return (
-    <>
-      <div className="sectionHeading">
-        <h2>已上架商品</h2>
-        {hydrated ? (
-          <div className="arrows">
-            <button
-              type="button"
-              aria-label="上一张"
-              disabled={bounds.start}
-              onClick={() => {
-                scroll(-1);
-              }}
-            >
-              ←
-            </button>
-            <button
-              type="button"
-              aria-label="下一张"
-              disabled={bounds.end}
-              onClick={() => {
-                scroll(1);
-              }}
-            >
-              →
-            </button>
-          </div>
-        ) : null}
-      </div>
-      <div ref={ref} className="shelf" aria-label="商品 banner">
-        {children}
-      </div>
-    </>
-  );
-}
-
 function CopyText({
   text,
   label,
@@ -211,10 +145,12 @@ export function UsageGuides({
 export function VariantChooser({
   productId,
   variants,
+  axisLabels = {},
   purchaseEnabled = true,
 }: {
   productId: string;
   variants: readonly PublicVariant[];
+  axisLabels?: Readonly<Record<string, string>>;
   purchaseEnabled?: boolean;
 }): ReactNode {
   const available = variants.filter(
@@ -228,7 +164,7 @@ export function VariantChooser({
   const text =
     selected === undefined
       ? ""
-      : `我想购买商品 ${productId}，规格 ${selected.id}（${optionText(selected.optionValues)}）。请先查询当前价格和库存，向我确认商品、规格和数量后再购买。`;
+      : `我想购买商品 ${productId}，规格 ${selected.id}（${optionText(selected.optionValues, axisLabels)}）。请先查询当前价格和库存，向我确认商品、规格和数量后再购买。`;
   return (
     <>
       <fieldset className="variantFieldset">
@@ -251,7 +187,7 @@ export function VariantChooser({
                 ) : null}
                 <span className="variantBody">
                   <span className="variantTop">
-                    <strong>{optionText(variant.optionValues)}</strong>
+                    <strong>{optionText(variant.optionValues, axisLabels)}</strong>
                     <span className="price">{displayPrice(variant.price, variant.currency)}</span>
                   </span>
                   <span>

@@ -256,6 +256,18 @@ async function toPublic(db: Db, row: PublicQueryRow): Promise<PublicProduct | un
     return undefined;
   }
   const fields = (await loadFields(db, row.catalog_id)).map(toField);
+  const axes = await db<{ key: string; label: string }[]>`
+    SELECT key, label
+    FROM product_axes
+    WHERE product_id = ${row.id}
+    ORDER BY position, key
+  `;
+  const axisLabels: Record<string, string> = {};
+  for (const axis of axes) {
+    if (axis.label.length > 0) {
+      axisLabels[axis.key] = axis.label;
+    }
+  }
   return {
     id: row.id,
     catalogId: row.catalog_id,
@@ -269,6 +281,7 @@ async function toPublic(db: Db, row: PublicQueryRow): Promise<PublicProduct | un
     },
     fields: publicFields(fields, readFields(row.fields)),
     fieldLabels: publicFieldLabels(fields, readFields(row.fields)),
+    axisLabels,
     variants: sellable.map((variant) => ({
       id: variant.id,
       price: minorUnits(variant.price),

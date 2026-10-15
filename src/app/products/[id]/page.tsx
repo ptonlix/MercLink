@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { slotProductFromPublic } from "../../../public-discovery/documents";
+import { slotProductFromPublic, slotStoreFromPublic } from "../../../public-discovery/documents";
 import { jsonLdElement, loadProduct, pageDiscovery } from "../../../public-discovery/model";
 import { isPublicProductId } from "../../../public-discovery/negotiate";
 import { publicBaseUrl } from "../../../public-discovery/site";
 import { ProductTemplate } from "../../../public-discovery/views";
+import { publicStore } from "../../../shared/seams/public-store";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
   if (!isPublicProductId(id)) {
     notFound();
   }
-  const model = await loadProduct(id);
+  const [model, store] = await Promise.all([loadProduct(id), publicStore.get()]);
   if (model.kind === "hidden") {
     notFound();
   }
@@ -53,7 +54,7 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
       <link rel="describedby" href="/llms.txt" />
       <ProductTemplate
         facts={{
-          store: null,
+          store: slotStoreFromPublic(store),
           products: [],
           product: slotProductFromPublic(model.product),
           orderStatus: null,

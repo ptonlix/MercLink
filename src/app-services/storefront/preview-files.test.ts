@@ -252,21 +252,132 @@ describe("storefront preview files", () => {
     const html =
       '<merclink-slot name="store.display_name"></merclink-slot><template data-merclink="product"><a href="/products/{id}"><merclink-slot name="product.price"></merclink-slot></a></template><merclink-slot name="products.next"></merclink-slot><template data-merclink="order.paid">支付已完成</template>';
     const expected = renderDocument(html, context);
+    expect(await renderedPreview(html, context)).toBe(expected);
+  });
+
+  it("renders axis labels the same way as the server renderer", async () => {
+    const html = '<merclink-slot name="product.variants"></merclink-slot>';
+    const labeled = variantContext({ size: "尺码" });
+    const labeledPreview = await renderedPreview(html, labeled);
+    const labeledServer = renderDocument(html, labeled);
+    expect(labeledPreview).toContain("尺码 42");
+    expect(labeledServer).toContain("尺码 42");
+
+    const plain = variantContext();
+    const plainPreview = await renderedPreview(html, plain);
+    const plainServer = renderDocument(html, plain);
+    expect(plainPreview).toContain("size=42");
+    expect(plainServer).toContain("size=42");
+    expect(plainPreview).not.toContain("merclink-slot");
+  });
+
+  it("uses MercLink for the nav slot when the preview store is missing", async () => {
+    const html =
+      '<a class="wordmark"><merclink-slot name="store.nav_name"></merclink-slot></a><h1><merclink-slot name="store.display_name"></merclink-slot></h1>';
+    const missing: SlotContext = {
+      store: null,
+      products: [],
+      product: null,
+      orderStatus: null,
+      nextCursor: null,
+    };
+    expect(await renderedPreview(html, missing)).toBe(renderDocument(html, missing));
+
+    const named: SlotContext = {
+      store: {
+        displayName: "南风商店",
+        summary: "",
+        logo: null,
+        website: null,
+        area: null,
+        address: null,
+        contactPhone: null,
+        contactLabel: null,
+        contactQr: null,
+        licenseName: null,
+        licenseCreditCode: null,
+        licenseLegalPerson: null,
+        licenseAddress: null,
+        licenseImage: null,
+      },
+      products: [],
+      product: null,
+      orderStatus: null,
+      nextCursor: null,
+    };
+    const preview = await renderedPreview(html, named);
+    expect(preview).toBe(renderDocument(html, named));
+    expect(preview).toContain("南风商店");
+    expect(preview).not.toContain("MercLink");
+  });
+
+  it("copies only string axis labels from preview product json", async () => {
     const { stdout } = await execFileAsync(
       process.execPath,
       [
         "--input-type=module",
         "-e",
-        `import { renderPreviewDocument } from './storefront/render-slots.mjs';
-process.stdout.write(renderPreviewDocument(${JSON.stringify(html)}, ${JSON.stringify(context)}));`,
+        `import { mapPreviewProduct } from './storefront/preview.mjs';
+const samples = [
+  { id: "1", title: "靴", variants: [], offer: {} },
+  { id: "1", title: "靴", variants: [], offer: {}, axisLabels: { size: "尺码", n: 1, ok: "" } },
+  { id: "1", title: "靴", variants: [], offer: {}, axis_labels: { size: "尺码" } },
+  { id: "1", title: "靴", variants: [], offer: {}, axisLabels: "nope", axis_labels: { size: "尺码" } },
+];
+process.stdout.write(JSON.stringify(samples.map((sample) => mapPreviewProduct(sample))));`,
       ],
       { cwd: process.cwd() },
     );
-    expect(stdout).toBe(expected);
+    const products = JSON.parse(stdout) as Array<{ axisLabels?: Record<string, string> }>;
+    expect(products[0]?.axisLabels).toBeUndefined();
+    expect(products[1]?.axisLabels).toEqual({ size: "尺码", ok: "" });
+    expect(products[2]?.axisLabels).toEqual({ size: "尺码" });
+    expect(products[3]?.axisLabels).toBeUndefined();
   });
 });
 
 const execFileAsync = promisify(execFile);
+
+async function renderedPreview(html: string, context: SlotContext): Promise<string> {
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `import { renderPreviewDocument } from './storefront/render-slots.mjs';
+process.stdout.write(renderPreviewDocument(${JSON.stringify(html)}, ${JSON.stringify(context)}));`,
+    ],
+    { cwd: process.cwd() },
+  );
+  return stdout;
+}
+
+function variantContext(axisLabels?: Readonly<Record<string, string>>): SlotContext {
+  return {
+    store: null,
+    products: [],
+    product: {
+      id: "prd_1",
+      name: "靴",
+      cover: null,
+      fields: {},
+      ...(axisLabels === undefined ? {} : { axisLabels }),
+      variants: [
+        {
+          optionValues: { size: "42" },
+          stock: 1,
+          availability: "in_stock",
+          priceMinor: 800,
+        },
+      ],
+      stock: 1,
+      availability: "in_stock",
+      priceMinor: 800,
+    },
+    orderStatus: null,
+    nextCursor: null,
+  };
+}
 
 async function proxyTarget(
   requestUrl: string,

@@ -16,7 +16,11 @@ const storeSlotNames = [
   "store.license_legal_person",
   "store.license_address",
   "store.license_image",
+  "store.nav_name",
 ] as const;
+
+// Same literal as siteName in src/public-discovery/site.ts. Domain cannot import that module.
+const storeNavFallback = "MercLink";
 
 const productSlotNames = [
   "product.name",
@@ -81,6 +85,7 @@ export type SlotProduct = {
   cover: string | null;
   fields: Readonly<Record<string, string | number | boolean | null>>;
   fieldLabels?: Readonly<Record<string, string>>;
+  axisLabels?: Readonly<Record<string, string>>;
   variants: readonly SlotVariant[];
   stock: number | null;
   availability: string;
@@ -466,7 +471,7 @@ function expandVariantTemplates(html: string, product: SlotProduct): string {
       .map((variant) =>
         fillNamedSlots(inner, {
           "variant.id": variant.id ?? "",
-          "variant.options": optionText(variant),
+          "variant.options": optionText(variant, product.axisLabels),
           "variant.price": slotDisplayPrice(variant.priceMinor, variant.currency ?? "CNY"),
           "variant.stock": variant.stock === null ? "" : String(variant.stock),
           "variant.availability": availabilityLabel(variant.availability),
@@ -498,7 +503,9 @@ function productSlotValue(name: string, product: SlotProduct, html = ""): string
         ? ""
         : fieldList(product.fields, product.fieldLabels);
     case "product.variants":
-      return html.includes('data-merclink="product.variant"') ? "" : variantList(product.variants);
+      return html.includes('data-merclink="product.variant"')
+        ? ""
+        : variantList(product.variants, product.axisLabels);
     case "product.stock":
       return product.stock === null ? "" : escapeHtml(String(product.stock));
     case "product.availability":
@@ -513,6 +520,12 @@ function productSlotValue(name: string, product: SlotProduct, html = ""): string
 function storeSlotValue(name: string, store: SlotStore | null): string | null {
   if (!storeSlotNames.includes(name as (typeof storeSlotNames)[number])) {
     return null;
+  }
+  if (name === "store.nav_name") {
+    const displayName = store?.displayName;
+    const visible =
+      displayName !== undefined && displayName.trim().length > 0 ? displayName : storeNavFallback;
+    return escapeHtml(visible);
   }
   if (store === null) {
     return "";
@@ -574,11 +587,27 @@ function declaresVariants(html: string): boolean {
   return hasSlot(html, "product.variants") || html.includes('data-merclink="product.variant"');
 }
 
-function optionText(variant: SlotVariant): string {
-  const options = Object.entries(variant.optionValues)
-    .map(([key, value]) => `${key}=${value}`)
+function optionText(variant: SlotVariant, labels?: Readonly<Record<string, string>>): string {
+  return formatOptionText(variant.optionValues, labels);
+}
+
+export function formatOptionText(
+  options: Readonly<Record<string, string>>,
+  labels?: Readonly<Record<string, string>>,
+): string {
+  const parts = Object.entries(options)
+    .map(([key, value]) => labeledOption(key, value, labels))
     .join("，");
-  return options.length === 0 ? "默认规格" : options;
+  return parts.length === 0 ? "默认规格" : parts;
+}
+
+function labeledOption(
+  key: string,
+  value: string,
+  labels?: Readonly<Record<string, string>>,
+): string {
+  const label = labels?.[key];
+  return label !== undefined && label.length > 0 ? `${label} ${value}` : `${key}=${value}`;
 }
 
 function fieldText(value: string | number | boolean | null): string {
@@ -616,11 +645,12 @@ function fieldList(fields: SlotProduct["fields"], labels: SlotProduct["fieldLabe
   return `<dl class="facts">${rows.join("")}</dl>`;
 }
 
-function variantList(variants: readonly SlotVariant[]): string {
+function variantList(
+  variants: readonly SlotVariant[],
+  labels?: Readonly<Record<string, string>>,
+): string {
   const items = variants.map((variant) => {
-    const options = Object.entries(variant.optionValues)
-      .map(([key, value]) => `${key}=${value}`)
-      .join("，");
+    const options = formatOptionText(variant.optionValues, labels);
     const stock =
       variant.stock === null
         ? "不限库存"
@@ -632,7 +662,7 @@ function variantList(variants: readonly SlotVariant[]): string {
       variant.sku === null || variant.sku === undefined || variant.sku.length === 0
         ? ""
         : `<span class="muted">SKU：${escapeHtml(variant.sku)}</span>`;
-    return `<li><strong>${escapeHtml(options.length === 0 ? "默认规格" : options)}</strong><span class="price">${escapeHtml(price)}</span><span>${escapeHtml(`${stock} · ${availabilityLabel(variant.availability)}`)}</span>${sku}</li>`;
+    return `<li><strong>${escapeHtml(options)}</strong><span class="price">${escapeHtml(price)}</span><span>${escapeHtml(`${stock} · ${availabilityLabel(variant.availability)}`)}</span>${sku}</li>`;
   });
   return items.length === 0 ? "" : `<ul class="variants">${items.join("")}</ul>`;
 }

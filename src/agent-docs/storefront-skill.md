@@ -89,6 +89,8 @@ Local preview fills fact slots from the source deployment before activation. It 
 - `<merclink-slot name="order.status"></merclink-slot>`
 - `<merclink-slot name="products.next"></merclink-slot>`
 
+`store.nav_name` 是导航上的店名，没有已发布店名时是 MercLink，不要拿它当页面主标题。
+
 商品列表放在 `<template data-merclink="product">` 里，链接使用 `/products/{id}`。商品页是 `products/item.html`。商品列表必须声明 `products.next`。还有下一页时，服务端把该槽位渲染成指向 `/products?cursor=` 的链接；没有下一页时槽位为空。不要把后续页一次写进同一份页面。
 
 支付成功文案只能放在 `<template data-merclink="order.paid">` 里，并且页面必须有订单状态槽位。服务端只有读到状态 `paid` 才放入这段文案。

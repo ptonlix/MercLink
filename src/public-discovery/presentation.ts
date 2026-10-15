@@ -1,3 +1,4 @@
+import { formatOptionText } from "../domain/storefront/slots";
 import type { PublicAvailability, PublicVariant } from "../shared/seams/public-products";
 
 // Public HTML, Markdown, and JSON-LD share this conversion. Domain and /api/v1 stay in minor units.
@@ -31,7 +32,9 @@ export function variantStock(variant: PublicVariant): string {
   return variant.stock === 0 ? "缺货" : `库存 ${String(variant.stock)} 件`;
 }
 
-export function optionText(options: PublicVariant["optionValues"]): string {
-  const parts = Object.entries(options).map(([key, value]) => `${key}=${value}`);
-  return parts.length === 0 ? "默认规格" : parts.join("，");
+export function optionText(
+  options: PublicVariant["optionValues"],
+  labels?: Readonly<Record<string, string>>,
+): string {
+  return formatOptionText(options, labels);
 }

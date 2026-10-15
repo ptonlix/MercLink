@@ -18,7 +18,20 @@ export const unverifiedProfileNotice = "商家自行填写，本系统未核验�
 
 export const viewAllProductsLabel = "查看更多";
 
+export const productShelfHeading = "商品货架";
+
+export const productFactsHeading = "商品信息";
+
 export const siteName = "MercLink";
+
+export function visibleStoreName(name: string | null | undefined): string {
+  if (name != null && name.trim().length > 0) {
+    return name;
+  }
+  return siteName;
+}
+
+export const poweredByLabel = `Powered by ${siteName}`;
 
 export const buyerSkillPath = "/skill.md";
 

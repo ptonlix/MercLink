@@ -364,6 +364,85 @@ describe("storefront rules", () => {
     expect(emptySlot).not.toContain("merclink-slot");
     expect(emptySlot).not.toContain("91310000MA1FL0000N");
   });
+
+  it("renders variant options when axis labels are omitted", () => {
+    const html = '<merclink-slot name="product.variants"></merclink-slot>';
+    const rendered = renderDocument(html, {
+      store: null,
+      products: [],
+      product: {
+        ...slotProduct(800, "靴"),
+        variants: [
+          {
+            optionValues: { size: "42" },
+            stock: 1,
+            availability: "in_stock",
+            priceMinor: 800,
+          },
+        ],
+      },
+      orderStatus: null,
+      nextCursor: null,
+    });
+    expect(rendered).toContain("size=42");
+    expect(rendered).not.toContain("merclink-slot");
+  });
+
+  it("renders an axis label with a space instead of the key", () => {
+    const html = '<merclink-slot name="product.variants"></merclink-slot>';
+    const rendered = renderDocument(html, {
+      store: null,
+      products: [],
+      product: {
+        ...slotProduct(800, "靴"),
+        axisLabels: { size: "尺码" },
+        variants: [
+          {
+            optionValues: { size: "42" },
+            stock: 1,
+            availability: "in_stock",
+            priceMinor: 800,
+          },
+        ],
+      },
+      orderStatus: null,
+      nextCursor: null,
+    });
+    expect(rendered).toContain("尺码 42");
+    expect(rendered).not.toContain("size=42");
+  });
+
+  it("keeps the nav name when the store display name is missing", () => {
+    const html =
+      '<a class="wordmark"><merclink-slot name="store.nav_name"></merclink-slot></a><h1><merclink-slot name="store.display_name"></merclink-slot></h1>';
+    const missing = renderDocument(html, {
+      store: null,
+      products: [],
+      product: null,
+      orderStatus: null,
+      nextCursor: null,
+    });
+    expect(missing).toContain('<a class="wordmark">MercLink</a>');
+    expect(missing).toContain("<h1></h1>");
+    expect(missing).not.toContain("<h1>MercLink</h1>");
+
+    const named = renderDocument(html, {
+      store: {
+        displayName: "南风商店",
+        summary: "",
+        logo: null,
+        website: null,
+        area: null,
+        address: null,
+        ...emptyStoreFacts(),
+      },
+      products: [],
+      product: null,
+      orderStatus: null,
+      nextCursor: null,
+    });
+    expect(named).toBe('<a class="wordmark">南风商店</a><h1>南风商店</h1>');
+  });
 });
 
 function text(value: string): Uint8Array {
