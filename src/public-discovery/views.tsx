@@ -4,7 +4,7 @@ import { createElement, type ReactNode } from "react";
 import { slotHtml, type SlotContext, type SlotProduct } from "../domain/storefront/slots";
 import { minorUnits } from "../shared/money";
 import { currentPurchaseEnabled } from "../shared/purchase-mode";
-import { BannerShelf, PublicImage, UsageGuides, VariantChooser } from "./interactions";
+import { PublicImage, UsageGuides, VariantChooser } from "./interactions";
 import { bodyExampleKind, pathExample, sectionExample } from "./interface-example";
 import type { ApiField, ApiSection } from "./interface-fields";
 import { interfaceContract } from "./interface-fields";
@@ -54,9 +54,12 @@ import {
   interfaceDirectoryPath,
   merchantSkillPath,
   explanationFor,
+  poweredByLabel,
+  productFactsHeading,
+  productShelfHeading,
   storefrontSkillPath,
+  visibleStoreName,
   storeSlogan,
-  unverifiedProfileNotice,
   viewAllProductsLabel,
 } from "./site";
 
@@ -65,14 +68,13 @@ export function LandingTemplate({ facts = null }: { facts?: Facts }): ReactNode 
     <main className="page">
       <div className="column">
         <StoreHeader facts={facts} />
-        <section className="productSection" aria-label="已上架商品">
+        <section className="productSection" aria-label={productShelfHeading}>
           <EmptyProductState facts={facts} />
-          {facts !== null && facts.products.length === 0 ? (
-            <h2>已上架商品</h2>
-          ) : (
-            <BannerShelf>
+          <h2>{productShelfHeading}</h2>
+          {facts !== null && facts.products.length === 0 ? null : (
+            <div className="shelf" aria-label="商品 banner">
               <ProductRepeat banner facts={facts} />
-            </BannerShelf>
+            </div>
           )}
           <div className="more">
             <a className="button" href="/products">
@@ -80,6 +82,7 @@ export function LandingTemplate({ facts = null }: { facts?: Facts }): ReactNode 
             </a>
           </div>
         </section>
+        <RecommendedFacts facts={facts} />
         <PlatformUsageGuide facts={facts} />
         <StoreFooter />
       </div>
@@ -89,7 +92,7 @@ export function LandingTemplate({ facts = null }: { facts?: Facts }): ReactNode 
 
 export function ProductListTemplate({ facts = null }: { facts?: Facts }): ReactNode {
   return (
-    <PublicShell>
+    <PublicShell facts={facts}>
       <header className="pageHeading">
         <h1>已上架商品</h1>
         <p>
@@ -114,7 +117,7 @@ export function ProductListTemplate({ facts = null }: { facts?: Facts }): ReactN
 
 export function ProductTemplate({ facts = null }: { facts?: Facts }): ReactNode {
   return (
-    <PublicShell>
+    <PublicShell facts={facts}>
       <a className="returnLink" href="/products">
         返回商品列表
       </a>
@@ -144,6 +147,7 @@ export function ProductTemplate({ facts = null }: { facts?: Facts }): ReactNode 
             <VariantChooser
               purchaseEnabled={currentPurchaseEnabled()}
               productId={facts.product.id}
+              axisLabels={facts.product.axisLabels ?? {}}
               variants={facts.product.variants.map((variant) => ({
                 id: variant.id ?? "",
                 price: minorUnits(variant.priceMinor),
@@ -180,69 +184,96 @@ export function ProductTemplate({ facts = null }: { facts?: Facts }): ReactNode 
               </p>
             </>
           )}
+          <ProductFacts facts={facts} />
           <a className="skillLink" href={buyerSkillPath}>
             查看用户 Skill
           </a>
         </div>
       </article>
-      <section className="factsSection">
-        <div>
-          <h2>公开字段</h2>
-          {facts === null ? (
-            <template data-merclink="product.field">
-              <div>
-                <dt>
-                  <Slot name="field.key" facts={facts} />
-                </dt>
-                <dd>
-                  <Slot name="field.value" facts={facts} />
-                </dd>
-              </div>
-            </template>
-          ) : (
-            <dl className="facts">
-              {Object.entries(facts.product?.fields ?? {}).map(([key, value]) => {
-                const label = facts.product?.fieldLabels?.[key];
-                const heading = label !== undefined && label.length > 0 ? label : key;
-                return (
-                  <div key={key}>
-                    <dt>{heading}</dt>
-                    <dd>
-                      {value === null
-                        ? "未填写"
-                        : value === true
-                          ? "是"
-                          : value === false
-                            ? "否"
-                            : String(value)}
-                    </dd>
-                  </div>
-                );
-              })}
-            </dl>
-          )}
-        </div>
-      </section>
     </PublicShell>
   );
 }
 
-function PublicShell({ children }: { children: ReactNode }): ReactNode {
+function ProductFacts({ facts }: { facts: Facts }): ReactNode {
+  if (facts !== null && Object.keys(facts.product?.fields ?? {}).length === 0) {
+    return null;
+  }
+  return (
+    <section className="productFacts" aria-label={productFactsHeading}>
+      <h2>{productFactsHeading}</h2>
+      {facts === null ? (
+        <template data-merclink="product.field">
+          <div>
+            <dt>
+              <Slot name="field.key" facts={facts} />
+            </dt>
+            <dd>
+              <Slot name="field.value" facts={facts} />
+            </dd>
+          </div>
+        </template>
+      ) : (
+        <dl className="facts">
+          {Object.entries(facts.product?.fields ?? {}).map(([key, value]) => {
+            const label = facts.product?.fieldLabels?.[key];
+            const heading = label !== undefined && label.length > 0 ? label : key;
+            return (
+              <div key={key}>
+                <dt>{heading}</dt>
+                <dd>
+                  {value === null
+                    ? "未填写"
+                    : value === true
+                      ? "是"
+                      : value === false
+                        ? "否"
+                        : String(value)}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      )}
+    </section>
+  );
+}
+
+export function PublicShell({
+  facts = null,
+  children,
+}: {
+  facts?: Facts;
+  children: ReactNode;
+}): ReactNode {
   return (
     <main className="page">
       <div className="column">
-        <nav className="siteNav" aria-label="站点导航">
-          <a href="/" className="wordmark">
-            MercLink
-          </a>
-          <a href="/">店铺首页</a>
-          <a href="/products">商品列表</a>
-        </nav>
+        <SiteNav wordmark={storeWordmark(facts)} />
         {children}
         <StoreFooter />
       </div>
     </main>
   );
+}
+
+function SiteNav({ wordmark, children }: { wordmark: ReactNode; children?: ReactNode }): ReactNode {
+  return (
+    <nav className="siteNav" aria-label="站点导航">
+      <a href="/" className="wordmark">
+        {wordmark}
+      </a>
+      <a href="/">店铺首页</a>
+      <a href="/products">商品列表</a>
+      {children}
+    </nav>
+  );
+}
+
+function storeWordmark(facts: Facts): ReactNode {
+  if (facts === null) {
+    return <Slot name="store.nav_name" facts={facts} />;
+  }
+  return visibleStoreName(facts.store?.displayName);
 }
 
 function StoreHeader({ facts }: { facts: Facts }): ReactNode {
@@ -276,7 +307,6 @@ function StoreHeader({ facts }: { facts: Facts }): ReactNode {
             </>
           )}
         </div>
-        <RecommendedFacts facts={facts} />
       </div>
       {facts?.store?.logo ? (
         <PublicImage src={httpUrl(facts.store.logo)} title={facts.store.displayName} logo />
@@ -290,40 +320,59 @@ function StoreHeader({ facts }: { facts: Facts }): ReactNode {
 function RecommendedFacts({ facts }: { facts: Facts }): ReactNode {
   if (facts === null) {
     return (
-      <div className="profileFacts">
-        <p>
-          客服电话：
-          <Slot name="store.contact_phone" facts={facts} />
-        </p>
-        <p>
-          客服说明：
-          <Slot name="store.contact_label" facts={facts} />
-        </p>
-        <p>
-          客服二维码：
-          <Slot name="store.contact_qr" facts={facts} />
-        </p>
-        <p>
-          企业名称：
-          <Slot name="store.license_name" facts={facts} />
-        </p>
-        <p>
-          统一社会信用代码：
-          <Slot name="store.license_credit_code" facts={facts} />
-        </p>
-        <p>
-          法人姓名：
-          <Slot name="store.license_legal_person" facts={facts} />
-        </p>
-        <p>
-          注册地址：
-          <Slot name="store.license_address" facts={facts} />
-        </p>
-        <p>
-          营业执照：
-          <Slot name="store.license_image" facts={facts} />
-        </p>
-      </div>
+      <section className="profileFacts" aria-label="联系方式与主体信息">
+        <div className="recordColumns">
+          <div>
+            <h2 className="recordLabel">联系</h2>
+            <dl className="recordLines">
+              <div>
+                <dt>客服电话</dt>
+                <dd>
+                  <Slot name="store.contact_phone" facts={facts} />
+                </dd>
+              </div>
+            </dl>
+            <p className="recordNote">
+              <Slot name="store.contact_label" facts={facts} />
+            </p>
+            <span className="contactQr">
+              <Slot name="store.contact_qr" facts={facts} />
+            </span>
+          </div>
+          <div>
+            <h2 className="recordLabel">主体</h2>
+            <dl className="recordLines">
+              <div>
+                <dt>企业名称</dt>
+                <dd>
+                  <Slot name="store.license_name" facts={facts} />
+                </dd>
+              </div>
+              <div>
+                <dt>统一社会信用代码</dt>
+                <dd>
+                  <Slot name="store.license_credit_code" facts={facts} />
+                </dd>
+              </div>
+              <div>
+                <dt>法人姓名</dt>
+                <dd>
+                  <Slot name="store.license_legal_person" facts={facts} />
+                </dd>
+              </div>
+              <div>
+                <dt>注册地址</dt>
+                <dd>
+                  <Slot name="store.license_address" facts={facts} />
+                </dd>
+              </div>
+            </dl>
+            <span className="licenseImage">
+              <Slot name="store.license_image" facts={facts} />
+            </span>
+          </div>
+        </div>
+      </section>
     );
   }
   const store = facts.store;
@@ -344,24 +393,63 @@ function RecommendedFacts({ facts }: { facts: Facts }): ReactNode {
   const qr = store.contactQr === null ? null : httpUrl(store.contactQr);
   const licenseImage = store.licenseImage === null ? null : httpUrl(store.licenseImage);
   return (
-    <section className="profileFacts">
-      {hasContact ? (
-        <div>
-          {store.contactPhone ? <p>客服电话：{store.contactPhone}</p> : null}
-          {store.contactLabel ? <p>{store.contactLabel}</p> : null}
-          {qr ? <img src={qr} alt="客服二维码" /> : null}
-        </div>
-      ) : null}
-      {hasLicense ? (
-        <div>
-          {store.licenseName ? <p>{store.licenseName}</p> : null}
-          {store.licenseCreditCode ? <p>统一社会信用代码：{store.licenseCreditCode}</p> : null}
-          {store.licenseLegalPerson ? <p>法人姓名：{store.licenseLegalPerson}</p> : null}
-          {store.licenseAddress ? <p>注册地址：{store.licenseAddress}</p> : null}
-          {licenseImage ? <img src={licenseImage} alt="营业执照" /> : null}
-        </div>
-      ) : null}
-      <p>{unverifiedProfileNotice}</p>
+    <section className="profileFacts" aria-label="联系方式与主体信息">
+      <div className="recordColumns">
+        {hasContact ? (
+          <div>
+            <h2 className="recordLabel">联系</h2>
+            {store.contactPhone ? (
+              <dl className="recordLines">
+                <div>
+                  <dt>客服电话</dt>
+                  <dd>{store.contactPhone}</dd>
+                </div>
+              </dl>
+            ) : null}
+            {store.contactLabel ? <p className="recordNote">{store.contactLabel}</p> : null}
+            {qr ? <img className="contactQr" src={qr} alt="客服二维码" /> : null}
+          </div>
+        ) : null}
+        {hasLicense ? (
+          <div>
+            <h2 className="recordLabel">主体</h2>
+            {store.licenseName ||
+            store.licenseCreditCode ||
+            store.licenseLegalPerson ||
+            store.licenseAddress ? (
+              <dl className="recordLines">
+                {store.licenseName ? (
+                  <div>
+                    <dt>企业名称</dt>
+                    <dd>{store.licenseName}</dd>
+                  </div>
+                ) : null}
+                {store.licenseCreditCode ? (
+                  <div>
+                    <dt>统一社会信用代码</dt>
+                    <dd>{store.licenseCreditCode}</dd>
+                  </div>
+                ) : null}
+                {store.licenseLegalPerson ? (
+                  <div>
+                    <dt>法人姓名</dt>
+                    <dd>{store.licenseLegalPerson}</dd>
+                  </div>
+                ) : null}
+                {store.licenseAddress ? (
+                  <div>
+                    <dt>注册地址</dt>
+                    <dd>{store.licenseAddress}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            ) : null}
+            {licenseImage ? (
+              <img className="licenseImage" src={licenseImage} alt="营业执照" />
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -437,10 +525,9 @@ function ProductCard({
         <span className="price">
           <Slot name="product.price" product={product} facts={facts} />
         </span>
-        <span className="muted">
+        <span className={product?.availability === "out_of_stock" ? "muted out" : "muted"}>
           <Slot name="product.availability" product={product} facts={facts} />
         </span>
-        {banner ? <span className="cardLink">查看详情</span> : null}
         {details ? (
           <>
             <Slot name="product.fields" product={product} facts={facts} />
@@ -455,18 +542,7 @@ function ProductCard({
 
 function GuideContact({ facts }: { facts: Facts }): ReactNode {
   if (facts === null) {
-    return (
-      <>
-        <p>
-          客服电话：
-          <Slot name="store.contact_phone" facts={facts} />
-        </p>
-        <p>
-          客服二维码：
-          <Slot name="store.contact_qr" facts={facts} />
-        </p>
-      </>
-    );
+    return null;
   }
   const store = facts.store;
   const phone = store?.contactPhone ?? null;
@@ -481,12 +557,7 @@ function GuideContact({ facts }: { facts: Facts }): ReactNode {
       </span>
     );
   }
-  return (
-    <>
-      {phone === null ? null : <p>客服电话：{phone}</p>}
-      {qr === null ? null : <img src={qr} alt="客服二维码" />}
-    </>
-  );
+  return null;
 }
 
 function EmptyProducts(): ReactNode {
@@ -566,9 +637,7 @@ function PlatformUsageGuide({ facts }: { facts: Facts }): ReactNode {
                 </li>
                 <li>
                   <h4>记下商品，联系店主</h4>
-                  <p>
-                    记下商品后联系店主。已发布联系方式时，向店主获取联系方式，手机号和二维码都会展示。
-                  </p>
+                  <p>记下商品后联系店主。已发布的电话和二维码在商品货架下方。</p>
                   <GuideContact facts={facts} />
                 </li>
               </ol>
@@ -682,6 +751,7 @@ function StoreFooter(): ReactNode {
       <div>
         <p className="slogan">{storeSlogan}</p>
         <p className="muted">{explanationFor(currentPurchaseEnabled())}</p>
+        <p className="poweredBy">{poweredByLabel}</p>
       </div>
       <nav aria-label="接口与发现文件">
         <a href={interfaceDirectoryPath}>{interfaceDirectoryLabel}</a>
@@ -694,22 +764,19 @@ function StoreFooter(): ReactNode {
 
 function ApiDocsFrame({
   currentSlug,
+  storeName = null,
   children,
 }: {
   currentSlug?: string;
+  storeName?: string | null;
   children: ReactNode;
 }): ReactNode {
   const groups = interfaceDirectoryGroups();
   return (
     <main className="page apiDocs">
-      <nav className="siteNav" aria-label="站点导航">
-        <a href="/" className="wordmark">
-          MercLink
-        </a>
-        <a href="/">店铺首页</a>
-        <a href="/products">商品列表</a>
+      <SiteNav wordmark={visibleStoreName(storeName)}>
         <a href="/interfaces">{interfaceDirectoryLabel}</a>
-      </nav>
+      </SiteNav>
       <div className="apiDocsFrame">
         <nav className="apiDocsNav" aria-label="接口文档">
           {groups.map((group) => (
@@ -816,26 +883,32 @@ function ExampleBlock({ title, text }: { title: string; text: string | null }): 
   );
 }
 
-export function InterfaceDirectory(): ReactNode {
+export function InterfaceDirectory({
+  storeName = null,
+}: {
+  storeName?: string | null;
+} = {}): ReactNode {
   const first = interfaceDirectoryGroups()[0]?.routes[0];
   if (first === undefined) {
     return null;
   }
-  return <InterfaceOperationPage method={first.method} path={first.path} />;
+  return <InterfaceOperationPage method={first.method} path={first.path} storeName={storeName} />;
 }
 
 export function InterfaceOperationPage({
   method,
   path,
+  storeName = null,
 }: {
   method: string;
   path: string;
+  storeName?: string | null;
 }): ReactNode {
   const doc = interfaceOperationDoc(method, path);
   const contract = interfaceContract(method, path);
   const slug = interfaceSlug(method, path);
   return (
-    <ApiDocsFrame currentSlug={slug}>
+    <ApiDocsFrame currentSlug={slug} storeName={storeName}>
       <header className="pageHeading">
         <h1>{doc.summary}</h1>
         <p>
@@ -932,10 +1005,14 @@ function responseShapeSection(): ApiSection {
   };
 }
 
-export function InterfaceResponseShapePage(): ReactNode {
+export function InterfaceResponseShapePage({
+  storeName = null,
+}: {
+  storeName?: string | null;
+} = {}): ReactNode {
   const shape = responseShapeSection();
   return (
-    <ApiDocsFrame currentSlug="response-shape">
+    <ApiDocsFrame currentSlug="response-shape" storeName={storeName}>
       <header className="pageHeading">
         <h1>响应结构</h1>
       </header>

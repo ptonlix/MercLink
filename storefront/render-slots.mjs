@@ -13,7 +13,11 @@ const storeSlotNames = new Set([
   "store.license_legal_person",
   "store.license_address",
   "store.license_image",
+  "store.nav_name",
 ]);
+
+// Same literal as siteName in src/public-discovery/site.ts.
+const storeNavFallback = "MercLink";
 
 const productTemplatePattern = /<template\s+data-merclink="product">([\s\S]*?)<\/template>/g;
 const paidTemplatePattern = /<template\s+data-merclink="order\.paid">([\s\S]*?)<\/template>/g;
@@ -85,7 +89,7 @@ function expandVariantTemplates(html, product) {
       .map((variant) =>
         fillNamed(inner, {
           "variant.id": variant.id ?? "",
-          "variant.options": optionText(variant),
+          "variant.options": optionText(variant, product.axisLabels),
           "variant.price": slotDisplayPrice(variant.priceMinor, variant.currency ?? "CNY"),
           "variant.stock": variant.stock === null ? "" : String(variant.stock),
           "variant.availability": availabilityLabel(variant.availability),
@@ -100,9 +104,16 @@ function fillNamed(html, values) {
   return html.replace(slotPattern(), (match, name) => (values[name] === undefined ? match : escapeHtml(values[name])));
 }
 
-function optionText(variant) {
-  const options = Object.entries(variant.optionValues).map(([key, value]) => `${key}=${value}`).join("，");
+function optionText(variant, labels) {
+  const options = Object.entries(variant.optionValues)
+    .map(([key, value]) => labeledOption(key, value, labels))
+    .join("，");
   return options.length === 0 ? "默认规格" : options;
+}
+
+function labeledOption(key, value, labels) {
+  const label = labels?.[key];
+  return label !== undefined && label.length > 0 ? `${label} ${value}` : `${key}=${value}`;
 }
 
 function fieldText(value) {
@@ -120,7 +131,7 @@ function productSlotValue(name, product, html = "") {
     case "product.fields":
       return html.includes('data-merclink="product.field"') ? "" : fieldList(product.fields);
     case "product.variants":
-      return html.includes('data-merclink="product.variant"') ? "" : variantList(product.variants);
+      return html.includes('data-merclink="product.variant"') ? "" : variantList(product.variants, product.axisLabels);
     case "product.stock":
       return product.stock === null ? "" : escapeHtml(String(product.stock));
     case "product.availability":
@@ -135,6 +146,12 @@ function productSlotValue(name, product, html = "") {
 function storeSlotValue(name, store) {
   if (!storeSlotNames.has(name)) {
     return null;
+  }
+  if (name === "store.nav_name") {
+    const displayName = store?.displayName;
+    const visible =
+      displayName !== undefined && displayName.trim().length > 0 ? displayName : storeNavFallback;
+    return escapeHtml(visible);
   }
   if (store === null) {
     return "";
@@ -203,10 +220,10 @@ function fieldList(fields) {
   return `<dl class="facts">${rows.join("")}</dl>`;
 }
 
-function variantList(variants) {
+function variantList(variants, labels) {
   const items = variants.map((variant) => {
     const options = Object.entries(variant.optionValues)
-      .map(([key, value]) => `${key}=${value}`)
+      .map(([key, value]) => labeledOption(key, value, labels))
       .join("，");
     const stock = variant.stock === null ? "不限库存" : variant.stock === 0 ? "缺货" : `库存 ${String(variant.stock)} 件`;
     const price = slotDisplayPrice(variant.priceMinor, variant.currency ?? "CNY");

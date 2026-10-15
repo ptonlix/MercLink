@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { slotProductFromPublic } from "../../public-discovery/documents";
+import { slotProductFromPublic, slotStoreFromPublic } from "../../public-discovery/documents";
 import { jsonLdElement, loadProductList, pageDiscovery } from "../../public-discovery/model";
 import { publicBaseUrl } from "../../public-discovery/site";
 import { ProductListTemplate } from "../../public-discovery/views";
+import { publicStore } from "../../shared/seams/public-store";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export default async function ProductsPage({
 }: ProductsPageProps = {}): Promise<ReactNode> {
   const params = searchParams === undefined ? {} : await searchParams;
   const cursor = typeof params.cursor === "string" ? params.cursor : undefined;
-  const model = await loadProductList(cursor);
+  const [model, store] = await Promise.all([loadProductList(cursor), publicStore.get()]);
   return (
     <>
       <span dangerouslySetInnerHTML={{ __html: jsonLdElement(model.jsonLd) }} />
@@ -39,7 +40,7 @@ export default async function ProductsPage({
       {model.nextUrl ? <link rel="next" href={model.nextUrl} /> : null}
       <ProductListTemplate
         facts={{
-          store: null,
+          store: slotStoreFromPublic(store),
           products: model.products.map(slotProductFromPublic),
           product: null,
           orderStatus: null,

@@ -207,17 +207,45 @@ function productId(pathname) {
   return id;
 }
 
+function copyStringRecord(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const labels = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === "string") {
+      labels[key] = item;
+    }
+  }
+  return labels;
+}
+
+function axisLabelsFrom(raw) {
+  if (raw === null || typeof raw !== "object") {
+    return null;
+  }
+  if (Object.hasOwn(raw, "axisLabels")) {
+    return copyStringRecord(raw.axisLabels);
+  }
+  if (Object.hasOwn(raw, "axis_labels")) {
+    return copyStringRecord(raw.axis_labels);
+  }
+  return null;
+}
+
 export function mapPreviewProduct(raw) {
   const variants = Array.isArray(raw.variants) ? raw.variants : [];
   const stocks = variants
     .map((variant) => variant.stock)
     .filter((stock) => stock !== null && stock !== undefined);
+  const axisLabels = axisLabelsFrom(raw);
   return {
     id: String(raw.id ?? ""),
     catalogId: typeof raw.catalog_id === "string" ? raw.catalog_id : "",
     name: String(raw.title ?? ""),
     cover: typeof raw.cover === "string" ? raw.cover : null,
     fields: raw.fields !== null && typeof raw.fields === "object" ? raw.fields : {},
+    ...(axisLabels === null ? {} : { axisLabels }),
     variants: variants.map((variant) => ({
       optionValues:
         variant.option_values !== null && typeof variant.option_values === "object"

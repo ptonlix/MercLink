@@ -451,6 +451,7 @@ describe("catalog management", () => {
       expect(
         seam.items[0]?.variants.some((variant) => Object.keys(variant.optionValues).length === 0),
       ).toBe(false);
+      expect(seam.items[0]?.axisLabels).toEqual({ size: "尺码" });
       const detail = await publicProducts.get(product.value.id);
       expect(detail.ok).toBe(true);
       if (detail.ok) {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { InterfaceDirectory } from "../../public-discovery/views";
 import { absoluteUrl, interfaceDirectoryLabel, publicBaseUrl } from "../../public-discovery/site";
+import { publicStore } from "../../shared/seams/public-store";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export function generateMetadata(): Metadata {
   };
 }
 
-export default function InterfacesPage(): ReactNode {
-  return <InterfaceDirectory />;
+export default async function InterfacesPage(): Promise<ReactNode> {
+  const store = await publicStore.get();
+  return <InterfaceDirectory storeName={store?.displayName ?? null} />;
 }
