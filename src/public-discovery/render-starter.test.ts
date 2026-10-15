@@ -1,12 +1,43 @@
-import { describe, expect, it } from "vitest";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   authorizeTemplateNames,
   buyerAuthorizeSubmit,
   merchantAuthorizeSubmit,
   prepareAuthorizeStep,
 } from "../domain/storefront/authorize";
+import { resetPurchaseModeCache } from "../shared/purchase-mode";
 import { renderStarterFragments } from "./render-starter";
-import { starterDocument } from "./starter-markup";
+import { parseStarterFragments, starterDocument } from "./starter-markup";
+
+type StarterPageName =
+  | "index.html"
+  | "products/index.html"
+  | "products/item.html"
+  | "account/buyer.html"
+  | "account/merchant.html"
+  | "pay/result.html";
+
+function pageSet(marker: string): Record<StarterPageName, string> {
+  const pages = {
+    "index.html": `<main>${marker}</main>`,
+    "products/index.html": "<main>list</main>",
+    "products/item.html": "<main>item</main>",
+    "account/buyer.html": "<main>buyer</main>",
+    "account/merchant.html": "<main>merchant</main>",
+    "pay/result.html": "<main>paid</main>",
+  };
+  return pages;
+}
+
+async function writeBaked(root: string, off: string, on: string): Promise<void> {
+  await writeFile(
+    path.join(root, "storefront-starter.json"),
+    JSON.stringify({ "0": pageSet(off), "1": pageSet(on) }),
+  );
+}
 
 describe("starter documents", () => {
   it("keeps the downloaded pages on the same templates as the renderer", () => {
@@ -106,5 +137,92 @@ describe("starter documents", () => {
     expect(merchantLogin?.html).toContain('action="/authorize/merchant/submit"');
     expect(merchantLogin?.html).toContain("请联系管理员开通");
     expect(merchantLogin?.html).not.toContain("注册商家");
+  });
+});
+
+describe("baked starter fragments", () => {
+  const previousPurchase = process.env.MERCLINK_PURCHASE;
+
+  afterEach(() => {
+    if (previousPurchase === undefined) {
+      delete process.env.MERCLINK_PURCHASE;
+    } else {
+      process.env.MERCLINK_PURCHASE = previousPurchase;
+    }
+    resetPurchaseModeCache();
+  });
+
+  it("requires every non-empty page", () => {
+    const baked = parseStarterFragments(
+      JSON.stringify({
+        "index.html": "<main>home</main>",
+        "products/index.html": "<main>list</main>",
+        "products/item.html": "<main>item</main>",
+        "account/buyer.html": "<main>buyer</main>",
+        "account/merchant.html": "<main>merchant</main>",
+        "pay/result.html": "<main>paid</main>",
+      }),
+    );
+    expect(baked["index.html"]).toBe("<main>home</main>");
+    expect(() => parseStarterFragments(JSON.stringify({ "index.html": "<main></main>" }))).toThrow(
+      "starter fragment missing: products/index.html",
+    );
+  });
+
+  it("selects the baked payload with currentPurchaseEnabled", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "starter-baked-"));
+    try {
+      await writeBaked(root, "purchase-off", "purchase-on");
+      process.env.MERCLINK_PURCHASE = "0";
+      resetPurchaseModeCache();
+      expect(starterDocument("index.html", root)).toContain("purchase-off");
+      expect(starterDocument("index.html", root)).not.toContain("purchase-on");
+
+      process.env.MERCLINK_PURCHASE = "1";
+      expect(starterDocument("index.html", root)).toContain("purchase-off");
+
+      resetPurchaseModeCache();
+      expect(starterDocument("index.html", root)).toContain("purchase-on");
+      expect(starterDocument("index.html", root)).not.toContain("purchase-off");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("uses a present render script instead of the baked file", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "starter-script-"));
+    try {
+      await writeBaked(root, "from-json", "from-json");
+      await mkdir(path.join(root, "scripts"));
+      await writeFile(
+        path.join(root, "scripts/render-starter.mjs"),
+        `process.stdout.write(${JSON.stringify(JSON.stringify(pageSet("from-script")))});\n`,
+      );
+      resetPurchaseModeCache();
+      const document = starterDocument("index.html", root);
+      expect(document).toContain("from-script");
+      expect(document).not.toContain("from-json");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("throws when either baked payload is missing a page", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "starter-incomplete-"));
+    try {
+      const on = pageSet("purchase-on");
+      on["products/index.html"] = "";
+      await writeFile(
+        path.join(root, "storefront-starter.json"),
+        JSON.stringify({ "0": pageSet("purchase-off"), "1": on }),
+      );
+      delete process.env.MERCLINK_PURCHASE;
+      resetPurchaseModeCache();
+      expect(() => starterDocument("index.html", root)).toThrow(
+        "starter fragment missing: products/index.html",
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

@@ -69,11 +69,50 @@ describe("foundation files", () => {
     expect(dockerfile).toContain("pnpm install --frozen-lockfile");
     expect(dockerfile).not.toMatch(/\bnpm install\b|\bnpx\b|\byarn\b/);
 
+    const build = dockerfile.slice(
+      dockerfile.indexOf("FROM base AS build"),
+      dockerfile.indexOf("FROM base AS runner"),
+    );
+    const built = build.indexOf("RUN pnpm run build");
+    const scriptCopy = build.indexOf(
+      "COPY scripts/render-starter.mjs ./scripts/render-starter.mjs",
+    );
+    const purchaseOff = build.indexOf("MERCLINK_PURCHASE=0 node scripts/render-starter.mjs");
+    const purchaseOn = build.indexOf("MERCLINK_PURCHASE=1 node scripts/render-starter.mjs");
+    expect(built).toBeGreaterThanOrEqual(0);
+    expect(scriptCopy).toBeGreaterThan(built);
+    expect(purchaseOff).toBeGreaterThan(scriptCopy);
+    expect(purchaseOn).toBeGreaterThan(purchaseOff);
+    for (const name of [
+      "index.html",
+      "products/index.html",
+      "products/item.html",
+      "account/buyer.html",
+      "account/merchant.html",
+      "pay/result.html",
+    ]) {
+      expect(build.slice(purchaseOff)).toContain(name);
+    }
+    expect(dockerfile).not.toMatch(/^(?:ENV|ARG)\s+MERCLINK_PURCHASE\b/m);
+
     const runner = dockerfile.slice(dockerfile.indexOf("FROM base AS runner"));
     const workdir = runner.indexOf("WORKDIR /app");
     const shipped = runner.indexOf("COPY storefront ./storefront");
+    const baked = runner.indexOf(
+      "COPY --from=build /app/storefront-starter.json ./storefront-starter.json",
+    );
     expect(workdir).toBeGreaterThanOrEqual(0);
     expect(shipped).toBeGreaterThan(workdir);
+    expect(baked).toBeGreaterThan(shipped);
+    expect(runner).not.toContain("render-starter");
+    expect(runner).not.toMatch(/COPY[^\n]*\.tsx/);
+    expect(runner).toContain("COPY --from=build /app/src/app/globals.css ./src/app/globals.css");
+    expect(runner).toContain(
+      "COPY --from=build /app/src/public-discovery/public.css ./src/public-discovery/public.css",
+    );
+    expect(runner).toContain(
+      "COPY --from=build /app/src/app/authorize/authorize.css ./src/app/authorize/authorize.css",
+    );
     const ignored = await readFile(".dockerignore", "utf8");
     expect(ignored).not.toMatch(/^\s*storefront(?:\/|\s|$)/m);
 

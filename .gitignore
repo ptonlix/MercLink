@@ -46,6 +46,9 @@ data/postgres/
 *.dump
 *.sql.gz
 
+# 镜像构建生成的两份起始页。工作目录有渲染脚本时不会读它。不提交。
+storefront-starter.json
+
 # 日志与临时文件
 logs/
 *.log
