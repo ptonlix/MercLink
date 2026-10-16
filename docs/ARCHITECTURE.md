@@ -45,6 +45,73 @@
 
 Agent 不直连数据库、Redis、对象存储，也不直连支付宝或阿里云。它只调用 MercLink 的 HTTP API。支付私钥、短信密钥、验证码密钥和对象存储密钥只存在于服务端环境变量。
 
+### 系统总览图
+
+下图从部署视角补充上面的分层图：三类 Agent 只走 HTTP API 和 OAuth 设备码，人在浏览器里批准授权、浏览店面；应用是单个 Next.js 进程，PostgreSQL、Redis 和 RustFS 都在 Compose 网络内，支付、验证码和短信只在开启买入（`MERCLINK_PURCHASE=1`）时才接入。README 中的架构图是同一内容的静态图片版（`docs/images/architecture.png`）。
+
+```mermaid
+flowchart LR
+    subgraph Agents["Agent"]
+        MA["商家 Agent<br/>/merchant/skill.md"]
+        BA["买家 Agent<br/>/skill.md"]
+        SA["店面 Agent<br/>/storefront/skill.md"]
+    end
+    Human["店主 / 买家<br/>浏览器"]
+    Visitor["访客 / 搜索引擎"]
+
+    subgraph App["MercLink（Next.js 单进程）"]
+        Pages["公开页面 · 店面<br/>/llms.txt · Markdown"]
+        API["/api/v1"]
+        OAuth["OAuth 2.1 设备码<br/>/oauth · /authorize"]
+        Notify["支付通知"]
+    end
+
+    Agents -->|Bearer 令牌| API
+    Agents -.->|申请设备码| OAuth
+    Human -->|登录并批准| OAuth
+    Visitor --> Pages
+
+    App --> PG[("PostgreSQL 18")]
+    App --> Redis[("Redis 8<br/>限流计数")]
+    App --> S3[("RustFS / S3<br/>商品图片")]
+    App -.->|买入开启时| Vendors["阿里云验证码 · 短信<br/>支付宝 / 易支付"]
+    Vendors -.-> Notify
+```
+
+<details>
+<summary>English version</summary>
+
+```mermaid
+flowchart LR
+    subgraph Agents["Agents"]
+        MA["Merchant agent<br/>/merchant/skill.md"]
+        BA["Buyer agent<br/>/skill.md"]
+        SA["Storefront agent<br/>/storefront/skill.md"]
+    end
+    Human["Owner / buyer<br/>browser"]
+    Visitor["Visitors / search engines"]
+
+    subgraph App["MercLink (single Next.js process)"]
+        Pages["Public pages · storefront<br/>/llms.txt · Markdown"]
+        API["/api/v1"]
+        OAuth["OAuth 2.1 device flow<br/>/oauth · /authorize"]
+        Notify["Payment notifications"]
+    end
+
+    Agents -->|Bearer token| API
+    Agents -.->|request device code| OAuth
+    Human -->|sign in and approve| OAuth
+    Visitor --> Pages
+
+    App --> PG[("PostgreSQL 18")]
+    App --> Redis[("Redis 8<br/>rate-limit counters")]
+    App --> S3[("RustFS / S3<br/>product images")]
+    App -.->|when purchasing is on| Vendors["Aliyun CAPTCHA · SMS<br/>Alipay / EasyPay"]
+    Vendors -.-> Notify
+```
+
+</details>
+
 ---
 
 ## 3. 技术选型
