@@ -243,6 +243,7 @@ export function mapPreviewProduct(raw) {
     id: String(raw.id ?? ""),
     catalogId: typeof raw.catalog_id === "string" ? raw.catalog_id : "",
     name: String(raw.title ?? ""),
+    description: typeof raw.description === "string" ? raw.description : null,
     cover: typeof raw.cover === "string" ? raw.cover : null,
     fields: raw.fields !== null && typeof raw.fields === "object" ? raw.fields : {},
     ...(axisLabels === null ? {} : { axisLabels }),

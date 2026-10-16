@@ -24,6 +24,7 @@ const storeNavFallback = "MercLink";
 
 const productSlotNames = [
   "product.name",
+  "product.description",
   "product.cover",
   "product.fields",
   "product.variants",
@@ -81,6 +82,7 @@ type SlotVariant = {
 export type SlotProduct = {
   id: string;
   name: string;
+  description?: string | null;
   catalogId?: string;
   cover: string | null;
   fields: Readonly<Record<string, string | number | boolean | null>>;
@@ -496,6 +498,8 @@ function productSlotValue(name: string, product: SlotProduct, html = ""): string
   switch (name) {
     case "product.name":
       return escapeHtml(product.name);
+    case "product.description":
+      return descriptionHtml(product.description);
     case "product.cover":
       return imageHtml(product.cover, product.name, "cover");
     case "product.fields":
@@ -722,6 +726,13 @@ function isHttpUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function descriptionHtml(value: string | null | undefined): string {
+  if (value === null || value === undefined || value.length === 0) {
+    return "";
+  }
+  return escapeHtml(value).replace(/\r\n|\r|\n/g, "<br>");
 }
 
 function escapeHtml(value: string): string {

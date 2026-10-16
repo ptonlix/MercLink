@@ -779,6 +779,7 @@ function variant(overrides: Partial<Variant> & { stock: number | null }): Varian
     productId: "prd_1",
     variantId: "var_1",
     title: "Shoe",
+    description: null,
     currency: "CNY",
     unitPrice: minorUnits(159900),
     sku: "SHOE-42",

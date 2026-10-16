@@ -14,6 +14,7 @@ export type LockedSellable = {
   productId: string;
   variantId: string;
   title: string;
+  description: string | null;
   currency: string;
   unitPrice: MinorUnits;
   stock: number | null;

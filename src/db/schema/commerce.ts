@@ -37,6 +37,7 @@ export const orderItems = pgTable("order_items", {
   productId: text("product_id").notNull(),
   variantId: text("variant_id").notNull(),
   titleSnapshot: text("title_snapshot").notNull(),
+  descriptionSnapshot: text("description_snapshot"),
   variantSnapshot: jsonb("variant_snapshot").$type<VariantSnapshot>().notNull(),
   priceSnapshot: integer("price_snapshot").notNull(),
   fieldsSnapshot: jsonb("fields_snapshot").$type<FieldsSnapshot>().notNull(),

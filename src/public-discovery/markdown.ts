@@ -37,6 +37,11 @@ function renderProductMarkdown(model: VisibleProductModel): string {
     "",
     `${displayPrice(product.offer.price, product.offer.currency)}，${availabilityText(product.offer.availability)}`,
     "",
+  ];
+  if (product.description !== null && product.description.length > 0) {
+    lines.push(product.description, "");
+  }
+  lines.push(
     `商品 ID：${product.id}`,
     `目录 ID：${product.catalogId}`,
     `价格整数分：${String(product.offer.price)}`,
@@ -45,7 +50,7 @@ function renderProductMarkdown(model: VisibleProductModel): string {
     "",
     "## 公开字段",
     "",
-  ];
+  );
   const fields = Object.entries(product.fields);
   if (fields.length === 0) {
     lines.push("没有公开字段。", "");

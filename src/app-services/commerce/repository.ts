@@ -27,6 +27,7 @@ export type StoredItem = {
   productId: string;
   variantId: string;
   titleSnapshot: string;
+  descriptionSnapshot: string | null;
   variantSnapshot: VariantSnapshot;
   priceSnapshot: number;
   fieldsSnapshot: FieldsSnapshot;

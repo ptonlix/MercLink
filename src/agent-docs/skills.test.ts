@@ -88,6 +88,10 @@ describe("buyer skill", () => {
     expect(body).toContain("不要重新申请设备码");
     expect(body).toContain("`unknown_field`");
     expect(body).toContain("`forbidden`");
+    expect(body).toContain("可选纯文本 `description`");
+    expect(body).toContain("`description` 是 `null`");
+    expect(body).toContain("不要从 `fields` 读取 `description`");
+    expect(body).not.toContain("海水珍珠");
     expect(body).not.toMatch(/Bearer\s+[A-Za-z0-9\-._]{12,}/);
     expect(body).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}/);
     expect(body.startsWith("# 用户 Skill")).toBe(true);
@@ -111,6 +115,9 @@ describe("buyer skill", () => {
     expect(body).toContain("purchase_disabled");
     expect(body).toContain("40302");
     expect(body).toContain("本部署未开启买入");
+    expect(body).toContain("可选纯文本 `description`");
+    expect(body).toContain("`description` 是 `null`");
+    expect(body).toContain("不要从 `fields` 读取 `description`");
     expect(body).not.toContain("POST /api/v1/orders");
     expect(body).not.toContain("GET /api/v1/orders");
     expect(body).not.toContain("令牌");
@@ -136,6 +143,7 @@ describe("merchant skill", () => {
               id: "prd_private",
               catalogId: "cat_private",
               title: sentinel,
+              description: null,
               cover: null,
               currency: "CNY",
               offer: {
@@ -205,6 +213,12 @@ describe("merchant skill", () => {
       expect(body).toContain("option_values");
       expect(body).toContain("choices");
       expect(body).toContain("fields");
+      expect(body).toContain('"description": "示例描述"');
+      expect(body).toContain("`null` 清空");
+      expect(body).toContain("不能放进 `fields`");
+      expect(body).toContain("2000");
+      expect(body).toContain("上架不要求");
+      expect(body).not.toContain("海水珍珠");
       expect(body).not.toContain("/options");
       expect(body).not.toContain('"options"');
       expect(body).toContain("先上传图片");

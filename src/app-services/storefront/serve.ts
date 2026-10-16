@@ -312,6 +312,7 @@ function slotProduct(product: PublicProduct): SlotProduct {
     id: product.id,
     catalogId: product.catalogId,
     name: product.title,
+    description: product.description,
     cover: product.cover,
     fields: product.fields,
     fieldLabels: product.fieldLabels,

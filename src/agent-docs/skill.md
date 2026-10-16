@@ -75,9 +75,9 @@ POST /api/v1/orders
 GET /api/v1/orders/{id}
 ```
 
-`GET /api/v1/products` 查询已上架商品，不需要登录。可用 `q`、`limit`、`cursor`、`catalog_id`，以及最低价、最高价。最低价和最高价也是整数分。自定义字段过滤必须同时带 `catalog_id`，例如 `field.weight_g.lte=500`。没有目录 id 的字段过滤会被拒绝。字段不存在时 `code` 是 `40001`（`unknown_field`）。已停用字段的 `code` 是 `40002`（`field_retired`），不是 `unknown_field`。
+`GET /api/v1/products` 查询已上架商品，不需要登录。可用 `q`、`limit`、`cursor`、`catalog_id`，以及最低价、最高价。最低价和最高价也是整数分。`q` 同时匹配标题、商品描述和目录文本字段，不要求 `catalog_id`。自定义字段过滤必须同时带 `catalog_id`，例如 `field.weight_g.lte=500`。没有目录 id 的字段过滤会被拒绝。字段不存在时 `code` 是 `40001`（`unknown_field`）。已停用字段的 `code` 是 `40002`（`field_retired`），不是 `unknown_field`。
 
-`GET /api/v1/products/{id}` 返回该商品的公开字段和可售规格。`fields` 仍是键和值，不含显示名。规格 ID 在 `data.variants[].id`，规格选项在 `option_values`。商品 Markdown 保留这些键。只有缝提供显示名时，下一行才注明含义。显示名不是字段键。商品 ID、目录 ID、价格整数分和原始可售状态写在 `/products/{id}.md`，不单独写在给人看的商品页上。CNY 价格仍是 `¥`；其他货币的主币价格仍带货币代码。下单和筛选仍用键和整数分，不要把主币价格当成整数分。
+`GET /api/v1/products/{id}` 返回该商品的公开字段和可售规格。商品 JSON 在 `title` 旁边有可选纯文本 `description`。没有描述时 `description` 是 `null`。不要从 `fields` 读取 `description`。`fields` 仍是键和值，不含显示名。规格 ID 在 `data.variants[].id`，规格选项在 `option_values`。商品 Markdown 保留这些键。只有缝提供显示名时，下一行才注明含义。显示名不是字段键。商品 ID、目录 ID、价格整数分和原始可售状态写在 `/products/{id}.md`，不单独写在给人看的商品页上。CNY 价格仍是 `¥`；其他货币的主币价格仍带货币代码。下单和筛选仍用键和整数分，不要把主币价格当成整数分。
 
 `GET /api/v1/catalogs/{id}/schema` 读取目录当前公开字段定义。用户和商家都可以调用。用它解释筛选字段，不要用它修改字段。
 

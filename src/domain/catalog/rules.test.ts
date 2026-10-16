@@ -93,6 +93,7 @@ function candidate(overrides: Partial<LockCandidate> = {}): LockCandidate {
     productId: "prd_1",
     catalogId: "cat_1",
     title: "鞋",
+    description: null,
     currency: "CNY",
     price: 159900,
     stock: 4,

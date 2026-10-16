@@ -53,6 +53,7 @@ export type ProductRow = {
   id: string;
   catalog_id: string;
   title: string;
+  description: string | null;
   status: string;
   cover: string | null;
   fields: unknown;
@@ -192,7 +193,7 @@ export async function loadFields(db: Db, catalogId: string): Promise<FieldRow[]>
 
 export async function lockProducts(db: Db, catalogId: string): Promise<ProductRow[]> {
   return db<ProductRow[]>`
-    SELECT id, catalog_id, title, status, cover, fields, schema_revision, created_at, updated_at, deleted_at
+    SELECT id, catalog_id, title, description, status, cover, fields, schema_revision, created_at, updated_at, deleted_at
     FROM products
     WHERE catalog_id = ${catalogId}
     ORDER BY id
@@ -202,7 +203,7 @@ export async function lockProducts(db: Db, catalogId: string): Promise<ProductRo
 
 export async function findProduct(db: Db, productId: string): Promise<ProductRow | undefined> {
   const rows = await db<ProductRow[]>`
-    SELECT id, catalog_id, title, status, cover, fields, schema_revision, created_at, updated_at, deleted_at
+    SELECT id, catalog_id, title, description, status, cover, fields, schema_revision, created_at, updated_at, deleted_at
     FROM products
     WHERE id = ${productId}
   `;
@@ -211,7 +212,7 @@ export async function findProduct(db: Db, productId: string): Promise<ProductRow
 
 export async function lockProduct(db: Db, productId: string): Promise<ProductRow | undefined> {
   const rows = await db<ProductRow[]>`
-    SELECT id, catalog_id, title, status, cover, fields, schema_revision, created_at, updated_at, deleted_at
+    SELECT id, catalog_id, title, description, status, cover, fields, schema_revision, created_at, updated_at, deleted_at
     FROM products
     WHERE id = ${productId}
     FOR UPDATE

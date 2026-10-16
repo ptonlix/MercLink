@@ -65,7 +65,7 @@ export async function getPublicProduct(
   productId: string,
 ): Promise<CatalogResult<PublicProduct>> {
   const rows = await db<PublicQueryRow[]>`
-    SELECT p.id, p.catalog_id, p.title, p.status, p.cover, p.fields, p.schema_revision,
+    SELECT p.id, p.catalog_id, p.title, p.description, p.status, p.cover, p.fields, p.schema_revision,
            p.created_at, p.updated_at, p.deleted_at, c.currency
     FROM products p
     JOIN catalogs c ON c.id = p.catalog_id
@@ -118,7 +118,7 @@ export async function listMerchantProducts(
   const limit = parsed.value.limit + 1;
   const rows = await db.unsafe<PublicQueryRow[]>(
     `
-      SELECT p.id, p.catalog_id, p.title, p.status, p.cover, p.fields, p.schema_revision,
+      SELECT p.id, p.catalog_id, p.title, p.description, p.status, p.cover, p.fields, p.schema_revision,
              p.created_at, p.updated_at, p.deleted_at, c.currency
       FROM products p
       JOIN catalogs c ON c.id = p.catalog_id
@@ -171,6 +171,7 @@ async function queryVisibleProducts(
     const pattern = add(likePattern(query.q));
     where.push(`(
       p.title ILIKE ${pattern} ESCAPE '\\'
+      OR p.description ILIKE ${pattern} ESCAPE '\\'
       OR EXISTS (
         SELECT 1 FROM product_fields f
         WHERE f.catalog_id = p.catalog_id
@@ -204,7 +205,7 @@ async function queryVisibleProducts(
   }
   const rows = await db.unsafe<PublicQueryRow[]>(
     `
-      SELECT p.id, p.catalog_id, p.title, p.status, p.cover, p.fields, p.schema_revision,
+      SELECT p.id, p.catalog_id, p.title, p.description, p.status, p.cover, p.fields, p.schema_revision,
              p.created_at, p.updated_at, p.deleted_at, c.currency
       FROM products p
       JOIN catalogs c ON c.id = p.catalog_id
@@ -272,6 +273,7 @@ async function toPublic(db: Db, row: PublicQueryRow): Promise<PublicProduct | un
     id: row.id,
     catalogId: row.catalog_id,
     title: row.title,
+    description: row.description,
     cover: row.cover,
     currency: row.currency,
     offer: {

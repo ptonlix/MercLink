@@ -1,6 +1,7 @@
 import { createPublicId } from "../../shared/id";
 import { validateFields } from "../../domain/catalog/attributes";
 import {
+  nextProductDescription,
   parseCover,
   parseMinorPrice,
   parseSku,
@@ -59,6 +60,14 @@ export async function createProduct(
   if (!title.ok) {
     return title;
   }
+  const description = nextProductDescription(
+    null,
+    parsed.value.description,
+    parsed.value.descriptionPresent,
+  );
+  if (!description.ok) {
+    return description;
+  }
   const cover = parseCover(parsed.value.cover);
   if (!cover.ok) {
     return cover;
@@ -98,12 +107,13 @@ export async function createProduct(
       const productId = createPublicId("product");
       await tx`
         INSERT INTO products (
-          id, catalog_id, title, status, cover, fields, schema_revision
+          id, catalog_id, title, description, status, cover, fields, schema_revision
         )
         VALUES (
           ${productId},
           ${catalogId},
           ${title.value},
+          ${description.value},
           'off',
           ${acceptedCover.value},
           ${tx.json(values.value)},
@@ -178,6 +188,14 @@ export async function patchProduct(
       if (!values.ok) {
         return values;
       }
+      const description = nextProductDescription(
+        loaded.value.description,
+        parsed.value.description,
+        parsed.value.descriptionPresent,
+      );
+      if (!description.ok) {
+        return description;
+      }
       if (loaded.value.status === "on" && loaded.value.deleted_at === null) {
         const publishable = assertPublishable({
           deleted: false,
@@ -194,6 +212,7 @@ export async function patchProduct(
       await tx`
         UPDATE products
         SET title = ${title?.ok === true ? title.value : loaded.value.title},
+            description = ${description.value},
             cover = ${acceptedCover === undefined ? loaded.value.cover : acceptedCover.value},
             fields = ${tx.json(values.value)},
             updated_at = now()

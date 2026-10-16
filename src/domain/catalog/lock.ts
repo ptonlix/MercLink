@@ -7,6 +7,7 @@ export type LockCandidate = {
   productId: string;
   catalogId: string;
   title: string;
+  description: string | null;
   currency: string;
   price: number;
   stock: number | null;

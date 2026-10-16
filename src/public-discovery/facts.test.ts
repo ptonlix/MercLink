@@ -241,6 +241,18 @@ describe("public fact discovery", () => {
     expect(labeledBody).toContain("- note: 无");
     expect(labeledBody).not.toContain("含义：无");
 
+    const described = pricedProduct("prd_described", "珍珠");
+    described.description = "海水珍珠\n第二行";
+    register([described]);
+    const describedBody = await (await productMarkdownResponse("prd_described")).text();
+    expect(describedBody).toContain("海水珍珠\n第二行");
+    expect(describedBody).not.toContain("- description:");
+    const undescribed = pricedProduct("prd_undescribed", "空白");
+    register([undescribed]);
+    const undescribedBody = await (await productMarkdownResponse("prd_undescribed")).text();
+    expect(undescribedBody).not.toContain("海水珍珠");
+    expect(undescribedBody).not.toContain("- description:");
+
     expect(existsSync("src/app/llms-full.txt")).toBe(false);
 
     const entries = await sitemap();
@@ -257,6 +269,7 @@ function pricedProduct(id: string, title: string): PublicProduct {
     id,
     catalogId: "cat_facts",
     title,
+    description: null,
     cover: null,
     currency: "CNY",
     offer: { price: minorUnits(159900), currency: "CNY", availability: "in_stock" },

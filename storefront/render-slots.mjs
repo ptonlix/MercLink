@@ -126,6 +126,8 @@ function productSlotValue(name, product, html = "") {
   switch (name) {
     case "product.name":
       return escapeHtml(product.name);
+    case "product.description":
+      return descriptionHtml(product.description);
     case "product.cover":
       return imageHtml(product.cover, product.name, "cover");
     case "product.fields":
@@ -280,6 +282,13 @@ function isHttpUrl(value) {
   } catch {
     return false;
   }
+}
+
+function descriptionHtml(value) {
+  if (value === null || value === undefined || value.length === 0) {
+    return "";
+  }
+  return escapeHtml(value).replace(/\r\n|\r|\n/g, "<br>");
 }
 
 function escapeHtml(value) {

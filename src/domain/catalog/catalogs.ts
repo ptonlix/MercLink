@@ -51,6 +51,31 @@ export function parseTitle(value: unknown): CatalogResult<string> {
   return catalogOk(title);
 }
 
+export function parseDescription(value: unknown): CatalogResult<string | null> {
+  if (value === null) {
+    return catalogOk(null);
+  }
+  if (typeof value !== "string") {
+    return catalogFail("validation_error", "商品描述必须是文本。");
+  }
+  const description = value.trim();
+  if (description.length === 0 || description.length > 2000) {
+    return catalogFail("validation_error", "商品描述不能为空，且不能超过 2000 个字符。");
+  }
+  return catalogOk(description);
+}
+
+export function nextProductDescription(
+  current: string | null,
+  value: unknown,
+  present: boolean,
+): CatalogResult<string | null> {
+  if (!present) {
+    return catalogOk(current);
+  }
+  return parseDescription(value);
+}
+
 export function parseCover(value: unknown): CatalogResult<string | null> {
   if (value === undefined || value === null) {
     return catalogOk(null);

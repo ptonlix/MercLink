@@ -102,6 +102,7 @@ describe("fail-closed seams", () => {
             productId: "prd_1",
             variantId: "var_1",
             title: "Shoe",
+            description: null,
             currency: "CNY",
             unitPrice: minorUnits(159900),
             stock: 4,

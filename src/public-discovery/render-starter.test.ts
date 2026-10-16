@@ -46,6 +46,9 @@ describe("starter documents", () => {
     expect(starterDocument("index.html")).toContain(fragments["index.html"]);
     expect(starterDocument("products/index.html")).toContain(fragments["products/index.html"]);
     expect(starterDocument("products/item.html")).toContain(fragments["products/item.html"]);
+    expect(fragments["products/item.html"]).toContain('name="product.description"');
+    expect(fragments["index.html"]).not.toContain("product.description");
+    expect(fragments["products/index.html"]).not.toContain("product.description");
     expect(starterDocument("account/buyer.html")).toContain('action="/authorize/buyer/submit"');
     expect(starterDocument("account/merchant.html")).toContain(
       'action="/authorize/merchant/submit"',

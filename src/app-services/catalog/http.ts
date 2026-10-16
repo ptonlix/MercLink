@@ -554,6 +554,7 @@ function productJson(product: ProductRecord) {
     id: product.id,
     catalog_id: product.catalogId,
     title: product.title,
+    description: product.description,
     status: product.status,
     cover: product.cover,
     fields: product.fields,
@@ -572,6 +573,7 @@ function publicProductJson(product: {
   id: string;
   catalogId: string;
   title: string;
+  description: string | null;
   cover: string | null;
   currency: string;
   offer: { price: number; currency: string; availability: string };
@@ -590,6 +592,7 @@ function publicProductJson(product: {
     id: product.id,
     catalog_id: product.catalogId,
     title: product.title,
+    description: product.description,
     cover: product.cover,
     currency: product.currency,
     offer: product.offer,

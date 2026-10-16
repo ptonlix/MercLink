@@ -201,7 +201,9 @@ key 以小写英文字母开头，后面只能是小写英文、数字和下划�
 
 价格单位是分，必须是非负整数。不要换算后再传元，也不要传小数或字符串。`159900` 表示 1599.00 元，`1990` 表示 19.90 元。空库存表示不限，用 `null`。新建商品默认下架。规格默认可售。确认后再调用 publish。
 
-商品自定义值放在 `fields`。数字字段传 JSON 数字，是否字段传布尔值，单选值必须是已声明的选项字符串。`price` 和 `stock` 不能放进 `fields`。`PATCH` 商品时，`fields` 会替换整份已保存的属性；省略的 key 会被去掉。只改一个属性时，也要带上仍需保留的全部 key。
+商品自定义值放在 `fields`。数字字段传 JSON 数字，是否字段传布尔值，单选值必须是已声明的选项字符串。`price` 和 `stock` 不能放进 `fields`。`description` 也不能放进 `fields`，也不能当作目录字段 key。`PATCH` 商品时，`fields` 会替换整份已保存的属性；省略的 key 会被去掉。只改一个属性时，也要带上仍需保留的全部 key。
+
+`description` 是商品上的可选纯文本，和 `title` 并列，最多 2000 个字符。创建时可以省略，省略后为空。`PATCH` 省略 `description` 不改变已保存的描述；传 `null` 清空。上架不要求填写描述。
 
 封面先上传图片，再改商品。Agent 不直接写对象存储。`POST /api/v1/catalogs/{id}/images` 使用 `multipart/form-data`，文件字段名是 `file`。不要用 JSON 或 base64。只接受 JPEG、PNG 或 WebP，最大 5 MiB。同一商家 60 秒内最多 30 次。成功时 HTTP 201，绝对地址在 `data.url`，路径是本站 `/media/{id}`。只把这个 `data.url` 写入商品或规格的 `cover`。
 
@@ -214,7 +216,7 @@ key 以小写英文字母开头，后面只能是小写英文、数字和下划�
 `POST /api/v1/catalogs/{id}/products`
 
 ```json
-{ "title": "示例商品", "price": 159900, "stock": 10, "fields": { "weight_g": 480 } }
+{ "title": "示例商品", "description": "示例描述", "price": 159900, "stock": 10, "fields": { "weight_g": 480 } }
 ```
 
 这只是请求形状，不是任何商家的商品数据。商品 ID 在 `data.id`，默认可售规格 ID 在 `data.variants[].id`。之后不要再给这个商品声明规格轴，除非先把这条无轴规格改成不可售。
@@ -243,7 +245,7 @@ key 以小写英文字母开头，后面只能是小写英文、数字和下划�
 
 规格 ID 在 `data.variants` 里对应组合的 `id`。不要传另一组常见的组合字段名。
 
-`PATCH /api/v1/catalogs/{id}/products/{product_id}` 只能编辑商品名、封面和 `fields`，不能改价格。`PATCH /api/v1/catalogs/{id}/variants/{variant_id}` 编辑规格价格、库存、SKU、封面和状态。状态只能是 `on` 或 `off`。`DELETE /api/v1/catalogs/{id}/variants/{variant_id}` 软删除规格。恢复规格使用：
+`PATCH /api/v1/catalogs/{id}/products/{product_id}` 可以编辑商品名、`description`、封面和 `fields`，不能改价格。省略 `description` 不改已保存的描述，`null` 清空。`PATCH /api/v1/catalogs/{id}/variants/{variant_id}` 编辑规格价格、库存、SKU、封面和状态。状态只能是 `on` 或 `off`。`DELETE /api/v1/catalogs/{id}/variants/{variant_id}` 软删除规格。恢复规格使用：
 
 ```json
 { "restore": true }

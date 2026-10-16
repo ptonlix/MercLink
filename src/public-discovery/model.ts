@@ -96,6 +96,7 @@ type ProductJsonLd = {
   "@context": "https://schema.org";
   "@type": "Product";
   name: string;
+  description: string;
   image?: string;
   offers: readonly OfferJsonLd[];
 };
@@ -322,8 +323,16 @@ function onlineStore(store: PublicStoreProfile, origin: string): JsonLdNode {
 }
 
 function productDescription(product: PublicProduct): string {
-  const text = `${product.title}。${displayPrice(product.offer.price, product.offer.currency)}，${availabilityText(product.offer.availability)}`;
+  const own = collapseWhitespace(product.description ?? "");
+  const text =
+    own.length > 0
+      ? own
+      : `${product.title}。${displayPrice(product.offer.price, product.offer.currency)}，${availabilityText(product.offer.availability)}`;
   return truncateChars(text, metaDescriptionLimit);
+}
+
+function collapseWhitespace(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function itemList(products: readonly PublicProduct[], origin: string): ItemListJsonLd {
@@ -355,6 +364,7 @@ function productJsonLd(product: PublicProduct): ProductJsonLd {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.title,
+    description: productDescription(product),
     offers: sources.map(offerJsonLd),
   };
   if (product.cover !== null && isHttpUrl(product.cover)) {
@@ -419,6 +429,7 @@ function productNode(product: PublicProduct): JsonLdNode {
   return {
     "@type": document["@type"],
     name: document.name,
+    description: document.description,
     offers: document.offers,
     ...(document.image === undefined ? {} : { image: document.image }),
   };

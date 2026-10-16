@@ -113,6 +113,8 @@ export function parseCatalogBody(
 
 export function parseProductBody(input: unknown): CatalogResult<{
   title: string;
+  description?: unknown;
+  descriptionPresent: boolean;
   price?: unknown;
   stock?: unknown;
   cover?: unknown;
@@ -131,8 +133,11 @@ export function parseProductBody(input: unknown): CatalogResult<{
   if (!fields.ok) {
     return fields;
   }
+  const descriptionPresent = hasOwn(record, "description");
   return catalogOk({
     title,
+    ...(descriptionPresent ? { description: record.description } : {}),
+    descriptionPresent,
     ...(hasOwn(record, "price") ? { price: record.price } : {}),
     ...(hasOwn(record, "stock") ? { stock: record.stock } : {}),
     ...(hasOwn(record, "cover") ? { cover: record.cover } : {}),
@@ -143,6 +148,8 @@ export function parseProductBody(input: unknown): CatalogResult<{
 
 export function parseProductPatch(input: unknown): CatalogResult<{
   title?: string;
+  description?: unknown;
+  descriptionPresent: boolean;
   cover?: unknown;
   fields?: Readonly<Record<string, unknown>>;
 }> {
@@ -155,8 +162,11 @@ export function parseProductPatch(input: unknown): CatalogResult<{
     return fields;
   }
   const title = readString(record, "title");
+  const descriptionPresent = hasOwn(record, "description");
   return catalogOk({
     ...(title !== undefined ? { title } : {}),
+    ...(descriptionPresent ? { description: record.description } : {}),
+    descriptionPresent,
     ...(hasOwn(record, "cover") ? { cover: record.cover } : {}),
     ...(fields.value !== undefined ? { fields: fields.value } : {}),
   });

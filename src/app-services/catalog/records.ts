@@ -36,6 +36,7 @@ export type ProductRecord = {
   id: string;
   catalogId: string;
   title: string;
+  description: string | null;
   status: "on" | "off";
   cover: string | null;
   fields: Fields;
@@ -85,6 +86,7 @@ export function productRecord(
     id: row.id,
     catalogId: row.catalog_id,
     title: row.title,
+    description: row.description,
     status: row.status === "on" ? "on" : "off",
     cover: row.cover,
     fields: readFields(row.fields),
