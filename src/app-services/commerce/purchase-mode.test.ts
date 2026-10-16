@@ -50,6 +50,7 @@ function graph(): StoredGraph {
         productId: "prd_1",
         variantId: "var_1",
         titleSnapshot: "灯",
+        descriptionSnapshot: null,
         variantSnapshot: { sku: null, optionValues: {}, stock: 2 },
         priceSnapshot: 100,
         fieldsSnapshot: {},

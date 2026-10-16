@@ -999,6 +999,7 @@ function product(id: string, price: number): PublicProduct {
     id,
     catalogId: "cat_1",
     title: "南风鞋",
+    description: null,
     cover: null,
     currency: "CNY",
     offer: { price: minorUnits(price), currency: "CNY", availability: "in_stock" },

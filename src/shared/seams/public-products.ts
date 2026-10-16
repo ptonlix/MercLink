@@ -22,6 +22,7 @@ export type PublicProduct = {
   id: string;
   catalogId: string;
   title: string;
+  description: string | null;
   cover: string | null;
   currency: string;
   offer: PublicOffer;

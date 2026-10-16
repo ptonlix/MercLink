@@ -207,6 +207,7 @@ function stringSample(field: ApiField): string {
   if (
     name === "name" ||
     name === "title" ||
+    name === "description" ||
     name === "label" ||
     name === "display_name" ||
     name === "summary"

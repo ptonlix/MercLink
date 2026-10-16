@@ -1,9 +1,14 @@
 import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, describe, expect, it } from "vitest";
 import { runMigrations } from "../../db/migrate";
+import { systemClock } from "../../ports/clock";
+import type { PaymentPort } from "../../ports/payment";
+import { createDrizzleCommerceRepository } from "../commerce/drizzle-store";
+import { placeOrder } from "../commerce/place-order";
 import { buyerActor } from "../../shared/actor";
 import { registerAuthenticator, resetAuthenticator } from "../../shared/seams/authenticate";
 import { defaultCatalog, resetDefaultCatalog } from "../../shared/seams/default-catalog";
@@ -17,6 +22,7 @@ import {
   createProduct,
   createVariant,
   declareAxis,
+  patchProduct,
   patchVariant,
   publishProduct,
   restoreProduct,
@@ -533,6 +539,237 @@ describe("catalog management", () => {
     });
   });
 
+  it("stores an optional description, publishes without one, and searches it without a catalog", async () => {
+    await withCatalogDb(async (sql) => {
+      const catalog = await mustCatalog(sql);
+      const note = await addField(sql, "mch_a", catalog.id, {
+        key: "note",
+        label: "备注",
+        type: "text",
+        required: false,
+      });
+      expect(note.ok && note.value.applied).toBe(true);
+      const reserved = await addField(sql, "mch_a", catalog.id, {
+        key: "description",
+        label: "描述",
+        type: "text",
+        required: false,
+      });
+      expect(reserved).toMatchObject({ ok: false, error: "validation_error" });
+
+      const bare = await createProduct(sql, "mch_a", catalog.id, {
+        title: "无描述",
+        price: 100,
+        stock: 1,
+      });
+      expect(bare.ok).toBe(true);
+      if (!bare.ok) {
+        return;
+      }
+      expect(bare.value.description).toBeNull();
+      expect(bare.value.fields).not.toHaveProperty("description");
+      const publishedBare = await publishProduct(sql, "mch_a", catalog.id, bare.value.id);
+      expect(publishedBare.ok && publishedBare.value.status).toBe("on");
+      expect(publishedBare.ok && publishedBare.value.description).toBeNull();
+
+      const rejected = await createProduct(sql, "mch_a", catalog.id, {
+        title: "放进字段",
+        description: "正文",
+        price: 100,
+        stock: 1,
+        fields: { description: "不能放这里" },
+      });
+      expect(rejected).toMatchObject({ ok: false, error: "validation_error" });
+      const absent = await sql<{ count: string }[]>`
+        SELECT count(*)::text AS count FROM products WHERE title = '放进字段'
+      `;
+      expect(absent[0]?.count).toBe("0");
+
+      const pearl = await createProduct(sql, "mch_a", catalog.id, {
+        title: "普通鞋",
+        description: "  只在描述里的海螺\n第二行  ",
+        price: 200,
+        stock: 2,
+        fields: { note: "没有那个词" },
+      });
+      expect(pearl.ok).toBe(true);
+      if (!pearl.ok) {
+        return;
+      }
+      expect(pearl.value.description).toBe("只在描述里的海螺\n第二行");
+      expect(pearl.value.fields).toEqual({ note: "没有那个词" });
+      const tooLong = await patchProduct(sql, "mch_a", catalog.id, pearl.value.id, {
+        description: "x".repeat(2001),
+      });
+      expect(tooLong).toMatchObject({ ok: false, error: "validation_error" });
+      const inFields = await patchProduct(sql, "mch_a", catalog.id, pearl.value.id, {
+        fields: { description: "正文" },
+      });
+      expect(inFields).toMatchObject({ ok: false, error: "validation_error" });
+      const renamed = await patchProduct(sql, "mch_a", catalog.id, pearl.value.id, {
+        title: "普通鞋改名",
+      });
+      expect(renamed.ok && renamed.value.title).toBe("普通鞋改名");
+      expect(renamed.ok && renamed.value.description).toBe("只在描述里的海螺\n第二行");
+      expect(renamed.ok && renamed.value.fields).toEqual({ note: "没有那个词" });
+      await publishProduct(sql, "mch_a", catalog.id, pearl.value.id);
+
+      const other = await createProduct(sql, "mch_a", catalog.id, {
+        title: "别的鞋",
+        price: 300,
+        stock: 1,
+        fields: { note: "普通备注" },
+      });
+      expect(other.ok).toBe(true);
+      if (!other.ok) {
+        return;
+      }
+      await publishProduct(sql, "mch_a", catalog.id, other.value.id);
+
+      const found = await listPublicProducts(sql, { q: "海螺", fieldFilters: [] });
+      expect(found.ok && found.value.items.map((item) => item.id)).toEqual([pearl.value.id]);
+      expect(found.ok && found.value.items[0]?.description).toBe("只在描述里的海螺\n第二行");
+      expect(found.ok && found.value.items[0]?.fields).not.toHaveProperty("description");
+      const merchant = await listMerchantProducts(sql, "mch_a", catalog.id, {});
+      const merchantPearl = merchant.ok
+        ? merchant.value.items.find((item) => item.id === pearl.value.id)
+        : undefined;
+      expect(merchantPearl?.description).toBe("只在描述里的海螺\n第二行");
+      const merchantBare = merchant.ok
+        ? merchant.value.items.find((item) => item.id === bare.value.id)
+        : undefined;
+      expect(merchantBare?.description).toBeNull();
+      const filtered = await listPublicProducts(sql, {
+        fieldFilters: [{ key: "note", op: "eq", raw: "普通备注" }],
+      });
+      expect(filtered).toMatchObject({ ok: false, error: "validation_error" });
+
+      const cleared = await patchProduct(sql, "mch_a", catalog.id, pearl.value.id, {
+        description: null,
+      });
+      expect(cleared.ok && cleared.value.description).toBeNull();
+      expect(cleared.ok && cleared.value.fields).toEqual({ note: "没有那个词" });
+      const afterClear = await getPublicProduct(sql, pearl.value.id);
+      expect(afterClear.ok && afterClear.value.description).toBeNull();
+      expect(afterClear.ok && afterClear.value.fields).not.toHaveProperty("description");
+    });
+  });
+
+  it("snapshots the ordered description and ignores a later product edit", async () => {
+    await withCatalogDb(async (sql, schema) => {
+      registerCatalog(sql);
+      const catalog = await mustCatalog(sql);
+      const created = await createProduct(sql, "mch_a", catalog.id, {
+        title: "珍珠",
+        description: "海水珍珠",
+        price: 100,
+        stock: 2,
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) {
+        return;
+      }
+      const variant = created.value.variants[0];
+      expect(variant).toBeDefined();
+      if (variant === undefined) {
+        return;
+      }
+      expect(await publishProduct(sql, "mch_a", catalog.id, created.value.id)).toMatchObject({
+        ok: true,
+      });
+      const empty = await createProduct(sql, "mch_a", catalog.id, {
+        title: "空描述",
+        price: 50,
+        stock: 1,
+      });
+      expect(empty.ok).toBe(true);
+      if (!empty.ok) {
+        return;
+      }
+      const emptyVariant = empty.value.variants[0];
+      expect(emptyVariant).toBeDefined();
+      if (emptyVariant === undefined) {
+        return;
+      }
+      expect(await publishProduct(sql, "mch_a", catalog.id, empty.value.id)).toMatchObject({
+        ok: true,
+      });
+      await sql`
+        INSERT INTO buyers (id, phone, password_hash)
+        VALUES ('byr_desc', '13900000077', 'hash')
+      `;
+      const commerce = postgres(databaseUrl, {
+        max: 1,
+        onnotice: () => undefined,
+        connection: { search_path: schema },
+      });
+      try {
+        const runtime = {
+          repo: createDrizzleCommerceRepository(drizzle(commerce)),
+          payment: descriptionPayment(),
+          clock: systemClock,
+          ownedCatalogs: () => [],
+          purchaseEnabled: true,
+        };
+        const actor = buyerActor({
+          buyerId: "byr_desc",
+          grantId: "grn_desc",
+          scopes: ["order:write", "order:read"],
+        });
+        const placed = await placeOrder({
+          actor,
+          body: {
+            client_order_no: "pearl-1",
+            items: [{ variant_id: variant.id, qty: 1 }],
+          },
+          runtime,
+        });
+        expect(placed.ok).toBe(true);
+        if (!placed.ok) {
+          return;
+        }
+        const blank = await placeOrder({
+          actor,
+          body: {
+            client_order_no: "blank-1",
+            items: [{ variant_id: emptyVariant.id, qty: 1 }],
+          },
+          runtime,
+        });
+        expect(blank.ok).toBe(true);
+        if (!blank.ok) {
+          return;
+        }
+        const before = await sql<
+          {
+            id: string;
+            description_snapshot: string | null;
+            fields_snapshot: Record<string, unknown>;
+          }[]
+        >`
+          SELECT id, description_snapshot, fields_snapshot
+          FROM order_items
+          WHERE order_id IN (${placed.graph.order.id}, ${blank.graph.order.id})
+          ORDER BY description_snapshot NULLS FIRST
+        `;
+        expect(before.map((row) => row.description_snapshot)).toEqual([null, "海水珍珠"]);
+        expect(before.every((row) => !Object.hasOwn(row.fields_snapshot, "description"))).toBe(
+          true,
+        );
+        const patched = await patchProduct(sql, "mch_a", catalog.id, created.value.id, {
+          description: "改后的描述",
+        });
+        expect(patched.ok && patched.value.description).toBe("改后的描述");
+        const after = await sql<{ description_snapshot: string | null }[]>`
+          SELECT description_snapshot FROM order_items WHERE order_id = ${placed.graph.order.id}
+        `;
+        expect(after).toEqual([{ description_snapshot: "海水珍珠" }]);
+      } finally {
+        await commerce.end({ timeout: 5 });
+      }
+    });
+  });
+
   it("returns 403 when a buyer actor publishes", async () => {
     registerAuthenticator(() => ({
       ok: true,
@@ -553,6 +790,28 @@ describe("catalog management", () => {
     await expect(response.json()).resolves.toMatchObject({ code: 40300, data: null });
   });
 });
+
+function descriptionPayment(): PaymentPort {
+  return {
+    upstreamClose: "supported",
+    createPayment: (input) =>
+      Promise.resolve({
+        ok: true,
+        action: `https://pay.example/${input.orderId}`,
+        providerTradeNo: null,
+      }),
+    queryPayment: (input) =>
+      Promise.resolve({
+        ok: true,
+        status: "pending",
+        providerTradeNo: input.providerTradeNo,
+        amount: null,
+      }),
+    cancelPayment: () => Promise.resolve({ ok: true, outcome: "closed" }),
+    verifyNotification: () =>
+      Promise.resolve({ ok: false, error: "invalid_signature", message: "验签失败。" }),
+  };
+}
 
 async function mustCatalog(sql: postgres.Sql) {
   const created = await createCatalog(sql, "mch_a", { name: "跑鞋" });

@@ -443,6 +443,42 @@ describe("storefront rules", () => {
     });
     expect(named).toBe('<a class="wordmark">南风商店</a><h1>南风商店</h1>');
   });
+
+  it("fills product.description only when the template declares the slot", () => {
+    const product = slotProduct(100, "珍珠");
+    product.description = "海水\n珍珠<script>";
+    const declared = renderDocument(
+      `<p><merclink-slot name="product.name"></merclink-slot></p><merclink-slot name="product.description"></merclink-slot>`,
+      {
+        store: null,
+        products: [],
+        product,
+        orderStatus: null,
+        nextCursor: null,
+      },
+    );
+    expect(declared).toContain("珍珠");
+    expect(declared).toContain("海水<br>珍珠&lt;script&gt;");
+    expect(declared).not.toContain("<script>");
+    const cleared = renderDocument(`<merclink-slot name="product.description"></merclink-slot>`, {
+      store: null,
+      products: [],
+      product: { ...product, description: null },
+      orderStatus: null,
+      nextCursor: null,
+    });
+    expect(cleared).toBe("");
+    const without = renderDocument(`<p><merclink-slot name="product.name"></merclink-slot></p>`, {
+      store: null,
+      products: [],
+      product,
+      orderStatus: null,
+      nextCursor: null,
+    });
+    expect(without).toBe("<p>珍珠</p>");
+    expect(without).not.toContain("海水");
+    expect(inspectDocument("products/item.html", productSlots).ok).toBe(true);
+  });
 });
 
 function text(value: string): Uint8Array {

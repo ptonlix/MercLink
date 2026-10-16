@@ -25,6 +25,7 @@ type LockRow = {
   variant_status: string;
   variant_deleted_at: Date | null;
   title: string;
+  description: string | null;
   product_status: string;
   product_deleted_at: Date | null;
   fields: unknown;
@@ -50,6 +51,7 @@ export async function lockSellable(input: LockSellableInput): Promise<LockSellab
       v.status AS variant_status,
       v.deleted_at AS variant_deleted_at,
       p.title,
+      p.description,
       p.status AS product_status,
       p.deleted_at AS product_deleted_at,
       p.fields,
@@ -88,6 +90,7 @@ export async function lockSellable(input: LockSellableInput): Promise<LockSellab
       productId: line.productId,
       variantId: line.variantId,
       title: line.title,
+      description: line.description,
       currency: line.currency,
       unitPrice: choice.value.unitPrice,
       stock: line.stock,
@@ -129,6 +132,7 @@ async function candidate(tx: postgres.TransactionSql, row: LockRow): Promise<Loc
     productId: row.product_id,
     catalogId: row.catalog_id,
     title: row.title,
+    description: row.description,
     currency: row.currency,
     price: row.price,
     stock: row.stock,

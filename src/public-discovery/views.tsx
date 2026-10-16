@@ -40,7 +40,7 @@ function Slot({
   if (html === null || html.length === 0) {
     return null;
   }
-  if (!html.includes("<")) {
+  if (name !== "product.description" && !html.includes("<")) {
     return html;
   }
   return <span dangerouslySetInnerHTML={{ __html: html }} />;
@@ -143,6 +143,7 @@ export function ProductTemplate({ facts = null }: { facts?: Facts }): ReactNode 
               <Slot name="product.availability" facts={facts} />
             </span>
           </p>
+          <ProductDescription facts={facts} />
           {facts?.product ? (
             <VariantChooser
               purchaseEnabled={currentPurchaseEnabled()}
@@ -191,6 +192,21 @@ export function ProductTemplate({ facts = null }: { facts?: Facts }): ReactNode 
         </div>
       </article>
     </PublicShell>
+  );
+}
+
+function ProductDescription({ facts }: { facts: Facts }): ReactNode {
+  if (facts === null) {
+    return <Slot name="product.description" facts={facts} />;
+  }
+  const text = facts.product?.description;
+  if (text === undefined || text === null || text.length === 0) {
+    return null;
+  }
+  return (
+    <p className="productDescription">
+      <Slot name="product.description" facts={facts} />
+    </p>
   );
 }
 

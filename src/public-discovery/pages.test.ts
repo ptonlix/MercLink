@@ -571,6 +571,60 @@ describe("public pages", () => {
     expect(visible).not.toContain('name="price"');
   });
 
+  it("shows a multiline description under the price and keeps the body off the shelf", async () => {
+    const product = publishedProduct();
+    product.description = "第一行\n第二行 <script>alert(1)</script>";
+    registerProducts([product]);
+    const detail = renderToStaticMarkup(
+      await ProductPage({ params: Promise.resolve({ id: product.id }) }),
+    );
+    const visible = visibleHtml(detail);
+    const priceAt = visible.indexOf("USD 2599.00");
+    const bodyAt = visible.indexOf("第一行");
+    expect(priceAt).toBeGreaterThan(-1);
+    expect(bodyAt).toBeGreaterThan(priceAt);
+    expect(visible).toContain("第二行");
+    expect(visible).toContain("<br>");
+    expect(visible).toContain("&lt;script&gt;");
+    expect(detail).not.toContain("<script>alert(1)</script>");
+    expect(visibleHtml(renderToStaticMarkup(await ProductsPage({})))).not.toContain("第一行");
+    expect(visibleHtml(renderToStaticMarkup(await HomePage()))).not.toContain("第一行");
+    const metadata = await productMetadata({ params: Promise.resolve({ id: product.id }) });
+    expect(metadata.description).toBe("第一行 第二行 <script>alert(1)</script>");
+    expect(String(metadata.description)).not.toContain("\n");
+    const block = jsonLdBlocks(detail)[0];
+    expect(isRecord(block) ? block.description : undefined).toBe(metadata.description);
+
+    const long = publishedProduct();
+    long.id = "prd_long_description";
+    long.description = `${"甲".repeat(80)}\n\n${"乙".repeat(80)}`;
+    registerProducts([long]);
+    const longMeta = await productMetadata({
+      params: Promise.resolve({ id: long.id }),
+    });
+    expect(String(longMeta.description)).toHaveLength(150);
+    expect(String(longMeta.description)).not.toMatch(/\s{2}|\n/);
+    expect(String(longMeta.description).startsWith("甲")).toBe(true);
+    const longHtml = renderToStaticMarkup(
+      await ProductPage({ params: Promise.resolve({ id: long.id }) }),
+    );
+    const longBlock = jsonLdBlocks(longHtml)[0];
+    expect(isRecord(longBlock) ? longBlock.description : undefined).toBe(longMeta.description);
+
+    const empty = publishedProduct();
+    empty.id = "prd_no_description";
+    empty.description = null;
+    registerProducts([empty]);
+    const emptyHtml = renderToStaticMarkup(
+      await ProductPage({ params: Promise.resolve({ id: empty.id }) }),
+    );
+    expect(emptyHtml).not.toContain("productDescription");
+    const emptyMeta = await productMetadata({ params: Promise.resolve({ id: empty.id }) });
+    expect(emptyMeta.description).toBe("哨兵短靴。USD 2599.00，有货");
+    const emptyBlock = jsonLdBlocks(emptyHtml)[0];
+    expect(isRecord(emptyBlock) ? emptyBlock.description : undefined).toBe(emptyMeta.description);
+  });
+
   it("shows a field label to people and hides the key when the seam provides one", async () => {
     const product = publishedProduct();
     product.fields = { origin: "北海合浦", note: null };
@@ -806,6 +860,7 @@ function publishedProduct(): PublicProduct {
     id: "prd_sentinel",
     catalogId: "cat_sentinel",
     title: "哨兵短靴",
+    description: null,
     cover: "https://cdn.example/sentinel.png",
     currency: "USD",
     offer: {

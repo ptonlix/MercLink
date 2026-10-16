@@ -1,6 +1,14 @@
 import { catalogFail, catalogOk, type CatalogResult } from "./result";
 
-export const systemFieldKeys = ["title", "status", "cover", "price", "stock", "currency"] as const;
+export const systemFieldKeys = [
+  "title",
+  "description",
+  "status",
+  "cover",
+  "price",
+  "stock",
+  "currency",
+] as const;
 
 const fieldTypes = ["text", "number", "boolean", "single-select"] as const;
 

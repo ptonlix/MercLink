@@ -262,6 +262,7 @@ function product(id: string, title: string): PublicProduct {
     id,
     catalogId: "cat_sentinel",
     title,
+    description: null,
     cover: null,
     currency: "CNY",
     offer: {

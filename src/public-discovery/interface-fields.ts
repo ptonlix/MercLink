@@ -56,6 +56,7 @@ const publicProductFields = [
   field("id", "string", true, "商品 ID，以 prd_ 开头"),
   field("catalog_id", "string", true, "目录 ID"),
   field("title", "string", true, "商品名称"),
+  field("description", "string | null", true, "可选纯文本，没有时为 null，不是 fields 里的键"),
   field("cover", "string | null", true, "封面地址，没有时为 null"),
   field("currency", "string", true, "货币代码"),
   field("offer.price", "integer", true, "展示价，整数分"),
@@ -72,6 +73,7 @@ const merchantProductFields = [
   field("id", "string", true, "商品 ID，以 prd_ 开头"),
   field("catalog_id", "string", true, "目录 ID"),
   field("title", "string", true, "商品名称"),
+  field("description", "string | null", true, "可选纯文本，没有时为 null，不是 fields 里的键"),
   field("status", "enum<string>", true, "上架状态", { options: ["on", "off"] }),
   field("cover", "string | null", true, "封面地址"),
   field("fields", "object", true, "目录字段值"),
@@ -192,7 +194,7 @@ const appliedFields = [
 ];
 
 const productQuery = jsonSection("查询参数都可省略，价格是整数分", [
-  field("q", "string", false, "按标题搜索"),
+  field("q", "string", false, "同时匹配标题、商品描述和文本字段，不要求目录"),
   field("limit", "integer", false, "每页数量"),
   field("cursor", "string", false, "上一页返回的 next_cursor"),
   field("catalog_id", "string", false, "目录 ID，字段过滤时必须同时带上"),
@@ -409,6 +411,12 @@ const contracts: Record<string, ApiContract> = {
     query: null,
     body: jsonSection("新建后默认下架，价格是整数分", [
       field("title", "string", true, "商品名称"),
+      field(
+        "description",
+        "string | null",
+        false,
+        "可选纯文本，最多 2000 个字符。省略为空。不能放进 fields。上架不要求",
+      ),
       field("cover", "string | null", false, "封面地址，或先上传后再写"),
       field("fields", "object", false, "目录字段值，数字用 JSON 数字，是否用布尔"),
       field("price", "integer", false, "没有规格轴时写入，整数分"),
@@ -432,6 +440,7 @@ const contracts: Record<string, ApiContract> = {
     query: null,
     body: jsonSection("出现的 fields 会整份替换，不能改价格", [
       field("title", "string", false, "新标题"),
+      field("description", "string | null", false, "省略不改。null 清空。不能放进 fields"),
       field("cover", "string | null", false, "新封面"),
       field("fields", "object", false, "整份替换已保存属性，省略的 key 会被去掉"),
     ]),

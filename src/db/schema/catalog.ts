@@ -69,6 +69,7 @@ export const products = pgTable("products", {
   id: text("id").primaryKey(),
   catalogId: text("catalog_id").notNull(),
   title: text("title").notNull(),
+  description: text("description"),
   status: text("status").notNull(),
   cover: text("cover"),
   fields: jsonb("fields").$type<Record<string, CatalogFieldValue>>().notNull().default({}),

@@ -39,6 +39,40 @@ afterEach(() => {
 });
 
 describe("order placement", () => {
+  it("snapshots the description and keeps it after the product description changes", async () => {
+    const shoe = variant({ stock: 2, description: "海水珍珠" });
+    const harness = harnessFor({ var_1: shoe });
+    const placed = await placeOrder({
+      actor: buyer(),
+      body: { client_order_no: "pearl-1", items: [{ variant_id: "var_1", qty: 1 }] },
+      runtime: harness.runtime,
+    });
+    expect(placed.ok).toBe(true);
+    if (!placed.ok) {
+      return;
+    }
+    expect(placed.graph.items[0]?.descriptionSnapshot).toBe("海水珍珠");
+    expect(placed.graph.items[0]?.fieldsSnapshot).not.toHaveProperty("description");
+    shoe.description = "改后的描述";
+    const stored = harness.graphs().find((graph) => graph.order.clientOrderNo === "pearl-1");
+    expect(stored).toBeDefined();
+    expect(placed.graph.items[0]?.descriptionSnapshot).toBe("海水珍珠");
+
+    const blank = variant({ variantId: "var_blank", stock: 1, description: null });
+    const empty = harnessFor({ var_blank: blank });
+    const unordered = await placeOrder({
+      actor: buyer(),
+      body: { client_order_no: "blank-1", items: [{ variant_id: "var_blank", qty: 1 }] },
+      runtime: empty.runtime,
+    });
+    expect(unordered.ok).toBe(true);
+    if (!unordered.ok) {
+      return;
+    }
+    expect(unordered.graph.items[0]?.descriptionSnapshot).toBeNull();
+    expect(unordered.graph.items[0]?.fieldsSnapshot).not.toHaveProperty("description");
+  });
+
   it("rejects two lines and a caller price without touching stock", async () => {
     const harness = harnessFor({ var_1: variant({ stock: 5 }) });
     const two = await placeOrder({
@@ -684,6 +718,7 @@ function variant(overrides: Partial<Variant> & { stock: number | null }): Varian
     productId: "prd_1",
     variantId: "var_1",
     title: "Shoe",
+    description: null,
     currency: "CNY",
     unitPrice: minorUnits(159900),
     sku: "SHOE-42",

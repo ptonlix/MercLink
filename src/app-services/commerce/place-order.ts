@@ -181,6 +181,7 @@ export async function placeOrder(input: {
         productId: locked.line.productId,
         variantId: locked.line.variantId,
         titleSnapshot: locked.line.title,
+        descriptionSnapshot: locked.line.description,
         variantSnapshot: snapshotVariant(locked.line),
         priceSnapshot: locked.line.unitPrice,
         fieldsSnapshot: snapshotFields(locked.line.fields),
