@@ -26,6 +26,7 @@ export function slotProductFromPublic(product: PublicProduct): SlotProduct {
     availability: product.offer.availability,
     priceMinor: product.offer.price,
     currency: product.offer.currency,
+    ...(product.faqs === undefined ? {} : { faqs: product.faqs }),
   };
 }
 

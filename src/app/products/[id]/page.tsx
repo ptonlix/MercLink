@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { slotProductFromPublic, slotStoreFromPublic } from "../../../public-discovery/documents";
-import { jsonLdElement, loadProduct, pageDiscovery } from "../../../public-discovery/model";
+import {
+  faqPageDocument,
+  jsonLdElement,
+  loadProduct,
+  pageDiscovery,
+} from "../../../public-discovery/model";
 import { isPublicProductId } from "../../../public-discovery/negotiate";
 import { publicBaseUrl } from "../../../public-discovery/site";
 import { ProductTemplate } from "../../../public-discovery/views";
@@ -46,9 +51,11 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
   if (model.kind === "hidden") {
     notFound();
   }
+  const faqLd = faqPageDocument(model.product.faqs ?? []);
   return (
     <>
       <span dangerouslySetInnerHTML={{ __html: jsonLdElement(model.jsonLd) }} />
+      {faqLd === null ? null : <span dangerouslySetInnerHTML={{ __html: jsonLdElement(faqLd) }} />}
       <link rel="canonical" href={model.canonicalUrl} />
       <link rel="alternate" type="text/markdown" href={model.markdownPath} />
       <link rel="describedby" href="/llms.txt" />

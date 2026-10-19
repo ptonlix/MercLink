@@ -9,7 +9,7 @@ import {
 } from "./model";
 import { canonicalLink, isPublicProductId } from "./negotiate";
 import { availabilityText, displayPrice, optionText, variantStock } from "./presentation";
-import { emptyProductsNote, unverifiedProfileNotice } from "./site";
+import { emptyProductsNote, faqHeading, unverifiedProfileNotice } from "./site";
 
 const hiddenProductMarkdownBody = "没有找到商品。\n";
 
@@ -18,6 +18,7 @@ function renderLandingMarkdown(model: LandingModel): string {
   appendStoreFacts(lines, model.store);
   lines.push("## 已上架商品", "");
   appendProducts(lines, model.products);
+  appendFaq(lines, model.faqs);
   return lines.join("\n");
 }
 
@@ -84,6 +85,7 @@ function renderProductMarkdown(model: VisibleProductModel): string {
     }
     lines.push("");
   }
+  appendFaq(lines, product.faqs ?? []);
   return lines.join("\n");
 }
 
@@ -177,6 +179,16 @@ function appendRecommendedFacts(lines: string[], store: NonNullable<LandingModel
     lines.push(`- 营业执照：${oneLine(license.imageUrl)}`);
   }
   lines.push(unverifiedProfileNotice);
+}
+
+function appendFaq(lines: string[], items: readonly { question: string; answer: string }[]): void {
+  if (items.length === 0) {
+    return;
+  }
+  lines.push(`## ${faqHeading}`, "");
+  for (const item of items) {
+    lines.push(`### ${oneLine(item.question)}`, "", oneLine(item.answer), "");
+  }
 }
 
 function appendProducts(lines: string[], products: readonly PublicProduct[]): void {

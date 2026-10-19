@@ -20,6 +20,8 @@ export const viewAllProductsLabel = "查看更多";
 
 export const productShelfHeading = "商品货架";
 
+export const faqHeading = "常见问题";
+
 export const productFactsHeading = "商品信息";
 
 export const siteName = "MercLink";
@@ -190,7 +192,7 @@ export function llmsText(
     "",
     "## 先读",
     "",
-    `- [落地页 Markdown（/index.md）](${absoluteUrl("/index.md", origin)}): 这家店的已发布事实，和总落地页相同。包括展示名、简介、区域、经营地址、网站和标识。客服电话、客服说明、客服二维码、企业名称、统一社会信用代码、法人、注册地址和执照图只在商家已发布时出现，并带「${unverifiedProfileNotice}」两组都没有时不写空段。这里没有规格 ID，不能靠它下单。`,
+    `- [落地页 Markdown（/index.md）](${absoluteUrl("/index.md", origin)}): 这家店的已发布事实，和总落地页相同。包括展示名、简介、区域、经营地址、网站和标识。已公开的常见问题在商品列表之后单独成节，没有条目时省略这一节。客服电话、客服说明、客服二维码、企业名称、统一社会信用代码、法人、注册地址和执照图只在商家已发布时出现，并带「${unverifiedProfileNotice}」两组都没有时不写空段。这里没有规格 ID，不能靠它下单。`,
     `- [商品列表 Markdown（/products.md）](${absoluteUrl("/products.md", origin)}): 当前已上架商品的摘要，和 /products 相同。每行是名称、主币价格、有货或没货、商品 ID。没有店铺介绍，没有规格 ID。单件的公开字段、封面、整数分和规格 ID 在 /products/{id}.md。超过一页时正文给出下一页 cursor。`,
     `- [用户 Skill（/skill.md）](${absoluteUrl(buyerSkillPath, origin)}): ${userSkill}`,
     "",
@@ -201,7 +203,7 @@ export function llmsText(
     "",
     "## 接口",
     "",
-    `- [店铺 JSON（/api/v1/store）](${absoluteUrl("/api/v1/store", origin)}): 已发布介绍的机器读取，不需要令牌。字段始终都在；没有的网站、标识、license、contact 是 null，不是省略。未发布时 404，不回显草稿。不要从 Markdown 猜测缺了哪一项。`,
+    `- [店铺 JSON（/api/v1/store）](${absoluteUrl("/api/v1/store", origin)}): 不需要令牌。介绍已发布时保留原有字段并附加 faqs，没有的网站、标识、license、contact 是 null，问答未公开时 faqs 为 []。介绍未发布但全店问答已公开且非空时，200 的 data 只有 faqs。两者都不可见，或商家停用、删除时 404，不回显草稿。不要把 200 理解成介绍一定已发布。`,
     `- [商家 Skill（/merchant/skill.md）](${absoluteUrl(merchantSkillPath, origin)}): 商家 Agent 的调用说明，不含这家店的资料或令牌。用它管理目录、目录字段、商品、规格、上下架，以及整店一份的介绍。介绍不是每本目录一份。客服和执照是推荐录入，不是上架条件；写入执照前必须先向用户读出四项并得到同意。不要用它给买家下单。`,
     `- [店面 Skill（/storefront/skill.md）](${absoluteUrl(storefrontSkillPath, origin)}): 只讲怎么改给人看的页面。${storefrontSkill}不能改 /llms.txt、三份 Skill、/api、授权页协议和支付结果判断。页面上的客服和执照必须用槽位，不能写死。`,
     `- [接口文档（/interfaces）](${absoluteUrl(interfaceDirectoryPath, origin)}): 给人看的已登记路径、字段、认证和权限。不是调用说明，也不能代替三份 Skill。不要从这里猜未登记的路径。`,

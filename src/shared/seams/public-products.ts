@@ -30,6 +30,7 @@ export type PublicProduct = {
   fieldLabels?: Readonly<Record<string, string>>;
   axisLabels?: Readonly<Record<string, string>>;
   variants: readonly PublicVariant[];
+  faqs?: readonly { question: string; answer: string }[];
 };
 
 export type PublicProductPage = {

@@ -19,7 +19,7 @@ import {
   type SlotProduct,
   type SlotStore,
 } from "../../domain/storefront/slots";
-import { jsonLdElement, serverFactJsonLd } from "../../public-discovery/model";
+import { faqPageDocument, jsonLdElement, serverFactJsonLd } from "../../public-discovery/model";
 import {
   alternateMarkdown,
   canonicalLink,
@@ -233,6 +233,10 @@ async function serveFile(
   if (jsonLd !== null) {
     rendered = injectJsonLd(rendered, jsonLdElement(jsonLd));
   }
+  const faqLd = faqPageDocument(visibleFaqItems(stripped, facts, onlyProduct !== undefined));
+  if (faqLd !== null) {
+    rendered = injectJsonLd(rendered, jsonLdElement(faqLd));
+  }
   rendered = withDiscoveryTags(rendered, pathname, request, facts.context.nextCursor);
   return htmlResponse(rendered, pathname, request, facts.context.nextCursor, file.contentType);
 }
@@ -246,12 +250,13 @@ type RenderFacts = {
 
 async function loadFacts(request: Request, onlyProduct?: PublicProduct): Promise<RenderFacts> {
   const url = new URL(request.url);
-  const [store, page] = await Promise.all([
-    publicStore.get(),
+  const [read, page] = await Promise.all([
+    publicStore.read(),
     onlyProduct === undefined
       ? publicProducts.list({ limit: 20, cursor: url.searchParams.get("cursor") ?? undefined })
       : Promise.resolve({ items: [onlyProduct], nextCursor: null }),
   ]);
+  const store = read.profile;
   const orderId = url.searchParams.get("order_id");
   const runtime = storefrontRuntime();
   const orderStatus =
@@ -266,6 +271,7 @@ async function loadFacts(request: Request, onlyProduct?: PublicProduct): Promise
       orderStatus,
       nextCursor: page.nextCursor,
       origin: url.origin,
+      storeFaqs: onlyProduct === undefined ? read.faqs : [],
     },
     store,
     products: onlyProduct === undefined ? page.items : [],
@@ -330,7 +336,25 @@ function slotProduct(product: PublicProduct): SlotProduct {
     availability: product.offer.availability,
     priceMinor: product.offer.price,
     currency: product.offer.currency,
+    ...(product.faqs === undefined ? {} : { faqs: product.faqs }),
   };
+}
+
+function visibleFaqItems(
+  html: string,
+  facts: RenderFacts,
+  productPage: boolean,
+): readonly { question: string; answer: string }[] {
+  if (productPage) {
+    if (facts.product === null || !html.includes('data-merclink="product.faq"')) {
+      return [];
+    }
+    return facts.product.faqs ?? [];
+  }
+  if (!html.includes('data-merclink="store.faq"')) {
+    return [];
+  }
+  return facts.context.storeFaqs ?? [];
 }
 
 function productPathname(url: string): string | null {

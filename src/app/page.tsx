@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { slotProductFromPublic, slotStoreFromPublic } from "../public-discovery/documents";
-import { jsonLdElement, loadLanding, pageDiscovery } from "../public-discovery/model";
+import {
+  faqPageDocument,
+  jsonLdElement,
+  loadLanding,
+  pageDiscovery,
+} from "../public-discovery/model";
 import { publicBaseUrl } from "../public-discovery/site";
 import { LandingTemplate } from "../public-discovery/views";
 
@@ -24,7 +29,9 @@ export default async function HomePage(): Promise<ReactNode> {
     orderStatus: null,
     nextCursor: model.nextCursor,
     origin: publicBaseUrl(),
+    storeFaqs: model.faqs,
   };
+  const faqLd = faqPageDocument(model.faqs);
   return (
     <>
       <Discovery
@@ -32,6 +39,7 @@ export default async function HomePage(): Promise<ReactNode> {
         canonical={model.canonicalUrl}
         markdown={model.markdownPath}
       />
+      {faqLd === null ? null : <span dangerouslySetInnerHTML={{ __html: jsonLdElement(faqLd) }} />}
       <LandingTemplate facts={facts} />
     </>
   );

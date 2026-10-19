@@ -263,7 +263,25 @@ export function mapPreviewProduct(raw) {
     availability: String(raw.offer?.availability ?? ""),
     priceMinor: Number(raw.offer?.price ?? 0),
     currency: typeof raw.offer?.currency === "string" ? raw.offer.currency : "CNY",
+    ...(Array.isArray(raw.faqs) ? { faqs: mapPreviewFaqs(raw.faqs) } : {}),
   };
+}
+
+function mapPreviewFaqs(raw) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const items = [];
+  for (const item of raw) {
+    if (item === null || typeof item !== "object") {
+      continue;
+    }
+    if (typeof item.question !== "string" || typeof item.answer !== "string") {
+      continue;
+    }
+    items.push({ question: item.question, answer: item.answer });
+  }
+  return items;
 }
 
 export function mapPreviewStore(raw) {
@@ -307,6 +325,7 @@ async function readJson(url, headers) {
 export async function loadPreviewFacts(origin, requestUrl, authorization) {
   const pathname = normalizePreviewPath(requestUrl.pathname);
   const id = productId(pathname);
+  const productPage = id !== null;
   const storeData = await readJson(new URL("/api/v1/store", origin));
   let products = [];
   let product = null;
@@ -353,6 +372,7 @@ export async function loadPreviewFacts(origin, requestUrl, authorization) {
       orderStatus,
       nextCursor,
       origin,
+      storeFaqs: productPage ? [] : mapPreviewFaqs(storeData?.faqs),
     },
   };
 }

@@ -1,6 +1,10 @@
 import type { PublicListQuery, PublicProduct } from "../shared/seams/public-products";
 import { publicProducts } from "../shared/seams/public-products";
-import { publicStore, type PublicStoreProfile } from "../shared/seams/public-store";
+import {
+  publicStore,
+  type PublicFaqItem,
+  type PublicStoreProfile,
+} from "../shared/seams/public-store";
 import { currentPurchaseEnabled } from "../shared/purchase-mode";
 import { isPublicProductId } from "./negotiate";
 import {
@@ -31,6 +35,7 @@ export type LandingModel = {
   canonicalUrl: string;
   markdownPath: string;
   store: PublicStoreProfile | null;
+  faqs: readonly PublicFaqItem[];
   products: readonly PublicProduct[];
   nextCursor: string | null;
   jsonLd: LandingJsonLd;
@@ -132,10 +137,11 @@ function truncateChars(value: string, max: number): string {
 }
 
 export async function loadLanding(): Promise<LandingModel> {
-  const [page, store] = await Promise.all([
+  const [page, read] = await Promise.all([
     publicProducts.list({ limit: listLimit }),
-    publicStore.get(),
+    publicStore.read(),
   ]);
+  const store = read.profile;
   const origin = publicBaseUrl();
   const description =
     store === null
@@ -153,6 +159,7 @@ export async function loadLanding(): Promise<LandingModel> {
     canonicalUrl: absoluteUrl("/", origin),
     markdownPath: "/index.md",
     store,
+    faqs: read.faqs,
     products: page.items,
     nextCursor: page.nextCursor,
     jsonLd: {
@@ -432,6 +439,29 @@ function productNode(product: PublicProduct): JsonLdNode {
     description: document.description,
     offers: document.offers,
     ...(document.image === undefined ? {} : { image: document.image }),
+  };
+}
+
+export function faqPageDocument(items: readonly PublicFaqItem[]): {
+  "@context": "https://schema.org";
+  "@type": "FAQPage";
+  mainEntity: readonly {
+    "@type": "Question";
+    name: string;
+    acceptedAnswer: { "@type": "Answer"; text: string };
+  }[];
+} | null {
+  if (items.length === 0) {
+    return null;
+  }
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    })),
   };
 }
 

@@ -55,6 +55,7 @@ import {
   merchantSkillPath,
   explanationFor,
   poweredByLabel,
+  faqHeading,
   productFactsHeading,
   productShelfHeading,
   storefrontSkillPath,
@@ -82,6 +83,7 @@ export function LandingTemplate({ facts = null }: { facts?: Facts }): ReactNode 
             </a>
           </div>
         </section>
+        <StoreFaq facts={facts} />
         <RecommendedFacts facts={facts} />
         <PlatformUsageGuide facts={facts} />
         <StoreFooter />
@@ -191,6 +193,7 @@ export function ProductTemplate({ facts = null }: { facts?: Facts }): ReactNode 
           </a>
         </div>
       </article>
+      <ProductFaq facts={facts} />
     </PublicShell>
   );
 }
@@ -207,6 +210,68 @@ function ProductDescription({ facts }: { facts: Facts }): ReactNode {
     <p className="productDescription">
       <Slot name="product.description" facts={facts} />
     </p>
+  );
+}
+
+function StoreFaq({ facts }: { facts: Facts }): ReactNode {
+  if (facts === null) {
+    return (
+      <template data-merclink="store.faq">
+        <h3>
+          <Slot name="faq.question" facts={facts} />
+        </h3>
+        <p>
+          <Slot name="faq.answer" facts={facts} />
+        </p>
+      </template>
+    );
+  }
+  return <FaqList items={facts.storeFaqs ?? []} />;
+}
+
+function ProductFaq({ facts }: { facts: Facts }): ReactNode {
+  if (facts === null) {
+    return (
+      <template data-merclink="product.faq">
+        <h3>
+          <Slot name="faq.question" facts={facts} />
+        </h3>
+        <p>
+          <Slot name="faq.answer" facts={facts} />
+        </p>
+      </template>
+    );
+  }
+  return <FaqList items={facts.product?.faqs ?? []} />;
+}
+
+function FaqList({ items }: { items: readonly { question: string; answer: string }[] }): ReactNode {
+  if (items.length === 0) {
+    return null;
+  }
+  return (
+    <section className="faq">
+      <h2>{faqHeading}</h2>
+      <div className="faqList">
+        {items.map((item) => (
+          <details className="faqItem" name="faq" key={item.question}>
+            <summary>
+              <h3>{item.question}</h3>
+              <svg
+                className="faqMark"
+                viewBox="0 0 20 20"
+                width="20"
+                height="20"
+                aria-hidden="true"
+              >
+                <path d="M4 10h12M10 4v12" />
+              </svg>
+            </summary>
+            <p>{item.answer}</p>
+          </details>
+        ))}
+      </div>
+    </section>
   );
 }
 

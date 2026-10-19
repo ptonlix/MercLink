@@ -12,11 +12,18 @@ describe("storefront", () => {
     if (response.status === 200) {
       expect(body.code).toBe(200);
       expect(body.message).toBe("成功");
-      expect(body.data).toMatchObject({
-        display_name: expect.any(String),
-        summary: expect.any(String),
-      });
       expect(body.data).not.toHaveProperty("pageNum");
+      const data = objectData(body.data);
+      if (typeof data.display_name === "string") {
+        expect(data).toMatchObject({
+          display_name: expect.any(String),
+          summary: expect.any(String),
+        });
+      } else {
+        expect(data).not.toHaveProperty("display_name");
+        expect(Array.isArray(data.faqs)).toBe(true);
+        expect(data.faqs).not.toHaveLength(0);
+      }
       return;
     }
     expect(response.status).toBe(404);
@@ -24,3 +31,10 @@ describe("storefront", () => {
     expect(body.data).toBeNull();
   });
 });
+
+function objectData(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null) {
+    throw new Error("expected an object");
+  }
+  return value as Record<string, unknown>;
+}

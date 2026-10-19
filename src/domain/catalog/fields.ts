@@ -3,6 +3,7 @@ import { catalogFail, catalogOk, type CatalogResult } from "./result";
 export const systemFieldKeys = [
   "title",
   "description",
+  "faqs",
   "status",
   "cover",
   "price",

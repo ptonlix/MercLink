@@ -19,8 +19,13 @@ const storeSlotNames = new Set([
 // Same literal as siteName in src/public-discovery/site.ts.
 const storeNavFallback = "MercLink";
 
+// Same literal as faqHeading in src/public-discovery/site.ts. Inserted only when a region has items.
+const faqRegionHeading = "常见问题";
+
 const productTemplatePattern = /<template\s+data-merclink="product">([\s\S]*?)<\/template>/g;
 const paidTemplatePattern = /<template\s+data-merclink="order\.paid">([\s\S]*?)<\/template>/g;
+const storeFaqTemplatePattern = /<template\s+data-merclink="store\.faq">([\s\S]*?)<\/template>/g;
+const productFaqTemplatePattern = /<template\s+data-merclink="product\.faq">([\s\S]*?)<\/template>/g;
 
 function slotPattern() {
   return /<merclink-slot\s+name="([a-z0-9._-]+)"\s*>\s*<\/merclink-slot>/g;
@@ -45,7 +50,17 @@ export function renderPreviewDocument(html, context) {
     return products.map((product) => fillProduct(inner, product)).join("");
   });
   const withProduct = context.product === null ? expanded : fillProduct(expanded, context.product);
-  const withStore = withProduct.replace(slotPattern(), (match, name) => {
+  const withProductFaqs = expandFaqRegion(
+    withProduct,
+    productFaqTemplatePattern,
+    context.product?.faqs ?? [],
+  );
+  const withStoreFaqs = expandFaqRegion(
+    withProductFaqs,
+    storeFaqTemplatePattern,
+    context.storeFaqs ?? [],
+  );
+  const withStore = withStoreFaqs.replace(slotPattern(), (match, name) => {
     if (name === "site.origin") {
       return escapeHtml(context.origin ?? "");
     }
@@ -64,13 +79,37 @@ export function renderPreviewDocument(html, context) {
 
 function fillProduct(html, product) {
   const expanded = expandVariantTemplates(expandFieldTemplates(html, product), product);
+  // Skeleton tokens first. Published FAQ text is inserted afterwards and must keep `{id}`.
   const withId = expanded
     .replaceAll("{id}", escapeHtml(product.id))
     .replaceAll("{catalogId}", escapeHtml(product.catalogId ?? ""))
     .replaceAll("{priceMinor}", escapeHtml(String(product.priceMinor)))
     .replaceAll("{availabilityRaw}", escapeHtml(product.availability))
     .replaceAll("{currency}", escapeHtml(product.currency ?? "CNY"));
-  return withId.replace(slotPattern(), (match, name) => productSlotValue(name, product, html) ?? match);
+  const withFaqs = expandFaqRegion(withId, productFaqTemplatePattern, product.faqs ?? []);
+  return withFaqs.replace(slotPattern(), (match, name) => productSlotValue(name, product, html) ?? match);
+}
+
+function expandFaqRegion(html, pattern, items) {
+  pattern.lastIndex = 0;
+  if (!pattern.test(html)) {
+    return html;
+  }
+  pattern.lastIndex = 0;
+  return html.replace(pattern, (_match, inner) => {
+    if (items.length === 0) {
+      return "";
+    }
+    const body = items
+      .map((item) =>
+        fillNamed(inner, {
+          "faq.question": item.question,
+          "faq.answer": item.answer,
+        }),
+      )
+      .join("");
+    return `<h2>${faqRegionHeading}</h2>${body}`;
+  });
 }
 
 function expandFieldTemplates(html, product) {

@@ -89,6 +89,13 @@ Local preview fills fact slots from the source deployment before activation. It 
 - `<merclink-slot name="order.status"></merclink-slot>`
 - `<merclink-slot name="products.next"></merclink-slot>`
 
+全店问答放在 `<template data-merclink="store.faq">` 里，商品问答放在 `<template data-merclink="product.faq">` 里。区域里面只用这两个槽位：
+
+- `<merclink-slot name="faq.question"></merclink-slot>`
+- `<merclink-slot name="faq.answer"></merclink-slot>`
+
+这两个槽位如果出现在区域外面，模板不能发布。区域里面也不能再放别的槽位。服务端用已公开的问答填槽。有一条或多条可见条目时，服务端在该区域的条目前插入恰好一个 `<h2>常见问题</h2>`，不是每条一个。没有可见条目时去掉整个区域，也不留下这个标题。模板里不要写死这个标题，也不要写死当时的问题和答案。没有声明对应区域的模板仍然有效，不会多出标题或问答。已经发布、而且没有对应区域的店面保持原样，不会被改写成带问答。
+
 `store.nav_name` 是导航上的店名，没有已发布店名时是 MercLink，不要拿它当页面主标题。
 
 商品列表放在 `<template data-merclink="product">` 里，链接使用 `/products/{id}`。商品页是 `products/item.html`。商品列表必须声明 `products.next`。还有下一页时，服务端把该槽位渲染成指向 `/products?cursor=` 的链接；没有下一页时槽位为空。不要把后续页一次写进同一份页面。

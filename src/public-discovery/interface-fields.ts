@@ -194,7 +194,7 @@ const appliedFields = [
 ];
 
 const productQuery = jsonSection("查询参数都可省略，价格是整数分", [
-  field("q", "string", false, "同时匹配标题、商品描述和文本字段，不要求目录"),
+  field("q", "string", false, "同时匹配标题、商品描述和文本字段，不匹配问答，不要求目录"),
   field("limit", "integer", false, "每页数量"),
   field("cursor", "string", false, "上一页返回的 next_cursor"),
   field("catalog_id", "string", false, "目录 ID，字段过滤时必须同时带上"),
@@ -232,12 +232,36 @@ function params(path: string): ApiField[] {
   });
 }
 
+const faqItemFields = [
+  field("faqs[].question", "string", true, "问题，单行纯文本"),
+  field("faqs[].answer", "string", true, "答案，单行纯文本"),
+];
+
+const managedFaqFields = [
+  field("published", "boolean", true, "为 true 时公开问答才出现在页面和公开 JSON"),
+  field("items", "object[]", true, "整份问答。未保存时为 []"),
+  field("items[].question", "string", true, "问题，去空白后 1 到 80 个字符"),
+  field("items[].answer", "string", true, "答案，去空白后 1 到 400 个字符"),
+  field("updated_at", "string | null", true, "更新时间，未保存时为 null"),
+];
+
+const managedFaqBody = jsonSection("published 和 items 必须都出现，不能多字段", [
+  field("published", "boolean", true, "没有条目时不能为 true"),
+  field("items", "object[]", true, "全店最多 12 条，商品最多 8 条"),
+  field("items[].question", "string", true, "单行纯文本", { range: "1 到 80" }),
+  field("items[].answer", "string", true, "单行纯文本", { range: "1 到 400" }),
+]);
+
 function readProduct(): ApiContract {
   return {
     pathParams: params("/api/v1/products/{id}"),
     query: null,
     body: null,
-    responses: jsonResponse(200, bearerJson, publicProductFields),
+    responses: jsonResponse(200, "详情包含 faqs，未公开时为 []。列表项不含 faqs", [
+      ...publicProductFields,
+      field("faqs", "object[]", true, "该商品已公开问答，未公开或没有时为 []"),
+      ...faqItemFields,
+    ]),
   };
 }
 
@@ -246,16 +270,20 @@ const contracts: Record<string, ApiContract> = {
     pathParams: [],
     query: productQuery,
     body: null,
-    responses: jsonResponse(200, "列表在 data.items，下一页游标在 data.next_cursor", [
-      field("items", "object[]", true, "已上架商品"),
-      ...publicProductFields.map((item) =>
-        field(`items[].${item.name}`, item.type, item.required, item.description, {
-          options: item.options,
-          range: item.range,
-        }),
-      ),
-      field("next_cursor", "string | null", true, "没有下一页时为 null"),
-    ]),
+    responses: jsonResponse(
+      200,
+      "列表在 data.items，下一页游标在 data.next_cursor。列表项不含 faqs",
+      [
+        field("items", "object[]", true, "已上架商品"),
+        ...publicProductFields.map((item) =>
+          field(`items[].${item.name}`, item.type, item.required, item.description, {
+            options: item.options,
+            range: item.range,
+          }),
+        ),
+        field("next_cursor", "string | null", true, "没有下一页时为 null"),
+      ],
+    ),
   },
   "GET /api/v1/products/{id}": readProduct(),
   "GET /api/v1/catalogs/{id}/schema": {
@@ -576,11 +604,62 @@ const contracts: Record<string, ApiContract> = {
       field("purpose", "enum<string>", true, "上传用途", { options: ["license", "contact_qr"] }),
     ]),
   },
+  "GET /api/v1/merchant/faqs": {
+    pathParams: [],
+    query: null,
+    body: null,
+    responses: jsonResponse(
+      200,
+      "未保存时 published 为 false，items 为 []，updated_at 为 null",
+      managedFaqFields,
+    ),
+  },
+  "PUT /api/v1/merchant/faqs": {
+    pathParams: [],
+    query: null,
+    body: managedFaqBody,
+    responses: jsonResponse(200, bearerJson, managedFaqFields),
+  },
+  "GET /api/v1/catalogs/{id}/products/{product_id}/faqs": {
+    pathParams: [
+      field("id", "string", true, "目录 ID"),
+      field("product_id", "string", true, "商品 ID"),
+    ],
+    query: null,
+    body: null,
+    responses: jsonResponse(
+      200,
+      "未保存时 published 为 false，items 为 []，updated_at 为 null",
+      managedFaqFields,
+    ),
+  },
+  "PUT /api/v1/catalogs/{id}/products/{product_id}/faqs": {
+    pathParams: [
+      field("id", "string", true, "目录 ID"),
+      field("product_id", "string", true, "商品 ID"),
+    ],
+    query: null,
+    body: managedFaqBody,
+    responses: jsonResponse(200, bearerJson, managedFaqFields),
+  },
   "GET /api/v1/store": {
     pathParams: [],
     query: null,
     body: null,
-    responses: jsonResponse(200, "字段始终都在，没有的值是 null，未发布时 404", storeFields),
+    responses: jsonResponse(
+      200,
+      "介绍已发布时原有字段都在并附加 faqs，问答未公开时 faqs 为 []。介绍未发布但全店问答已公开且非空时 data 只有 faqs。两者都不可见或商家停用、删除时 404，不回显草稿",
+      [
+        ...storeFields,
+        field(
+          "faqs",
+          "object[]",
+          true,
+          "已公开全店问答。介绍已发布但问答未公开时为 []。只有问答公开时这是 data 里唯一的字段",
+        ),
+        ...faqItemFields,
+      ],
+    ),
   },
   "POST /api/v1/payments/alipay/notify": {
     pathParams: [],

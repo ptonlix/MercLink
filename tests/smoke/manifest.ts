@@ -4,7 +4,8 @@ type SmokeMethod = (typeof smokeMethods)[number];
 
 type SmokeAudience = "public" | "bearer" | "cookie" | "form";
 
-type SmokeBodyKind = "envelope" | "text" | "json" | "html" | "bytes" | "redirect" | "empty" | "oauth";
+type SmokeBodyKind =
+  "envelope" | "text" | "json" | "html" | "bytes" | "redirect" | "empty" | "oauth";
 
 export type SmokeRoute = {
   method: SmokeMethod;
@@ -15,7 +16,12 @@ export type SmokeRoute = {
 
 // Coverage inventory only. Skills keep using src/shared/api-routes.ts.
 export const smokeManifest = [
-  { method: "GET", path: "/.well-known/oauth-protected-resource", audience: "public", bodyKind: "json" },
+  {
+    method: "GET",
+    path: "/.well-known/oauth-protected-resource",
+    audience: "public",
+    bodyKind: "json",
+  },
   { method: "POST", path: "/admin/submit", audience: "form", bodyKind: "redirect" },
   { method: "GET", path: "/agent-docs/buyer-skill", audience: "public", bodyKind: "text" },
   { method: "GET", path: "/agent-docs/merchant-skill", audience: "public", bodyKind: "text" },
@@ -25,23 +31,98 @@ export const smokeManifest = [
   { method: "POST", path: "/api/v1/api-keys/{id}", audience: "cookie", bodyKind: "redirect" },
   { method: "GET", path: "/api/v1/api-keys", audience: "cookie", bodyKind: "envelope" },
   { method: "POST", path: "/api/v1/api-keys", audience: "cookie", bodyKind: "envelope" },
-  { method: "POST", path: "/api/v1/catalogs/{id}/fields/changes", audience: "bearer", bodyKind: "envelope" },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/fields/changes",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
   { method: "GET", path: "/api/v1/catalogs/{id}/fields", audience: "bearer", bodyKind: "envelope" },
-  { method: "POST", path: "/api/v1/catalogs/{id}/fields", audience: "bearer", bodyKind: "envelope" },
-  { method: "POST", path: "/api/v1/catalogs/{id}/images", audience: "bearer", bodyKind: "envelope" },
-  { method: "POST", path: "/api/v1/catalogs/{id}/products/{product_id}/axes", audience: "bearer", bodyKind: "envelope" },
-  { method: "POST", path: "/api/v1/catalogs/{id}/products/{product_id}/options", audience: "public", bodyKind: "envelope" },
-  { method: "POST", path: "/api/v1/catalogs/{id}/products/{product_id}/publish", audience: "bearer", bodyKind: "envelope" },
-  { method: "POST", path: "/api/v1/catalogs/{id}/products/{product_id}/restore", audience: "bearer", bodyKind: "envelope" },
-  { method: "PATCH", path: "/api/v1/catalogs/{id}/products/{product_id}", audience: "bearer", bodyKind: "envelope" },
-  { method: "DELETE", path: "/api/v1/catalogs/{id}/products/{product_id}", audience: "bearer", bodyKind: "envelope" },
-  { method: "POST", path: "/api/v1/catalogs/{id}/products/{product_id}/unpublish", audience: "bearer", bodyKind: "envelope" },
-  { method: "POST", path: "/api/v1/catalogs/{id}/products/{product_id}/variants", audience: "bearer", bodyKind: "envelope" },
-  { method: "GET", path: "/api/v1/catalogs/{id}/products", audience: "bearer", bodyKind: "envelope" },
-  { method: "POST", path: "/api/v1/catalogs/{id}/products", audience: "bearer", bodyKind: "envelope" },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/fields",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/images",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/axes",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/options",
+    audience: "public",
+    bodyKind: "envelope",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/publish",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/restore",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
+  {
+    method: "PATCH",
+    path: "/api/v1/catalogs/{id}/products/{product_id}",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
+  {
+    method: "DELETE",
+    path: "/api/v1/catalogs/{id}/products/{product_id}",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/unpublish",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/variants",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
+  {
+    method: "GET",
+    path: "/api/v1/catalogs/{id}/products",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/catalogs/{id}/products",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
   { method: "GET", path: "/api/v1/catalogs/{id}/schema", audience: "public", bodyKind: "envelope" },
-  { method: "PATCH", path: "/api/v1/catalogs/{id}/variants/{variant_id}", audience: "bearer", bodyKind: "envelope" },
-  { method: "DELETE", path: "/api/v1/catalogs/{id}/variants/{variant_id}", audience: "bearer", bodyKind: "envelope" },
+  {
+    method: "PATCH",
+    path: "/api/v1/catalogs/{id}/variants/{variant_id}",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
+  {
+    method: "DELETE",
+    path: "/api/v1/catalogs/{id}/variants/{variant_id}",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
   { method: "GET", path: "/api/v1/catalogs", audience: "bearer", bodyKind: "envelope" },
   { method: "POST", path: "/api/v1/catalogs", audience: "bearer", bodyKind: "envelope" },
   { method: "GET", path: "/api/v1/manage/orders", audience: "bearer", bodyKind: "envelope" },
@@ -52,8 +133,27 @@ export const smokeManifest = [
     bodyKind: "envelope",
   },
   { method: "GET", path: "/api/v1/merchant/profile", audience: "bearer", bodyKind: "envelope" },
-  { method: "POST", path: "/api/v1/merchant/profile/images", audience: "bearer", bodyKind: "envelope" },
+  {
+    method: "POST",
+    path: "/api/v1/merchant/profile/images",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
   { method: "PUT", path: "/api/v1/merchant/profile", audience: "bearer", bodyKind: "envelope" },
+  { method: "GET", path: "/api/v1/merchant/faqs", audience: "bearer", bodyKind: "envelope" },
+  { method: "PUT", path: "/api/v1/merchant/faqs", audience: "bearer", bodyKind: "envelope" },
+  {
+    method: "GET",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/faqs",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
+  {
+    method: "PUT",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/faqs",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
   { method: "GET", path: "/api/v1/orders/{id}", audience: "bearer", bodyKind: "envelope" },
   { method: "POST", path: "/api/v1/orders", audience: "bearer", bodyKind: "envelope" },
   { method: "POST", path: "/api/v1/payments/alipay/notify", audience: "public", bodyKind: "text" },
@@ -82,7 +182,12 @@ export const smokeManifest = [
   },
   { method: "GET", path: "/api/v1/storefront/source", audience: "bearer", bodyKind: "bytes" },
   { method: "POST", path: "/api/v1/storefront/reset", audience: "bearer", bodyKind: "envelope" },
-  { method: "GET", path: "/api/v1/storefront/reset/{id}", audience: "bearer", bodyKind: "envelope" },
+  {
+    method: "GET",
+    path: "/api/v1/storefront/reset/{id}",
+    audience: "bearer",
+    bodyKind: "envelope",
+  },
   {
     method: "POST",
     path: "/admin/storefront-resets/{id}/approve",
@@ -92,7 +197,12 @@ export const smokeManifest = [
   { method: "GET", path: "/authorize/buyer/submit", audience: "public", bodyKind: "html" },
   { method: "POST", path: "/authorize/buyer/submit", audience: "form", bodyKind: "redirect" },
   { method: "POST", path: "/authorize/merchant/submit", audience: "form", bodyKind: "redirect" },
-  { method: "POST", path: "/dev/pay/{paymentId}/confirm", audience: "public", bodyKind: "redirect" },
+  {
+    method: "POST",
+    path: "/dev/pay/{paymentId}/confirm",
+    audience: "public",
+    bodyKind: "redirect",
+  },
   { method: "GET", path: "/llms.txt", audience: "public", bodyKind: "text" },
   { method: "GET", path: "/markdown/hidden", audience: "public", bodyKind: "text" },
   { method: "GET", path: "/markdown/landing", audience: "public", bodyKind: "text" },
