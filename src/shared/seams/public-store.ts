@@ -23,8 +23,19 @@ export type PublicStoreProfile = {
   contact: PublicContact | null;
 };
 
+export type PublicFaqItem = {
+  question: string;
+  answer: string;
+};
+
+export type PublicStoreRead = {
+  profile: PublicStoreProfile | null;
+  faqs: readonly PublicFaqItem[];
+};
+
 export type PublicStoreImpl = {
   get: () => Promise<PublicStoreProfile | null>;
+  faqs?: () => Promise<readonly PublicFaqItem[]>;
 };
 
 const slotKey = Symbol.for("merclink.publicStore");
@@ -53,8 +64,23 @@ async function get(): Promise<PublicStoreProfile | null> {
   return implementation.get();
 }
 
+async function faqs(): Promise<readonly PublicFaqItem[]> {
+  const implementation = slot().impl?.faqs;
+  if (implementation === undefined) {
+    return [];
+  }
+  return implementation();
+}
+
+async function read(): Promise<PublicStoreRead> {
+  const [profile, items] = await Promise.all([get(), faqs()]);
+  return { profile, faqs: items };
+}
+
 export const publicStore = {
   get,
+  faqs,
+  read,
   register: registerPublicStore,
   reset: resetPublicStore,
 };

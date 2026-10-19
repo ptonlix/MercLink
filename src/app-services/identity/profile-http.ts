@@ -11,6 +11,7 @@ import { authenticate } from "../../shared/seams/authenticate";
 import {
   publicStore,
   resetPublicStore,
+  type PublicFaqItem,
   type PublicStoreProfile,
 } from "../../shared/seams/public-store";
 import {
@@ -20,6 +21,14 @@ import {
 } from "./profile-store";
 
 let boundStore: MerchantProfileStore | undefined;
+let publicFaqRead: (() => Promise<readonly PublicFaqItem[]>) | undefined;
+
+function registerProfileSeam(store: MerchantProfileStore): void {
+  publicStore.register({
+    get: () => store.readPublished(),
+    faqs: () => publicFaqRead?.() ?? Promise.resolve([]),
+  });
+}
 
 export function bindMerchantProfileStore(store: MerchantProfileStore | undefined): void {
   boundStore = store;
@@ -27,11 +36,21 @@ export function bindMerchantProfileStore(store: MerchantProfileStore | undefined
     resetPublicStore();
     return;
   }
-  publicStore.register({ get: () => store.readPublished() });
+  registerProfileSeam(store);
+}
+
+export function bindPublicFaqRead(
+  read: (() => Promise<readonly PublicFaqItem[]>) | undefined,
+): void {
+  publicFaqRead = read;
+  if (boundStore !== undefined) {
+    registerProfileSeam(boundStore);
+  }
 }
 
 export function resetMerchantProfileStore(): void {
   boundStore = undefined;
+  publicFaqRead = undefined;
   resetPublicStore();
 }
 
@@ -100,11 +119,19 @@ export async function putMerchantProfile(request: Request): Promise<Response> {
 
 export async function getPublicStore(request?: Request): Promise<Response> {
   ensureStore();
-  const store = await publicStore.get();
-  if (store === null) {
-    return apiFailure("not_found", "没有已发布的店铺介绍。", { request });
+  const { profile, faqs } = await publicStore.read();
+  const visible = faqs.map(faqJson);
+  if (profile !== null) {
+    return apiSuccess({ ...publicStoreJson(profile), faqs: visible }, { request });
   }
-  return apiSuccess(publicStoreJson(store), { request });
+  if (visible.length > 0) {
+    return apiSuccess({ faqs: visible }, { request });
+  }
+  return apiFailure("not_found", "没有已发布的店铺介绍。", { request });
+}
+
+function faqJson(item: PublicFaqItem): { question: string; answer: string } {
+  return { question: item.question, answer: item.answer };
 }
 
 function ensureStore(): MerchantProfileStore {

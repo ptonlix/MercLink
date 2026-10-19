@@ -82,7 +82,7 @@ export async function getPublicProduct(
   if (product === undefined) {
     return catalogFail("not_found", "没有找到商品。");
   }
-  return catalogOk(product);
+  return catalogOk({ ...product, faqs: await readPublishedProductFaqs(db, row.id) });
 }
 
 export async function listMerchantProducts(
@@ -231,6 +231,42 @@ async function queryVisibleProducts(
         ? encodeCursor({ createdAt: last.created_at.toISOString(), id: last.id })
         : null,
   };
+}
+
+async function readPublishedProductFaqs(
+  db: Db,
+  productId: string,
+): Promise<readonly { question: string; answer: string }[]> {
+  const rows = await db<{ items: unknown }[]>`
+    SELECT f.items
+    FROM merchant_faqs f
+    JOIN products p ON p.id = f.product_id
+    JOIN catalogs c ON c.id = p.catalog_id
+    JOIN merchants m ON m.id = c.merchant_id
+    WHERE f.product_id = ${productId}
+      AND f.published = true
+      AND m.status = 'active'
+      AND m.deleted_at IS NULL
+    LIMIT 1
+  `;
+  return faqItemsFrom(rows[0]?.items);
+}
+
+function faqItemsFrom(value: unknown): { question: string; answer: string }[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const items: { question: string; answer: string }[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) {
+      continue;
+    }
+    const record = item as { question?: unknown; answer?: unknown };
+    if (typeof record.question === "string" && typeof record.answer === "string") {
+      items.push({ question: record.question, answer: record.answer });
+    }
+  }
+  return items;
 }
 
 async function toPublic(db: Db, row: PublicQueryRow): Promise<PublicProduct | undefined> {

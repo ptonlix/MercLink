@@ -125,6 +125,9 @@ export function parseProductBody(input: unknown): CatalogResult<{
   if (record === undefined) {
     return catalogFail("validation_error", "请求体必须是 JSON 对象。");
   }
+  if (hasOwn(record, "faqs")) {
+    return catalogFail("validation_error", "不能提交未声明的字段。");
+  }
   const title = readString(record, "title");
   if (title === undefined) {
     return catalogFail("validation_error", "商品名不能为空。");
@@ -156,6 +159,9 @@ export function parseProductPatch(input: unknown): CatalogResult<{
   const record = asRecord(input);
   if (record === undefined) {
     return catalogFail("validation_error", "请求体必须是 JSON 对象。");
+  }
+  if (hasOwn(record, "faqs")) {
+    return catalogFail("validation_error", "不能提交未声明的字段。");
   }
   const fields = hasOwn(record, "fields") ? readObject(record, "fields") : catalogOk(undefined);
   if (!fields.ok) {

@@ -270,6 +270,22 @@ describe("catalog management", () => {
         fields: { nope: "x" },
       });
       expect(unknown).toMatchObject({ ok: false, error: "unknown_field" });
+      const patchedFaqs = await patchProduct(sql, "mch_a", catalog.id, product.value.id, {
+        faqs: [],
+      });
+      expect(patchedFaqs).toMatchObject({ ok: false, error: "validation_error" });
+      const faqsOnCreate = await createProduct(sql, "mch_a", catalog.id, {
+        title: "问答不能进商品",
+        price: 100,
+        faqs: [],
+      });
+      expect(faqsOnCreate).toMatchObject({ ok: false, error: "validation_error" });
+      const faqsInFields = await createProduct(sql, "mch_a", catalog.id, {
+        title: "问答不能进字段",
+        price: 100,
+        fields: { faqs: "no" },
+      });
+      expect(faqsInFields).toMatchObject({ ok: false, error: "validation_error" });
       const priceInAttrs = await createProduct(sql, "mch_a", catalog.id, {
         title: "价格进属性",
         price: 100,

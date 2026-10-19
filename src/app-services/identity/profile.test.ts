@@ -157,6 +157,12 @@ describe("merchant profile http", () => {
     expect(unknown.status).toBe(400);
     await expect(unknown.json()).resolves.toMatchObject({ code: 40000, data: null });
 
+    const faqsField = await putProfileRoute(
+      authed("PUT", { ...draftBody({ summary: "带问答字段" }), faqs: [] }),
+    );
+    expect(faqsField.status).toBe(400);
+    await expect(faqsField.json()).resolves.toMatchObject({ code: 40000, data: null });
+
     const emptySummary = await putProfileRoute(
       authed("PUT", draftBody({ display_name: "新店名", summary: "", published: true })),
     );

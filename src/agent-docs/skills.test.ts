@@ -403,6 +403,16 @@ describe("skill paths match the route table", () => {
     expect(merchant).toContain("本文档不讲页面上传、激活或回滚");
     expect(merchant).not.toContain("/api/v1/storefront/");
     expect(buyer).not.toContain("/api/v1/storefront/");
+    expect(buyer).not.toContain("/api/v1/merchant/faqs");
+    expect(buyer).not.toContain("/products/{product_id}/faqs");
+    expect(merchant).toContain("全店最多 12 条");
+    expect(merchant).toContain("商品最多 8 条");
+    expect(storefront).toContain('data-merclink="store.faq"');
+    expect(storefront).toContain('data-merclink="product.faq"');
+    expect(storefront).toContain('name="faq.question"');
+    expect(storefront).toContain('name="faq.answer"');
+    expect(storefront).toContain("<h2>常见问题</h2>");
+    expect(storefront).toContain("没有可见条目时去掉整个区域，也不留下这个标题");
     expect(buyer).toContain("只有缝提供显示名时");
     expect(buyer).toContain("含义：");
     expect(buyer).toContain("不要把显示名当成字段键");

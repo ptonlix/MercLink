@@ -92,6 +92,24 @@ export const merchantProfiles = pgTable("merchant_profiles", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const merchantFaqs = pgTable(
+  "merchant_faqs",
+  {
+    id: text("id").primaryKey(),
+    merchantId: text("merchant_id").notNull(),
+    productId: text("product_id"),
+    published: boolean("published").notNull().default(false),
+    items: jsonb("items").$type<readonly { question: string; answer: string }[]>().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("merchant_faqs_store_uidx")
+      .on(table.merchantId)
+      .where(sql`product_id is null`),
+    uniqueIndex("merchant_faqs_product_uidx").on(table.productId),
+  ],
+);
+
 export const merchantProfileImages = pgTable("merchant_profile_images", {
   id: text("id").primaryKey(),
   merchantId: text("merchant_id").notNull(),

@@ -5,6 +5,7 @@ import { validateFields } from "./attributes";
 import { parseCover, parseSku, parseTitle, planCatalog } from "./catalogs";
 import {
   convertFieldValue,
+  isSystemFieldKey,
   parseFieldKey,
   parseLabel,
   parseChoices,
@@ -400,6 +401,20 @@ describe("catalog edge branches", () => {
     expect(parseProductBody(null)).toMatchObject({ ok: false });
     expect(parseProductBody({ title: "鞋", fields: [] })).toMatchObject({ ok: false });
     expect(parseProductBody({ fields: { color: "黑" } })).toMatchObject({ ok: false });
+    expect(parseProductBody({ title: "鞋", faqs: [] })).toMatchObject({
+      ok: false,
+      error: "validation_error",
+    });
+    expect(parseProductBody({ title: "鞋", fields: { faqs: "x" } }).ok).toBe(true);
+    expect(isSystemFieldKey("faqs")).toBe(true);
+    expect(validateFields([], { faqs: "x" })).toMatchObject({
+      ok: false,
+      error: "validation_error",
+    });
+    expect(parseProductPatch({ faqs: [] })).toMatchObject({
+      ok: false,
+      error: "validation_error",
+    });
     expect(parseProductPatch(null)).toMatchObject({ ok: false });
     expect(parseProductPatch({ fields: [] })).toMatchObject({ ok: false });
     expect(parseProductPatch({ title: "新鞋", cover: null }).ok).toBe(true);

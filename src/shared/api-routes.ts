@@ -77,6 +77,19 @@ export const apiRoutes = [
   { method: "GET", path: "/api/v1/merchant/profile", audiences: merchant },
   { method: "PUT", path: "/api/v1/merchant/profile", audiences: merchant },
   { method: "POST", path: "/api/v1/merchant/profile/images", audiences: merchant },
+  // FAQ writes reuse product:write. Do not add a faq scope.
+  { method: "GET", path: "/api/v1/merchant/faqs", audiences: merchant },
+  { method: "PUT", path: "/api/v1/merchant/faqs", audiences: merchant },
+  {
+    method: "GET",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/faqs",
+    audiences: merchant,
+  },
+  {
+    method: "PUT",
+    path: "/api/v1/catalogs/{id}/products/{product_id}/faqs",
+    audiences: merchant,
+  },
   // Public read. Listed so the merchant skill documents the same path.
   { method: "GET", path: "/api/v1/store", audiences: merchant },
   { method: "POST", path: "/api/v1/payments/alipay/notify", audiences: [] },

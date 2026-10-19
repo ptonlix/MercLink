@@ -22,6 +22,9 @@ const storeSlotNames = [
 // Same literal as siteName in src/public-discovery/site.ts. Domain cannot import that module.
 const storeNavFallback = "MercLink";
 
+// Same literal as faqHeading in src/public-discovery/site.ts. Inserted only when a region has items.
+const faqRegionHeading = "常见问题";
+
 const productSlotNames = [
   "product.name",
   "product.description",
@@ -54,6 +57,15 @@ const emptyProductsTemplatePattern =
   /<template\s+data-merclink="products\.empty">([\s\S]*?)<\/template>/g;
 
 const paidTemplatePattern = /<template\s+data-merclink="order\.paid">([\s\S]*?)<\/template>/g;
+
+const storeFaqTemplatePattern = /<template\s+data-merclink="store\.faq">([\s\S]*?)<\/template>/g;
+
+const productFaqTemplatePattern =
+  /<template\s+data-merclink="product\.faq">([\s\S]*?)<\/template>/g;
+
+const faqSlotPattern = /<merclink-slot\s+name="faq\.(?:question|answer)"\s*>/;
+
+const faqSlotName = /<merclink-slot\s+name="([^"]+)"\s*>/g;
 
 const pricePattern =
   /[¥￥]\s*\d|\d+(?:\.\d{1,2})?\s*元|(?:价格|售价|单价|标价)\s*[:：]?\s*\d|price\s*[:=]\s*\d/i;
@@ -93,6 +105,7 @@ export type SlotProduct = {
   availability: string;
   priceMinor: number;
   currency?: string;
+  faqs?: readonly { question: string; answer: string }[];
 };
 
 export type SlotStore = {
@@ -119,6 +132,7 @@ export type SlotContext = {
   orderStatus: string | null;
   nextCursor: string | null;
   origin?: string;
+  storeFaqs?: readonly { question: string; answer: string }[];
 };
 
 export function majorUnitPrice(minor: number): string {
@@ -381,6 +395,10 @@ export function inspectDocument(filePath: string, html: string): StorefrontResul
   ) {
     return storefrontFail("validation_error", "不能写死价格、库存或店铺资料。");
   }
+  const faqSlots = inspectFaqSlots(html);
+  if (!faqSlots.ok) {
+    return faqSlots;
+  }
   return storefrontOk(true);
 }
 
@@ -399,7 +417,17 @@ export function renderDocument(html: string, context: SlotContext): string {
     return products.map((product) => fillProduct(inner, product)).join("");
   });
   const withProduct = context.product === null ? expanded : fillProduct(expanded, context.product);
-  const withStore = withProduct.replace(slotPattern, (match, name: string) => {
+  const withProductFaqs = expandFaqRegion(
+    withProduct,
+    productFaqTemplatePattern,
+    context.product?.faqs ?? [],
+  );
+  const withStoreFaqs = expandFaqRegion(
+    withProductFaqs,
+    storeFaqTemplatePattern,
+    context.storeFaqs ?? [],
+  );
+  const withStore = withStoreFaqs.replace(slotPattern, (match, name: string) => {
     if (name === "site.origin") {
       return escapeHtml(context.origin ?? "");
     }
@@ -435,13 +463,15 @@ export function slotHtml(
 
 function fillProduct(html: string, product: SlotProduct): string {
   const expanded = expandVariantTemplates(expandFieldTemplates(html, product), product);
+  // Skeleton tokens first. Published FAQ text is inserted afterwards and must keep `{id}`.
   const withId = expanded
     .replaceAll("{id}", escapeHtml(product.id))
     .replaceAll("{catalogId}", escapeHtml(product.catalogId ?? ""))
     .replaceAll("{priceMinor}", escapeHtml(String(product.priceMinor)))
     .replaceAll("{availabilityRaw}", escapeHtml(product.availability))
     .replaceAll("{currency}", escapeHtml(product.currency ?? "CNY"));
-  return withId.replace(slotPattern, (match, name: string) => {
+  const withFaqs = expandFaqRegion(withId, productFaqTemplatePattern, product.faqs ?? []);
+  return withFaqs.replace(slotPattern, (match, name: string) => {
     const value = productSlotValue(name, product, html);
     return value ?? match;
   });
@@ -482,6 +512,54 @@ function expandVariantTemplates(html: string, product: SlotProduct): string {
       )
       .join(""),
   );
+}
+
+function expandFaqRegion(
+  html: string,
+  pattern: RegExp,
+  items: readonly { question: string; answer: string }[],
+): string {
+  pattern.lastIndex = 0;
+  if (!pattern.test(html)) {
+    return html;
+  }
+  pattern.lastIndex = 0;
+  return html.replace(pattern, (_match, inner: string) => {
+    if (items.length === 0) {
+      return "";
+    }
+    const body = items
+      .map((item) =>
+        fillNamedSlots(inner, {
+          "faq.question": item.question,
+          "faq.answer": item.answer,
+        }),
+      )
+      .join("");
+    return `<h2>${faqRegionHeading}</h2>${body}`;
+  });
+}
+
+function inspectFaqSlots(html: string): StorefrontResult<true> {
+  let outside = html;
+  for (const pattern of [storeFaqTemplatePattern, productFaqTemplatePattern]) {
+    pattern.lastIndex = 0;
+    for (const match of html.matchAll(pattern)) {
+      const inner = match[1] ?? "";
+      faqSlotName.lastIndex = 0;
+      for (const slot of inner.matchAll(faqSlotName)) {
+        const name = slot[1];
+        if (name !== "faq.question" && name !== "faq.answer") {
+          return storefrontFail("validation_error", "问答区域只能声明问题和答案槽位。");
+        }
+      }
+      outside = outside.replace(match[0], "");
+    }
+  }
+  if (faqSlotPattern.test(outside)) {
+    return storefrontFail("validation_error", "问答槽位必须放在问答重复区域里。");
+  }
+  return storefrontOk(true);
 }
 
 function fillNamedSlots(html: string, values: Readonly<Record<string, string>>): string {

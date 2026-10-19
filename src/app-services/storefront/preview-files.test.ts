@@ -311,6 +311,138 @@ describe("storefront preview files", () => {
     expect(preview).not.toContain("MercLink");
   });
 
+  it("expands faq regions the same way as the server renderer", async () => {
+    const answer = "查看 /products/{id}";
+    const context: SlotContext = {
+      store: null,
+      products: [],
+      product: {
+        id: "prd_real",
+        catalogId: "cat_real",
+        name: "吊坠",
+        cover: null,
+        fields: {},
+        variants: [],
+        stock: 1,
+        availability: "in_stock",
+        priceMinor: 100,
+        currency: "CNY",
+        faqs: [{ question: "在哪看", answer }],
+      },
+      orderStatus: null,
+      nextCursor: null,
+      storeFaqs: [],
+    };
+    const html =
+      '<a href="/products/{id}">商品</a><template data-merclink="product.faq"><p><merclink-slot name="faq.answer"></merclink-slot></p></template>';
+    const preview = await renderedPreview(html, context);
+    expect(preview).toBe(renderDocument(html, context));
+    expect(preview).toContain(answer);
+    expect(preview.match(/<h2>常见问题<\/h2>/g)).toEqual(["<h2>常见问题</h2>"]);
+
+    const storeHtml = `<template data-merclink="store.faq"><p><merclink-slot name="faq.question"></merclink-slot></p><p><merclink-slot name="faq.answer"></merclink-slot></p></template>`;
+    const storeContext: SlotContext = {
+      ...context,
+      product: null,
+      storeFaqs: [
+        { question: "区域问题", answer: "区域答案" },
+        { question: "第二条", answer: "第二个答案" },
+      ],
+    };
+    const storePreview = await renderedPreview(storeHtml, storeContext);
+    expect(storePreview).toBe(renderDocument(storeHtml, storeContext));
+    expect(storePreview.match(/<h2>常见问题<\/h2>/g)).toEqual(["<h2>常见问题</h2>"]);
+    const emptied = await renderedPreview(storeHtml, { ...storeContext, storeFaqs: [] });
+    expect(emptied).toBe("");
+    expect(emptied).not.toContain("常见问题");
+  });
+
+  it("fills published faqs in preview without a published profile", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "merclink-preview-"));
+    roots.push(root);
+    await mkdir(path.join(root, "products"));
+    await writeFile(
+      path.join(root, "index.html"),
+      '<h1><merclink-slot name="store.display_name"></merclink-slot></h1><template data-merclink="store.faq"><h3><merclink-slot name="faq.question"></merclink-slot></h3><p><merclink-slot name="faq.answer"></merclink-slot></p></template>',
+    );
+    await writeFile(
+      path.join(root, "products", "index.html"),
+      '<template data-merclink="product"><a href="/products/{id}"><merclink-slot name="product.name"></merclink-slot></a></template>',
+    );
+    await writeFile(
+      path.join(root, "products", "item.html"),
+      '<a href="/products/{id}">链接</a><template data-merclink="product.faq"><p><merclink-slot name="faq.question"></merclink-slot></p><p><merclink-slot name="faq.answer"></merclink-slot></p></template><template data-merclink="store.faq"><p><merclink-slot name="faq.question"></merclink-slot></p></template>',
+    );
+    const origin = await listenJson({
+      "/api/v1/store": {
+        code: 200,
+        message: "ok",
+        data: { faqs: [{ question: "只公开问答", answer: "没有介绍" }] },
+      },
+      "/api/v1/products": {
+        code: 200,
+        message: "ok",
+        data: {
+          items: [
+            {
+              id: "prd_1",
+              title: "吊坠",
+              cover: null,
+              offer: { price: 168000, currency: "CNY", availability: "in_stock" },
+              fields: {},
+              variants: [],
+            },
+          ],
+          next_cursor: null,
+        },
+      },
+      "/api/v1/products/prd_1": {
+        code: 200,
+        message: "ok",
+        data: {
+          id: "prd_1",
+          title: "吊坠",
+          cover: null,
+          offer: { price: 168000, currency: "CNY", availability: "in_stock" },
+          fields: {},
+          variants: [],
+          faqs: [{ question: "商品问", answer: "查看 /products/{id}" }],
+        },
+      },
+    });
+    const port = await freePort();
+    const child = spawn(process.execPath, [previewScript, root], {
+      env: {
+        ...process.env,
+        PORT: String(port),
+        STOREFRONT_ORIGIN: `http://127.0.0.1:${origin.port}`,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    children.push(child);
+    await waitForOk(port);
+    const home = await textResponse(port, "/");
+    expect(home.status).toBe(200);
+    expect(home.body).toContain("只公开问答");
+    expect(home.body).toContain("没有介绍");
+    expect(home.body.match(/<h2>常见问题<\/h2>/g)).toEqual(["<h2>常见问题</h2>"]);
+    expect(home.body).not.toContain("商品问");
+    const list = await textResponse(port, "/products");
+    expect(list.body).toContain("吊坠");
+    expect(list.body).toContain("/products/prd_1");
+    expect(list.body).not.toContain("只公开问答");
+    expect(list.body).not.toContain("商品问");
+    expect(list.body).not.toContain("常见问题");
+    const item = await textResponse(port, "/products/prd_1");
+    expect(item.body).toContain("商品问");
+    expect(item.body).toContain("查看 /products/{id}");
+    expect(item.body).toContain('href="/products/prd_1"');
+    expect(item.body).not.toContain("查看 /products/prd_1");
+    expect(item.body).not.toContain("只公开问答");
+    expect(item.body.match(/<h2>常见问题<\/h2>/g)).toEqual(["<h2>常见问题</h2>"]);
+    origin.close();
+  });
+
   it("copies only string axis labels from preview product json", async () => {
     const { stdout } = await execFileAsync(
       process.execPath,
@@ -333,6 +465,39 @@ process.stdout.write(JSON.stringify(samples.map((sample) => mapPreviewProduct(sa
     expect(products[1]?.axisLabels).toEqual({ size: "尺码", ok: "" });
     expect(products[2]?.axisLabels).toEqual({ size: "尺码" });
     expect(products[3]?.axisLabels).toBeUndefined();
+  });
+
+  it("keeps preview faq text and drops a profile that has no display name", async () => {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `import { mapPreviewProduct, mapPreviewStore } from './storefront/preview.mjs';
+const product = mapPreviewProduct({
+  id: "prd_real",
+  title: "靴",
+  variants: [],
+  offer: {},
+  faqs: [{ question: "问", answer: "查看 /products/{id}" }, { question: 1, answer: "跳过" }],
+});
+const bare = mapPreviewProduct({ id: "1", title: "靴", variants: [], offer: {} });
+process.stdout.write(JSON.stringify({
+  product,
+  bareFaqs: Object.hasOwn(bare, "faqs"),
+  store: mapPreviewStore({ faqs: [{ question: "问", answer: "答" }] }),
+}));`,
+      ],
+      { cwd: process.cwd() },
+    );
+    const parsed = JSON.parse(stdout) as {
+      product: { faqs?: { question: string; answer: string }[] };
+      bareFaqs: boolean;
+      store: unknown;
+    };
+    expect(parsed.product.faqs).toEqual([{ question: "问", answer: "查看 /products/{id}" }]);
+    expect(parsed.bareFaqs).toBe(false);
+    expect(parsed.store).toBeNull();
   });
 });
 

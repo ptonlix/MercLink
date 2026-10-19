@@ -132,7 +132,21 @@ GET /api/v1/manage/orders
 
 不要把登录手机号、密码、短信验证码、API Key 或身份证号提交为公开资料。不要把登录手机号写进 `website_url`、`summary`、`phone`、`label` 或其他字段。
 
-公开读取是 `GET /api/v1/store`，不需要令牌。未发布、已撤回或商家停用时，它返回 `not_found`，不回显草稿。
+公开读取是 `GET /api/v1/store`，不需要令牌。介绍已发布时，原有字段都在，并附加 `faqs`。介绍未发布但全店问答已公开且非空时，`200` 的 `data` 只有 `faqs`。两者都不可见，或商家停用、删除时，它返回 `not_found`，不回显草稿。不要把 `200` 理解成介绍一定已发布。
+
+## 常见问题
+
+问答和店铺介绍、商品、目录字段都分开保存。`faqs` 不是介绍字段，也不是商品字段，更不是目录字段。介绍 `PUT`、商品创建和商品 `PATCH` 如果带上 `faqs`，会得到 `validation_error`，并且不会把问答写进 `fields`。保存介绍、上架或下架商品都不会改问答行。
+
+全店一份用 `GET /api/v1/merchant/faqs` 和 `PUT /api/v1/merchant/faqs`。某一个商品用 `GET /api/v1/catalogs/{id}/products/{product_id}/faqs` 和 `PUT /api/v1/catalogs/{id}/products/{product_id}/faqs`。读取不需要额外权限名。写入要商家令牌，并且要有 `product:write`。正文必须是 `application/json`。
+
+还没保存时，`GET` 返回 `published` 为 `false`、`items` 为 `[]`、`updated_at` 为 `null`，不是 404。`PUT` 整份替换。全店最多 12 条，商品最多 8 条。问题和答案必须是单行纯文本，不能换行，不能包含 HTML 或 Markdown。去掉首尾空白后，问题 1 到 80 个字符，答案 1 到 400 个字符。同一份问答里的问题不能重复。`published` 为 `true` 时 `items` 不能是空数组。`published` 为 `false` 且 `items` 为空会清空，公开页不再显示。只有 `published` 为 `true` 且有条目时，落地页或商品页才会显示。
+
+只保存商家明确给出的句子。不要编造问答，不要提交登录手机号、密码、短信验证码或 API Key。下面只是请求形状，不是任何商家已保存的问答。
+
+```json
+{ "published": false, "items": [{ "question": "问题", "answer": "答案" }] }
+```
 
 ## 目录
 
@@ -216,7 +230,13 @@ key 以小写英文字母开头，后面只能是小写英文、数字和下划�
 `POST /api/v1/catalogs/{id}/products`
 
 ```json
-{ "title": "示例商品", "description": "示例描述", "price": 159900, "stock": 10, "fields": { "weight_g": 480 } }
+{
+  "title": "示例商品",
+  "description": "示例描述",
+  "price": 159900,
+  "stock": 10,
+  "fields": { "weight_g": 480 }
+}
 ```
 
 这只是请求形状，不是任何商家的商品数据。商品 ID 在 `data.id`，默认可售规格 ID 在 `data.variants[].id`。之后不要再给这个商品声明规格轴，除非先把这条无轴规格改成不可售。

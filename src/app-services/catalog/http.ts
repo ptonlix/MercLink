@@ -162,7 +162,7 @@ export async function getProducts(request: Request): Promise<Response> {
 export async function getProduct(id: string, request?: Request): Promise<Response> {
   const sql = ensureCatalogRegistered();
   const product = await getPublicProduct(sql, id);
-  return jsonResult(product, publicProductJson, 200, request);
+  return jsonResult(product, publicProductDetailJson, 200, request);
 }
 
 export async function getCatalogs(request: Request): Promise<Response> {
@@ -566,6 +566,20 @@ function productJson(product: ProductRecord) {
     variants: product.variants
       .filter((variant) => product.deletedAt !== null || !variant.deleted)
       .map(variantJson),
+  };
+}
+
+function publicProductDetailJson(
+  product: Parameters<typeof publicProductJson>[0] & {
+    faqs?: readonly { question: string; answer: string }[];
+  },
+) {
+  return {
+    ...publicProductJson(product),
+    faqs: (product.faqs ?? []).map((item) => ({
+      question: item.question,
+      answer: item.answer,
+    })),
   };
 }
 
