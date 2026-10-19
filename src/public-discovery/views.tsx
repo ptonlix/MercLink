@@ -245,11 +245,7 @@ function ProductFaq({ facts }: { facts: Facts }): ReactNode {
   return <FaqList items={facts.product?.faqs ?? []} />;
 }
 
-function FaqList({
-  items,
-}: {
-  items: readonly { question: string; answer: string }[];
-}): ReactNode {
+function FaqList({ items }: { items: readonly { question: string; answer: string }[] }): ReactNode {
   if (items.length === 0) {
     return null;
   }

@@ -55,9 +55,9 @@ describe("public faq pages", () => {
     expect(visible.indexOf(`<h2>${faqHeading}</h2>`)).toBeLessThan(visible.indexOf(storeQuestion));
     expect(visible).toContain(`<h3>${storeQuestion}</h3>`);
     expect(visible).toContain('class="faq"');
-    expect(visible.match(/<details\b[^>]*>/g)?.filter((tag) => tag.includes("open")) ?? []).toHaveLength(
-      0,
-    );
+    expect(
+      visible.match(/<details\b[^>]*>/g)?.filter((tag) => tag.includes("open")) ?? [],
+    ).toHaveLength(0);
     expect(visible).toContain('name="faq"');
     expect(html).toContain("全店答案 &lt;script&gt;");
     expect(html).not.toContain("<script>全店");
@@ -291,8 +291,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// Cut script blocks out by tag position. A stripping regexp is flagged as an HTML sanitizer.
 function visibleHtml(html: string): string {
-  return html.replace(/<script[\s\S]*?<\/script>/gi, "");
+  const parts: string[] = [];
+  const lower = html.toLowerCase();
+  let cursor = 0;
+  while (cursor < html.length) {
+    const start = lower.indexOf("<script", cursor);
+    if (start < 0) {
+      parts.push(html.slice(cursor));
+      break;
+    }
+    parts.push(html.slice(cursor, start));
+    const endTag = lower.indexOf("</script", start + "<script".length);
+    const close = endTag < 0 ? -1 : html.indexOf(">", endTag);
+    if (close < 0) {
+      parts.push(html.slice(start));
+      break;
+    }
+    cursor = close + 1;
+  }
+  return parts.join("");
 }
 
 function jsonLdBlocks(html: string): unknown[] {
