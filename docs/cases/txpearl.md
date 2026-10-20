@@ -96,7 +96,7 @@
 
 1. `GET /api/v1/storefront/source` 下载起始源码包（需要 `storefront:write`），解压得到 `README.md`、`accept.mjs`、`preview.mjs`、`render-slots.mjs` 和 `static/`。保留一份原样副本作对照。
 2. **只改四个正文文件**：`static/index.html`、`static/products/index.html`、`static/products/item.html`、`static/styles.css`。授权页和支付结果页保持内置。
-3. 保留原有 class 和 `/styles.css` 链接；所有会变的事实（店名、简介、地址、客服、执照、商品名 / 封面 / 价格 / 库存）都用 `<merclink-slot name="...">`；商品列表保留 `<template data-merclink="product">` 和 `products.next`；**不写 JSON-LD**（由服务端注入）。
+3. 保留原有 class 和 `/styles.css` 链接；所有会变的事实（店名、简介、地址、客服、执照、商品名 / 封面 / 价格 / 库存）都用 `<merclink-slot name="...">`。商品页要显示描述时，在 `static/products/item.html` 声明可选槽 `<merclink-slot name="product.description"></merclink-slot>`；不声明则正文不出现描述，发布仍然有效。商品列表保留 `<template data-merclink="product">` 和 `products.next`；**不写 JSON-LD**（由服务端注入）。
 4. 新设计：深海蓝 + 金色的「BEIHAI · PEARL ATELIER」首屏，标语和「浏览全部珍珠」按钮，四张卖点卡片，下面是商品集合、客服和营业执照区。营业执照用 `<details>` / `<summary>` 做了无 JS 的点击放大。
 5. 用 `node preview.mjs` 本地预览（代理到线上源站，按激活后同样的规则填槽位），把改版前后的电脑 / 手机截图发给店主确认。
 6. 生成一套 favicon（SVG、PNG、ICO、apple-touch-icon），放在 `static/assets/`。

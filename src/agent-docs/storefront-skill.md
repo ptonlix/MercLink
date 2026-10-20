@@ -86,6 +86,7 @@ Local preview fills fact slots from the source deployment before activation. It 
 - `<merclink-slot name="product.stock"></merclink-slot>`
 - `<merclink-slot name="product.availability"></merclink-slot>`
 - `<merclink-slot name="product.price"></merclink-slot>`
+- `<merclink-slot name="product.description"></merclink-slot>`
 - `<merclink-slot name="order.status"></merclink-slot>`
 - `<merclink-slot name="products.next"></merclink-slot>`
 
@@ -96,13 +97,15 @@ Local preview fills fact slots from the source deployment before activation. It 
 
 这两个槽位如果出现在区域外面，模板不能发布。区域里面也不能再放别的槽位。服务端用已公开的问答填槽。有一条或多条可见条目时，服务端在该区域的条目前插入恰好一个 `<h2>常见问题</h2>`，不是每条一个。没有可见条目时去掉整个区域，也不留下这个标题。模板里不要写死这个标题，也不要写死当时的问题和答案。没有声明对应区域的模板仍然有效，不会多出标题或问答。已经发布、而且没有对应区域的店面保持原样，不会被改写成带问答。
 
+`product.description` 可以不声明。没有这个槽位的发布仍可激活，服务端也不改写已发布模板，不会自动补上描述。声明在商品页时，服务端填入当前商品自己的纯文本描述，内部换行予以保留，空描述时槽位为空。不要把某一件商品当时的描述写进 HTML，也不要另起槽位名。首页和商品列表不必声明它。它不是商品页或商品列表的必填槽。
+
 `store.nav_name` 是导航上的店名，没有已发布店名时是 MercLink，不要拿它当页面主标题。
 
 商品列表放在 `<template data-merclink="product">` 里，链接使用 `/products/{id}`。商品页是 `products/item.html`。商品列表必须声明 `products.next`。还有下一页时，服务端把该槽位渲染成指向 `/products?cursor=` 的链接；没有下一页时槽位为空。不要把后续页一次写进同一份页面。
 
 支付成功文案只能放在 `<template data-merclink="order.paid">` 里，并且页面必须有订单状态槽位。服务端只有读到状态 `paid` 才放入这段文案。
 
-店铺槽位来自已发布的店铺资料：展示名、简介、标识、网站、区域、地址，以及可选的客服电话、客服说明、客服二维码、企业名称、统一社会信用代码、法人姓名、注册地址和执照图片。`store.contact_phone`、`store.contact_label`、`store.contact_qr`、`store.license_name`、`store.license_credit_code`、`store.license_legal_person`、`store.license_address`、`store.license_image` 可以不声明；没有这些槽位的发布仍可激活。没有对应事实时槽位为空。一旦页面在这些标签后写出可见的具体值，却没有对应槽位，就不能发布。商品槽位来自当前已上架商品：名称、封面、公开字段、规格值、库存、可售状态、主币单位价格。商品列表和 `/products/{id}` 必须使用这些商品槽位。`order_id` 不是公开查询。只有与 `GET /api/v1/orders/{id}` 相同的买家 Authorization，且订单属于该买家时，服务端才填 `order.status`。匿名、其他买家或没有 `order:read` 时槽位为空，也不展开支付成功文案。不得把支付成功建立在回跳上。只有槽位值为 `paid` 时，页面才能显示支付成功。
+店铺槽位来自已发布的店铺资料：展示名、简介、标识、网站、区域、地址，以及可选的客服电话、客服说明、客服二维码、企业名称、统一社会信用代码、法人姓名、注册地址和执照图片。`store.contact_phone`、`store.contact_label`、`store.contact_qr`、`store.license_name`、`store.license_credit_code`、`store.license_legal_person`、`store.license_address`、`store.license_image` 可以不声明；没有这些槽位的发布仍可激活。没有对应事实时槽位为空。一旦页面在这些标签后写出可见的具体值，却没有对应槽位，就不能发布。商品槽位来自当前已上架商品：名称、封面、公开字段、规格值、库存、可售状态、主币单位价格。商品列表和 `/products/{id}` 必须使用这些商品槽位。`product.description` 不在这些必填槽位里。`order_id` 不是公开查询。只有与 `GET /api/v1/orders/{id}` 相同的买家 Authorization，且订单属于该买家时，服务端才填 `order.status`。匿名、其他买家或没有 `order:read` 时槽位为空，也不展开支付成功文案。不得把支付成功建立在回跳上。只有槽位值为 `paid` 时，页面才能显示支付成功。
 
 没有这些事实的营销页可以是静态版式。一旦展示上述任一事实，就必须用对应槽位。写死价格、库存、店铺资料或「支付成功」，该页面不得发布。
 
@@ -143,7 +146,8 @@ Local preview fills fact slots from the source deployment before activation. It 
 
 ## 常见错误用法
 
-- 把商品价格、库存或店名直接写进 HTML，指望以后手动再改。
+- 把商品价格、库存、店名或某一件商品的描述直接写进 HTML，指望以后手动再改。
+- 自创一个描述槽位名，或以为没写在旧版 Skill 里的 `product.description` 不能发布。
 - 不下载起始源码，按接口 JSON 重写首页和商品页。
 - 换掉 `styles.css`，使 `.cover` 和 `.placeholder` 失效。
 - 给 `product.cover` 再包一层封面，或把图片地址写进文件。
