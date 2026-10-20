@@ -324,6 +324,11 @@ describe("storefront skill", () => {
     expect(body).toContain("会随后端变化的事实必须用槽位");
     expect(body).toContain("store.license_credit_code");
     expect(body).toContain("store.contact_qr");
+    expect(body).toContain('name="product.description"');
+    expect(body).toContain("没有这个槽位的发布仍可激活");
+    expect(body).toContain("不会自动补上描述");
+    expect(body).toContain("不要把某一件商品当时的描述写进 HTML");
+    expect(body).toContain("它不是商品页或商品列表的必填槽");
     expect(body).toContain("可以不声明");
     expect(body).toContain("没有对应槽位，就不能发布");
     expect(body).not.toContain("91310000MA1FL0000N");
